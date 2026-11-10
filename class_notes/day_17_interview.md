@@ -111,3 +111,50 @@ The test passes when the expected exception is raised.
 - Test business behavior, not implementation details only.
 - Keep integration tests separate from isolated unit tests.
 - A test suite is executable documentation of expected behavior.
+
+
+---
+
+## 7. Follow-up interview questions
+
+16. What is a unit test? A test of a small component in isolation.
+17. What is an integration test? A test that verifies connected components work together.
+18. What is an end-to-end test? A test of a complete workflow across its major boundaries.
+19. What is an assertion? A check that actual behavior matches an expected condition.
+20. Why use unittest? It is included with Python and supports test cases, assertions and discovery.
+21. Why should test methods start with test_? It follows unittest discovery conventions.
+22. What is a regression test? A test that helps ensure previously working behavior remains correct after a change.
+23. What is a boundary test? A test at an edge of the valid input range.
+24. Why test empty input? Empty data is a common pipeline condition and may expose assumptions.
+25. Should unit tests call a live API? Usually not; isolate the unit and mock external dependencies where appropriate.
+26. What does a failing assertion tell you? Actual output did not match the expected behavior.
+27. Why should expected values be independently reasoned? Otherwise the test may simply repeat the same defect as the implementation.
+28. What is test discovery? The framework's process for locating and running test modules and methods.
+29. What should be tested after a transformation change? Normal cases, boundary cases, invalid cases and downstream integration behavior as relevant.
+30. Do passing tests guarantee a bug-free pipeline? No. They provide evidence for tested conditions, not proof for every possible input or environment.
+
+## 8. Scenario questions
+
+A unit test passes but the database load fails. Add integration coverage for the database boundary and inspect credentials, schema and transaction behavior.
+
+A test passes only on one developer's machine. Check environment dependencies, paths, test data and hidden state; make the test reproducible.
+
+A business rule changes. Update the expected behavior and add tests that prevent the old rule from returning unnoticed.
+
+## 9. Mini-project defense
+
+- Which behaviors did you test?
+- Which edge cases did you include?
+- How did you run the suite?
+- What did a deliberate failing test teach you?
+- Which parts would require integration tests?
+
+## 10. Readiness rubric
+
+| Skill | Ready when the student can… |
+|---|---|
+| Unit test | Write and run a unittest case |
+| Assertions | Compare expected and actual results |
+| Coverage thinking | Include normal, boundary and invalid inputs |
+| Test layers | Distinguish unit, integration and end-to-end |
+| Debugging | Interpret a failing test and correct the cause |
