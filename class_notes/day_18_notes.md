@@ -549,3 +549,99 @@ The history should show the initial project commit and the feature commit.
 - GitHub hosts repositories and adds collaboration features; Git itself is the version control tool.
 
 **Day 18 checkpoint:** You should be able to create a repository, stage and commit changes, work on a feature branch, merge it, resolve a basic conflict and protect local secrets and generated files.
+
+
+---
+
+# Beginner Teaching Extension — Day 18
+
+## A. Understand version control
+
+Git records changes to project files over time. It helps a team review what changed, restore earlier versions and work on features separately. Git is the version-control tool; GitHub hosts repositories and provides collaboration features.
+
+## B. Configure Git once on a computer
+
+```bash
+git --version
+git config --global user.name "Student Name"
+git config --global user.email "student@example.com"
+```
+
+The name and email identify commits. Use an email address you are comfortable associating with your Git commits. The version output depends on the installed Git release.
+
+## C. Create a repository
+
+```bash
+mkdir order_pipeline
+cd order_pipeline
+git init
+```
+
+Expected terminal message indicates an empty Git repository was initialized. Git creates a hidden .git directory containing repository metadata and history.
+
+## D. Understand the three important areas
+
+- Working directory: files you are editing.
+- Staging area: selected changes prepared for the next commit.
+- Repository history: committed snapshots.
+
+Check status:
+
+```bash
+git status
+```
+
+Create README.md, then stage and commit:
+
+```bash
+echo # Order Pipeline > README.md
+git add README.md
+git status
+git commit -m "Add project README"
+```
+
+The status command shows staged and unstaged changes. A commit records the staged snapshot with a message. In Windows CMD, if shell quoting for the echo command differs, create the README in an editor instead.
+
+## E. Inspect history and differences
+
+```bash
+git log --oneline
+git diff
+```
+
+log shows commit history. diff shows unstaged changes relative to the index. Use git diff --staged to inspect changes already staged.
+
+## F. Create and switch to a branch
+
+```bash
+git switch -c feature/add-validation
+```
+
+A branch is a movable reference to a line of development. Make a change, stage and commit it, then return to the main branch and merge the feature branch:
+
+```bash
+git switch main
+git merge feature/add-validation
+```
+
+Some new repositories use master instead of main; use the branch name that actually exists in your repository.
+
+## G. Understand a merge conflict
+
+A conflict occurs when Git cannot automatically combine overlapping edits. Git marks the conflicted file. Open it, decide the correct combined content, remove conflict markers, save, then stage and complete the merge commit. Do not blindly choose one side without understanding the intended change.
+
+## H. Protect secrets and generated files
+
+Create .gitignore for items such as .venv/, __pycache__/, *.pyc and local .env files. Never commit passwords, API keys or database credentials. If a secret is committed, removing it in a later commit does not make the exposed secret safe; rotate it and follow the repository's secret-removal process.
+
+## I. Connect to GitHub
+
+A remote is a named reference to a hosted repository. After creating an empty GitHub repository, add its URL and push the branch using the commands shown by GitHub. Authentication may use a browser sign-in, credential manager or SSH key; do not paste access tokens into code or chat.
+
+## J. Mini-project: Version-Controlled ETL Project
+
+Create a small project with README.md, a Python transformation file, a sample input file and .gitignore. Initialize Git, commit the initial version, create a feature branch, add a validation improvement, commit it, merge it back, and inspect the final log. Confirm that local secrets and virtual-environment folders are not tracked.
+
+## K. Readiness check
+
+The student can explain working tree, staging, commit, branch, merge, remote, .gitignore and secret rotation. They can show the repository history and describe the changes made on a feature branch.
