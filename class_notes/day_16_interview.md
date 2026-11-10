@@ -126,3 +126,51 @@
 - Use the correct business key for duplicate checks.
 - Reconcile input, accepted and rejected counts.
 - Treat schema changes as controlled engineering changes.
+
+
+---
+
+## 7. Follow-up interview questions
+
+16. What is data validation? Checking whether data meets structural and business expectations.
+17. Parsing versus schema validation? Parsing checks whether representation can be read; schema validation checks fields and types.
+18. What is a business-rule validation? A check that a value is acceptable under business meaning, such as positive quantity.
+19. What is a required field? A field that must be present and valid for a record to be accepted.
+20. Why distinguish null, empty string and zero? They represent different states and can have different business meanings.
+21. What is a duplicate key? A repeated identifier that should uniquely identify a record under the agreed data model.
+22. Why preserve rejected rows? For correction, audit, replay and source-owner feedback.
+23. What is schema drift? An unexpected change in the structure or types of incoming data.
+24. What is a data contract? An agreement about data structure, meaning, quality expectations and change behavior between producers and consumers.
+25. Should unknown columns always be rejected? Not necessarily; policy depends on whether additional fields are permitted and whether they affect downstream processing.
+26. How validate a date field? Parse using the agreed format, reject invalid values and verify any business date constraints.
+27. How measure validation quality? Track input, accepted and rejected counts and reason categories; ensure the counts reconcile.
+28. What is a quality threshold? A defined limit, such as maximum rejection percentage, that determines whether processing can proceed.
+29. Why not replace all invalid amounts with zero? It hides source errors and can distort financial totals.
+30. Where should validation happen? At ingestion boundaries and again where downstream transformations introduce new constraints.
+
+## 8. Scenario questions
+
+A source adds an optional column. Check the contract and ensure consumers tolerate additive changes where intended.
+
+A required identifier disappears. Fail or quarantine according to the contract because records cannot be reliably keyed.
+
+The rejected percentage rises sharply. Stop or alert based on the quality threshold and investigate the source change before publishing output.
+
+## 9. Mini-project defense
+
+- What fields were mandatory?
+- Which type conversions could fail?
+- Which business rules were applied?
+- How were duplicates detected?
+- How do accepted and rejected counts reconcile?
+
+## 10. Readiness rubric
+
+| Skill | Ready when the student can… |
+|---|---|
+| Parsing | Detect values that cannot be converted |
+| Schema | Check required fields and types |
+| Business rules | Validate allowed values and ranges |
+| Duplicates | Detect repeated business keys |
+| Rejections | Preserve reasons and source context |
+| Contracts | Explain schema drift and quality thresholds |
