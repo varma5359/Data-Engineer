@@ -4,53 +4,125 @@
 
 ## 1. Core questions
 
-1. **What is data validation?** Checking whether data meets defined structural, technical and business expectations.
-2. **Schema validation vs business validation?** Schema checks fields/types/shape; business validation checks rules such as positive quantity or valid status.
-3. **What is a data contract?** An agreement describing a dataset's schema, meaning, quality, ownership and change expectations.
-4. **Why quarantine rejected records?** To preserve evidence, support correction and prevent invalid data from silently entering curated tables.
-5. **What is schema evolution?** Controlled change to a dataset's structure over time.
+1. **What is data validation?**  
+   Checking whether data meets defined structural, technical and business expectations before it is used downstream.
+
+2. **Parsing vs schema validation vs business validation?**  
+   Parsing reads the representation; schema validation checks fields and types; business validation checks rules such as positive quantity or approved status.
+
+3. **What is a data contract?**  
+   An agreement describing a dataset's schema, field meaning, quality expectations, ownership and change policy.
+
+4. **Why validate before loading?**  
+   Incorrect data can contaminate reports, models and downstream systems even when the pipeline code runs successfully.
+
+5. **What is a required field?**  
+   A field that must be present and contain an acceptable value according to the contract.
+
+6. **What is referential integrity?**  
+   A rule ensuring a reference such as customer_id points to an existing customer record.
+
+7. **What is schema evolution?**  
+   A controlled change to a dataset's structure over time, such as adding, removing or changing a field.
+
+8. **Why keep rejected records?**  
+   They provide evidence for investigation, correction and replay instead of hiding data loss.
 
 ## 2. Difference-based questions
 
 | Compare | Answer |
 |---|---|
-| Null vs zero | Missing value vs numeric zero |
-| Duplicate row vs duplicate key | Identical row vs repeated business identifier |
-| Warning vs critical validation | Observable issue vs condition that blocks safe processing |
-| Backward-compatible vs breaking change | Existing consumers continue vs consumer changes required |
-| Technical vs business rule | Format/type constraint vs domain meaning |
+| Schema vs business validation | Structure/type checks vs domain rules |
+| Missing vs invalid value | Absent/blank vs present but unacceptable |
+| Null vs zero | Unknown/absent value vs numeric zero |
+| Reject vs quarantine | Refuse a record vs isolate it for investigation |
+| Hard vs soft failure | Stop the batch vs continue under an approved policy |
+| Accuracy vs validity | Reflects reality vs conforms to defined rules |
 
 ## 3. Practical questions
 
-6. **How do you validate uniqueness?** Define the table grain and business key, then check duplicates at that key.
-7. **How do you handle invalid rows?** Preserve them with reason codes, apply approved thresholds and alert the owner.
-8. **How do you validate timestamps?** Parse against an explicit format and timezone convention.
-9. **What should happen when a required field disappears?** Treat it as a contract-breaking change and stop or quarantine the batch according to policy.
+9. **How do you check required fields in a dictionary?**  
+   Iterate over the required field list and check whether each key is absent, None or blank.
+
+10. **How do you convert a raw amount safely?**  
+    Check missing input, convert from the original string using Decimal for financial values and capture conversion errors.
+
+11. **How do you validate an allowed status?**  
+    Compare the value against an approved set of statuses.
+
+12. **How do you detect duplicate IDs?**  
+    Maintain a set of previously accepted business keys and reject or resolve repeats according to policy.
+
+13. **Why store rejection reasons?**  
+    They explain exactly why a row failed and allow data owners to correct the source.
+
+14. **How do you reconcile input counts?**  
+    Confirm total input rows equal accepted plus rejected rows, accounting for any explicitly documented exclusions.
 
 ## 4. Scenario questions
 
-### Scenario A: Source adds a new optional field
-Review compatibility, update documentation and tests, and ensure downstream consumers tolerate it.
+### Scenario 1: Amount is "unknown"
 
-### Scenario B: Amount values become strings
-Check source contract, parse safely, quarantine invalid values and coordinate with producer owner.
+**Problem:** The amount field cannot be converted to a decimal.
 
-### Scenario C: Duplicate keys found
-Check source behavior, update timestamps and table grain. Define whether to deduplicate, retain history or reject the batch.
+**Strong answer:** Reject or quarantine the row with a clear conversion reason. Do not replace the value with zero unless the business contract explicitly defines that behavior.
 
-## 5. Troubleshooting
-- False duplicate alerts: key may not represent the correct grain.
-- Many rejected rows: inspect producer release and schema drift.
-- Date parsing failures: confirm format, locale and timezone.
-- Null explosion: compare source version and upstream completeness.
+### Scenario 2: Quantity is negative
 
-## 6. Follow-up questions
-- What is referential integrity?
-- What is a schema registry?
-- What is drift detection?
-- What is a quarantine table?
+**Problem:** A record has quantity -3.
+
+**Strong answer:** Apply the documented range rule. If returns are represented as negative quantities in this system, the contract must define that exception; otherwise reject it.
+
+### Scenario 3: A required field disappears
+
+**Problem:** The upstream producer removes customer_id.
+
+**Strong answer:** Treat it as a schema-breaking change, stop or quarantine according to severity, notify the producer and assess downstream impact.
+
+### Scenario 4: Duplicate business key
+
+**Problem:** Two records have the same order_id.
+
+**Strong answer:** Check whether the source sent a duplicate or whether order_id is not the correct grain. Use an approved version/timestamp rule; do not silently discard one.
+
+### Scenario 5: Rejection rate suddenly increases
+
+**Problem:** Yesterday 1% of records failed; today 40% fail.
+
+**Strong answer:** Compare rejection reasons, source version and batch metadata. Alert the owner and investigate a source schema or upstream quality change before publishing misleading data.
+
+## 5. Troubleshooting questions
+
+15. **Why can int conversion fail?**  
+    The value may be blank, contain non-numeric text or contain a decimal representation that is not an integer.
+
+16. **Why should validation order matter?**  
+    Required-field checks should happen before conversion; range checks should happen after successful conversion.
+
+17. **Can a record have multiple validation errors?**  
+    Yes. Collect independent errors so the source owner can correct the row efficiently.
+
+18. **What should happen to accepted and rejected rows?**  
+    Accepted rows continue to the approved next stage; rejected rows are retained with reasons and traceable source metadata.
+
+## 6. Mini-project explanation
+
+"I built a validation engine for incoming order records. It checked required fields, converted numeric values, enforced positive IDs and quantity, checked non-negative amount and allowed statuses, and detected duplicate order IDs. It separated accepted records from rejected records with reasons and reconciled the counts."
+
+## 7. Follow-up questions
+
+- Would you fail the entire batch if one row is invalid?
 - How do you version a data contract?
-- How do you measure completeness?
+- How do you validate foreign keys across two datasets?
+- How would you alert on a sudden quality drop?
+- How do you prevent rejected records from being loaded later by mistake?
+- How do you make validation deterministic and testable?
 
-## 7. Mini-project defence
-Present the contract, validation categories, severity rules and rejection report. Explain how a downstream consumer is protected when a producer changes its schema.
+## 8. Quick revision
+
+- Validate structure, types and business meaning separately.
+- Convert raw values safely.
+- Keep rejected records with reasons.
+- Use the correct business key for duplicate checks.
+- Reconcile input, accepted and rejected counts.
+- Treat schema changes as controlled engineering changes.

@@ -4,152 +4,70 @@
 
 ## 1. Core questions
 
-1. **Why is file handling important in data engineering?**  
-   Data often arrives as files. Pipelines must discover, read, validate, transform, write and archive these files reliably.
+1. **Why use a context manager when opening files?**  
+   It reliably closes the file after the block completes, including when an exception occurs.
 
-2. **What is the difference between an absolute and relative path?**  
-   An absolute path identifies a location from the drive or root. A relative path is resolved from the current working directory.
+2. **What is the difference between read, write and append modes?**  
+   Read retrieves existing content; write creates or truncates; append adds content at the end.
 
-3. **Why is `pathlib` preferred for path handling?**  
-   It provides readable path operations and handles platform-specific separators.
+3. **Why use pathlib?**  
+   It provides readable, cross-platform path operations.
 
-4. **What does file mode `w` do?**  
-   It creates a file or truncates an existing file. Existing content is lost.
+4. **How do you process a large text file?**  
+   Iterate over the file handle line by line or use bounded chunks rather than loading the complete file.
 
-5. **What is the difference between `w` and `a`?**  
-   `w` replaces existing content; `a` adds content at the end.
-
-6. **What is the purpose of a context manager?**  
-   The `with` statement ensures the file is closed after the block, including when an exception occurs.
-
-7. **What is the difference between `read()` and iterating over a file?**  
-   `read()` loads the complete content into memory. Iteration processes one line at a time.
-
-8. **What does `Path.exists()` check?**  
-   Whether a filesystem path exists. It does not prove the file contains valid data.
-
-9. **What is the purpose of `shutil.copy2()`?**  
-   It copies a file and attempts to preserve metadata such as timestamps.
-
-10. **Why should a source file be archived only after output verification?**  
-    If processing fails, the original should remain available for retry and investigation.
+5. **What is the risk of write mode?**  
+   It truncates an existing file. A wrong path can destroy an earlier output.
 
 ## 2. Difference-based questions
 
 | Compare | Answer |
 |---|---|
-| File vs directory | A file stores content; a directory organizes filesystem entries |
-| Relative vs absolute path | Relative depends on working directory; absolute identifies the full location |
-| `read()` vs `readlines()` | String containing all content vs list of lines |
-| `readlines()` vs file iteration | Both can load all lines vs iterative reading |
-| `w` vs `a` | Overwrite vs append |
-| `rename()` vs `copy2()` | Changes path/name vs creates a copy |
-| Raw vs processed folder | Original source vs transformed output |
+| Absolute vs relative path | Full path vs path resolved from working directory |
+| Text vs binary mode | Decoded characters vs raw bytes |
+| `read()` vs iteration | Read all/selected characters vs process lines incrementally |
+| `write` vs `append` | Replace contents vs add to existing contents |
+| File vs directory | Data object vs container of filesystem entries |
 
-## 3. Practical implementation questions
+## 3. Practical questions
 
-11. **How do you create a folder only when it does not exist?**  
-    Use `Path.mkdir(parents=True, exist_ok=True)`. The flag prevents an error if the directory already exists.
+6. **How do you find all CSV files in nested folders?**  
+   Use `Path("folder").rglob("*.csv")`.
 
-12. **How do you check that a file exists and is not empty?**  
-    Check `path.is_file()` and `path.stat().st_size > 0`. Then validate the file's contents.
+7. **How do you avoid reading an incomplete output?**  
+   Write to a temporary file, close and validate it, then move/rename to the final location where the storage system supports safe rename semantics.
 
-13. **How would you process every CSV file in a folder?**  
-    Use `Path.glob("*.csv")` to discover files and process each path. Use the CSV parser to read records.
+8. **Why not parse every CSV with split(",")?**  
+   Quoted values may contain commas, quotes or newlines. Use the `csv` module or a suitable data library.
 
-14. **How do you avoid loading a large text file into memory?**  
-    Iterate over the file object and process each line or a bounded batch.
+## 4. Scenario questions
 
-15. **How would you copy a source file before transforming it?**  
-    Use `shutil.copy2(source, backup)`, then verify the backup.
+### Scenario A: FileNotFoundError on scheduled execution
+Check the working directory, configured absolute/relative path, mount availability and file-arrival timing. Do not assume the scheduler starts in the developer's folder.
 
-16. **How do you move a processed file to an archive?**  
-    Verify the output first, then use `shutil.move()` to move the original to the archive directory.
+### Scenario B: A 20 GB text file causes memory failure
+Use line-by-line or chunked processing, write incremental outputs and avoid keeping all records in memory.
 
-17. **Why should file encoding be specified?**  
-    Explicit encoding reduces differences between machines and avoids relying on environment defaults.
+### Scenario C: Same input file is processed twice
+Track stable file identity, checksum or source batch ID; mark successful processing and make downstream writes duplicate-safe.
 
-## 4. Scenario-based questions
+## 5. Troubleshooting
 
-### Scenario 1: The pipeline says the file is missing
+- UnicodeDecodeError: verify encoding with the source owner.
+- PermissionError: inspect service account permissions and file locks.
+- Empty file: verify path, size, producer completion and filters.
+- Partial file: check arrival protocol; require a completion marker or atomic publish pattern where possible.
+- Unexpected rows: use a format-aware parser and validate schema.
 
-**Problem:** The file is visible in the project folder, but Python raises `FileNotFoundError`.
+## 6. Follow-up questions
 
-**Strong answer:**
-- Print `Path.cwd()` to inspect the current working directory.
-- Build the path from a known project directory.
-- Check `path.exists()` and `path.is_file()`.
-- Avoid assuming that the notebook starts in the same directory as the script.
+- What is a file descriptor?
+- Why is encoding important?
+- What is a checksum?
+- How would you archive source files?
+- How do you handle zero-byte files?
+- What metadata should be recorded for each processed file?
 
-**Reasoning:** Relative paths are interpreted from the process's working directory, not necessarily the source-code file's location.
+## 7. Mini-project defence
 
-### Scenario 2: Yesterday's records disappeared
-
-**Problem:** A job opens the daily output using mode `w`, and yesterday's records are lost.
-
-**Strong answer:**
-- Explain that `w` truncates the file.
-- Use a date-partitioned output path or append mode only if the data contract allows it.
-- Prefer writing to a temporary output and validating it before replacing a published file.
-- Preserve raw source data.
-
-### Scenario 3: A 10 GB log file crashes the script
-
-**Problem:** The script calls `read()` and runs out of memory.
-
-**Strong answer:**
-- Iterate over the file line by line or in bounded chunks.
-- Avoid retaining all processed records in a list.
-- Write output incrementally.
-- Monitor memory and throughput for production-sized data.
-
-### Scenario 4: The source was archived but the output is incomplete
-
-**Problem:** The input file was moved before the output write completed.
-
-**Strong answer:**
-- Change the order: write output, close it, verify existence and expected counts, then archive.
-- If verification fails, preserve the source and mark the batch as failed.
-- Use a temporary output path to avoid exposing partial output.
-
-## 5. Troubleshooting questions
-
-18. **What causes `PermissionError`?**  
-    The process may not have permission, or another application may hold a conflicting lock. Check access and close the other application.
-
-19. **Why can a file exist but still be unusable?**  
-    It may be empty, malformed, encoded unexpectedly or contain an invalid schema.
-
-20. **Why is manual comma splitting unsafe for CSV?**  
-    Quoted fields can contain commas, quotes and newlines. Use the `csv` module.
-
-21. **What should happen if the same source file arrives twice?**  
-    Define duplicate-delivery behavior using file identity, batch IDs, checksums or source metadata. Avoid accidental double processing.
-
-## 6. Mini-project explanation
-
-**Question:** Explain the File Processing Manager project.
-
-**Strong answer:**
-
-"I created input, output and archive folders using pathlib. I checked that the incoming file existed and was not empty. I read the file, removed blank lines, wrote a cleaned output to a separate folder, verified the output row count and only then moved the source into the archive. This taught me why source retention, output verification and safe file modes matter in a data pipeline."
-
-## 7. Follow-up questions an interviewer may ask
-
-- How would you handle a file that is still being uploaded?
-- How would you detect a duplicate file?
-- How would you process files in date order?
-- How would you retain rejected files for investigation?
-- How would you make the process safe to rerun?
-- What metadata would you record for each processed file?
-
-A good junior answer should mention validation, source retention, clear failure handling and repeatable processing.
-
-## 8. Quick revision
-
-- Always inspect the working directory when a relative path fails.
-- Use `with open(...)` for safe file access.
-- Understand the destructive behavior of `w`.
-- Iterate over large files instead of reading everything at once.
-- Verify outputs before archiving source data.
-- Use structured parsers for CSV/JSON/XML rather than manual string splitting.
+Explain how the File Processing Manager discovers files, validates records, separates accepted and rejected data, and prevents duplicate processing. State why the demonstration parser is not a replacement for a proper CSV parser.

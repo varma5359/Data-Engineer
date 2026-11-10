@@ -4,55 +4,139 @@
 
 ## 1. Core questions
 
-1. **What is REST?** An architectural style commonly used to expose resources over HTTP.
-2. **What does GET do?** Retrieves a resource or collection.
-3. **Why set a timeout?** To bound how long a connection or response can block a pipeline.
-4. **What is pagination?** Splitting a large result into manageable pages.
-5. **What is a bearer token?** A credential sent to authorize a request; it must be protected.
-6. **What does raise_for_status do?** Raises an HTTP error for unsuccessful response status codes.
+1. **What is an API?**  
+   A defined interface through which one application requests data or operations from another application.
+
+2. **What is REST?**  
+   An architectural style commonly used to expose resources over HTTP.
+
+3. **What does GET do?**  
+   Retrieves a resource or collection. It is commonly used in data extraction.
+
+4. **What is an endpoint?**  
+   A URL representing a resource or operation exposed by an API.
+
+5. **What is an HTTP response?**  
+   The server's reply containing a status code, headers and often a response body.
+
+6. **Why inspect the status code?**  
+   A request can receive a client or server error. Do not parse a response as valid data without checking the HTTP result.
+
+7. **Why set a timeout?**  
+   It bounds how long the client waits for a connection or response and prevents a pipeline from hanging indefinitely.
+
+8. **What does `raise_for_status()` do?**  
+   It raises an HTTP error for unsuccessful 4xx/5xx responses.
+
+9. **What is a bearer token?**  
+   A credential commonly sent in an Authorization header. It must be stored securely.
+
+10. **What is pagination?**  
+    Splitting a large result into multiple requests/pages so the client can retrieve all records in manageable portions.
+
+11. **What is a rate limit?**  
+    A restriction on how frequently a client can call an API.
+
+12. **Does valid JSON mean valid business data?**  
+    No. JSON parsing checks syntax and structure; schema and business rules must be checked separately.
 
 ## 2. Difference-based questions
 
 | Compare | Answer |
 |---|---|
-| 401 vs 403 | Authentication missing/invalid vs authenticated but not permitted |
-| Page vs cursor pagination | Numeric page position vs opaque continuation token |
-| Connect vs read timeout | Time to establish connection vs wait for response data |
-| 4xx vs 5xx | Request/client issue vs server-side issue |
-| HTTP success vs schema validity | Server accepted request vs payload matches expected contract |
+| GET vs POST | Retrieve vs submit/create |
+| Header vs query parameter | Request metadata vs endpoint filtering/input |
+| 401 vs 403 | Authentication missing/invalid vs access not permitted |
+| 404 vs 500 | Resource not found vs server-side failure |
+| Timeout vs connection error | Wait exceeded vs connection could not be established |
+| Page vs cursor pagination | Numeric page navigation vs opaque continuation token |
+| Parsing vs validation | Decode response vs verify expected fields and rules |
 
-## 3. Practical questions
+## 3. Practical implementation questions
 
-7. **How do you extract all API records?** Follow the documented pagination method until the API signals no next page, while persisting progress.
-8. **How do you handle 429?** Respect Retry-After or provider policy and use bounded backoff.
-9. **How do you protect credentials?** Use secret management or secure runtime variables, least privilege and log redaction.
-10. **How do you resume after failure?** Persist cursor/page checkpoint only after the corresponding page is safely stored.
+13. **How do you make a GET request?**  
+    Use `requests.get(url, timeout=...)`, inspect the status and parse JSON only after checking the response.
+
+14. **How do you pass query parameters?**  
+    Supply a dictionary through the `params` argument. This lets Requests encode the URL correctly.
+
+15. **How do you pass authentication?**  
+    Read the token from an environment variable or secret manager and pass it in the documented Authorization header.
+
+16. **How do you handle invalid JSON?**  
+    Catch the JSON decoding error, record safe diagnostic metadata and quarantine the response.
+
+17. **How do you implement pagination?**  
+    Follow the provider's documented page, offset or cursor mechanism until the documented end condition is reached.
+
+18. **What should you log for an API extraction?**  
+    Endpoint identifier, request/page number, status code, duration, records received and safe error details. Do not log tokens or sensitive payloads.
 
 ## 4. Scenario questions
 
-### Scenario A: API returns 200 but data is empty
-Check filters, date range, pagination, response schema and whether empty is valid for that interval. Do not treat empty as success without business validation.
+### Scenario 1: API returns HTTP 429
 
-### Scenario B: API starts returning 429
-Reduce request rate, respect Retry-After, apply backoff and monitor quota usage.
+**Problem:** Your extractor is sending too many requests.
 
-### Scenario C: Page 8 fails after pages 1–7 were saved
-Resume from the last committed cursor/page. Ensure rerunning a page does not duplicate destination records.
+**Strong answer:**
+- Respect the provider's rate-limit documentation.
+- Inspect `Retry-After` if supplied.
+- Apply bounded exponential backoff.
+- Reduce request frequency or batch size.
+- Resume from a saved page/cursor checkpoint.
 
-## 5. Troubleshooting
-- ConnectionError: network, DNS or endpoint reachability.
-- Timeout: slow service or insufficient timeout.
-- HTTPError: inspect status and safe response details.
-- JSON decode error: response may be HTML, empty or malformed.
-- Missing records: inspect pagination and filters.
+### Scenario 2: API returns HTTP 200 but no records
 
-## 6. Follow-up questions
-- What is an idempotency key?
-- What is rate limiting?
-- Why might offset pagination miss records while data changes?
-- What is exponential backoff?
-- How do you handle API schema evolution?
-- What metadata do you persist for audit?
+**Problem:** The request succeeded but the response contains an empty list.
 
-## 7. Mini-project defence
-Describe endpoint contract, authentication, pagination, validation, checkpointing, retries, raw response retention and duplicate-safe loading. Explain which details must come from the API documentation rather than assumptions.
+**Strong answer:** Check whether the filter is too restrictive, whether the dataset is genuinely empty and whether the response schema is as documented. A 200 status does not guarantee records exist.
+
+### Scenario 3: The API response adds a new field
+
+**Problem:** The upstream team adds `delivery_zone`.
+
+**Strong answer:** Determine whether the field is optional or required, validate the existing contract, update downstream mappings deliberately and communicate any breaking change.
+
+### Scenario 4: The extractor stops after the first 100 records
+
+**Problem:** The API paginates results.
+
+**Strong answer:** Implement the documented pagination mechanism, collect all pages, stop on the provider's termination condition and persist a checkpoint.
+
+### Scenario 5: Network is temporarily unavailable
+
+**Problem:** The request fails with a connection error.
+
+**Strong answer:** Use a bounded retry policy for transient failures, record the failure and make the job report unsuccessful if it cannot complete. Do not silently publish partial data as complete.
+
+## 5. Troubleshooting questions
+
+19. **Why should you not retry every HTTP error?**  
+    Some errors are permanent, such as invalid credentials or malformed requests. Retrying them wastes time and can worsen rate limits.
+
+20. **What if the API returns HTML instead of JSON?**  
+    Inspect status and content type, then handle the unexpected response without assuming JSON parsing will succeed.
+
+21. **Why protect API credentials?**  
+    A leaked token may allow unauthorized access. Use environment variables or secret-management systems and never commit secrets.
+
+## 6. Mini-project explanation
+
+"I built an API extraction workflow that requests data, checks the response, parses JSON, validates required keys, handles pagination and saves records. I practised the pagination logic with local mock responses so the workflow can be tested even without internet access. For production, I would use the provider's authentication, rate-limit and checkpoint rules."
+
+## 7. Follow-up questions
+
+- How do you prevent duplicate records when a page is retried?
+- How do you detect incomplete extraction?
+- What if the API changes its response schema?
+- How do you handle a cursor that expires?
+- How would you make the extractor restartable?
+- Which information should not be included in logs?
+
+## 8. Quick revision
+
+- Check HTTP status before parsing.
+- Always set a timeout.
+- Use documented pagination and bounded retries.
+- Protect tokens and sensitive response data.
+- Validate schema and business rules after parsing.

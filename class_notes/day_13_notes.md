@@ -5,229 +5,617 @@
 **Learning time:** 2–3 hours
 
 ## 1. Learning outcomes
-- Explain how Python connects to relational databases.
-- Understand connection, cursor and transaction.
-- Execute parameterized SQL safely.
-- Fetch query results and handle database errors.
-- Manage connections and bulk extraction responsibly.
+
+- Explain how Python communicates with relational databases.
+- Understand database drivers, connections, cursors and transactions.
+- Create a local SQLite database for practice.
+- Create tables and insert records from Python.
+- Execute SELECT queries and retrieve results.
+- Use parameterized queries safely.
+- Update and delete records.
+- Commit or roll back transactions.
+- Extract records in batches and manage connections.
 
 ## 2. Why connect Python to a database?
-Python pipelines often need to read operational records, load transformed data, execute SQL checks or coordinate database tasks. The database remains responsible for storing and querying relational data; Python manages the surrounding workflow.
 
-## 3. Connection concepts
+A data engineer often needs to extract records from operational systems, validate data, load transformed results or automate SQL tasks. Python coordinates the workflow while the database stores and queries the data.
+
+Example:
+
+```text
+Python script -> Database connection -> SQL query -> Result rows
+             -> Validation / transformation -> Output file
+```
+
+## 3. Understand the main database terms
 
 | Term | Meaning |
 |---|---|
-| Driver | Library that speaks a database's protocol |
-| Connection | Session between application and database |
-| Cursor | Object used to execute statements and fetch results |
-| Transaction | Group of operations committed or rolled back together |
-| Commit | Persist transaction changes |
-| Rollback | Undo uncommitted changes |
+| Database driver | Library that allows Python to communicate with a database |
+| Connection | Active session between Python and the database |
+| Cursor | Object used to execute SQL statements and fetch results |
+| SQL statement | Command such as SELECT, INSERT or UPDATE |
+| Transaction | Group of database operations managed together |
+| Commit | Make the transaction's changes permanent |
+| Rollback | Cancel uncommitted changes |
+| Parameterized query | SQL statement with values supplied separately |
 
-Credentials, host, database name and permissions must come from approved configuration. Never embed production passwords in source files.
+## 4. Why begin with SQLite?
 
-## 4. Install a driver
-For PostgreSQL, a common driver is psycopg:
+SQLite is included with standard Python installations through the `sqlite3` module. It stores a database in a local file, so students can practise without installing a database server or creating credentials.
 
-```bash
-python -m pip install "psycopg[binary]"
+SQLite is excellent for this lesson's local exercises. Production teams may use PostgreSQL, MySQL or managed database services; their drivers and operational setup differ.
+
+## 5. Connect to a local SQLite database
+
+```python
+import sqlite3
+
+connection = sqlite3.connect("retail_orders.db")
+
+print("Database connection created")
 ```
 
-For MySQL, use an approved connector such as mysql-connector-python. Driver APIs differ; read the documentation for the selected version.
+**Expected output**
 
-## 5. Connect to PostgreSQL
+```text
+Database connection created
+```
+
+**Explanation**
+
+- `import sqlite3` loads Python's built-in SQLite interface.
+- `connect()` opens the database file or creates it if it does not exist.
+- `connection` represents the database session.
+
+The database file is created in the current working directory. Use `Path.cwd()` if you need to confirm where it was created.
+
+## 6. Create a cursor
+
 ```python
-import os
-import psycopg
+cursor = connection.cursor()
 
-connection = psycopg.connect(
-    host=os.environ["DB_HOST"],
-    dbname=os.environ["DB_NAME"],
-    user=os.environ["DB_USER"],
-    password=os.environ["DB_PASSWORD"],
-    port=os.environ.get("DB_PORT", "5432")
+print(type(cursor).__name__)
+```
+
+**Expected output**
+
+```text
+Cursor
+```
+
+The cursor executes SQL and provides methods to retrieve query results. A connection can create cursors as needed.
+
+## 7. Create a table
+
+```python
+cursor.execute("""
+CREATE TABLE IF NOT EXISTS orders (
+    order_id INTEGER PRIMARY KEY,
+    customer_name TEXT NOT NULL,
+    amount REAL NOT NULL,
+    status TEXT NOT NULL
+)
+""")
+
+connection.commit()
+
+print("Orders table is ready")
+```
+
+**Expected output**
+
+```text
+Orders table is ready
+```
+
+**SQL explanation**
+
+- `CREATE TABLE IF NOT EXISTS` creates the table only if it is absent.
+- `order_id` is the primary key.
+- `INTEGER`, `TEXT` and `REAL` are SQLite type declarations.
+- `NOT NULL` prevents missing values in these columns.
+- `commit()` saves the schema change.
+
+## 8. Insert one record
+
+```python
+cursor.execute(
+    "INSERT OR REPLACE INTO orders (order_id, customer_name, amount, status) VALUES (?, ?, ?, ?)",
+    (1001, "Ravi", 1200.50, "PAID")
 )
 
-print("Database connection established")
+connection.commit()
+
+print("One order inserted")
 ```
 
-The environment variables must be configured before execution. Do not print the password or full connection string.
+**Expected output**
 
-## 6. Execute a SELECT
+```text
+One order inserted
+```
+
+**Important:** The question marks are parameter placeholders in SQLite. Values are supplied as a tuple separately from the SQL statement.
+
+The example uses `INSERT OR REPLACE` to make a notebook cell repeatable for the same primary key. In a production application, choose conflict behavior deliberately; replacing a row can overwrite existing data.
+
+## 9. Insert multiple records
+
 ```python
-with connection.cursor() as cursor:
-    cursor.execute("SELECT order_id, status FROM orders LIMIT 5")
-    rows = cursor.fetchall()
+order_rows = [
+    (1002, "Anu", 850.00, "PENDING"),
+    (1003, "Kiran", 450.00, "PAID"),
+    (1004, "Meena", 1500.00, "PAID")
+]
+
+cursor.executemany(
+    "INSERT OR REPLACE INTO orders (order_id, customer_name, amount, status) VALUES (?, ?, ?, ?)",
+    order_rows
+)
+
+connection.commit()
+
+print("Rows supplied:", len(order_rows))
+```
+
+**Expected output**
+
+```text
+Rows supplied: 3
+```
+
+`executemany()` runs the same parameterized statement for multiple parameter sets. It is useful for basic bulk inserts.
+
+## 10. Read all records using SELECT
+
+```python
+cursor.execute("SELECT order_id, customer_name, amount, status FROM orders ORDER BY order_id")
+rows = cursor.fetchall()
 
 for row in rows:
     print(row)
 ```
 
-A cursor executes SQL and retrieves result rows. `fetchall()` loads the selected result into memory, so limit or page large result sets.
+**Expected output**
 
-## 7. Fetch one or many rows
-```python
-with connection.cursor() as cursor:
-    cursor.execute("SELECT order_id FROM orders ORDER BY order_id")
-    first_row = cursor.fetchone()
-    print(first_row)
+```text
+(1001, 'Ravi', 1200.5, 'PAID')
+(1002, 'Anu', 850.0, 'PENDING')
+(1003, 'Kiran', 450.0, 'PAID')
+(1004, 'Meena', 1500.0, 'PAID')
 ```
 
-Fetch in bounded batches:
+**Explanation**
+
+- `execute()` sends the SELECT statement to SQLite.
+- `fetchall()` retrieves all remaining result rows into a Python list.
+- Each row is a tuple in the selected column order.
+- `ORDER BY` makes the output order explicit.
+
+**Memory note:** `fetchall()` is appropriate for this small practice table. For large tables, use bounded batches or database-side filtering.
+
+## 11. Fetch one row or a limited number
+
+### 11.1 Fetch one row
 
 ```python
-with connection.cursor() as cursor:
-    cursor.execute("SELECT order_id, amount FROM orders ORDER BY order_id")
+cursor.execute("SELECT order_id, customer_name FROM orders ORDER BY order_id")
+first_order = cursor.fetchone()
 
-    while True:
-        batch = cursor.fetchmany(1000)
-
-        if not batch:
-            break
-
-        print("Batch records:", len(batch))
+print(first_order)
 ```
 
-For very large tables, also consider server-side cursors, keyset pagination, query plans and source load.
+**Expected output**
 
-## 8. Parameterized queries
-Never build SQL by concatenating untrusted values.
-
-Unsafe pattern:
-
-```python
-# Do not do this with untrusted input:
-# query = "SELECT * FROM orders WHERE customer_id = " + customer_id
+```text
+(1001, 'Ravi')
 ```
 
-Safe parameterized pattern (psycopg):
+### 11.2 Fetch a bounded number
 
 ```python
-customer_id = 1001
+cursor.execute("SELECT order_id, amount FROM orders ORDER BY order_id")
+first_two = cursor.fetchmany(2)
 
-with connection.cursor() as cursor:
-    cursor.execute(
-        "SELECT order_id, amount FROM orders WHERE customer_id = %s",
-        (customer_id,)
-    )
-    rows = cursor.fetchall()
-
-print(rows)
+print(first_two)
 ```
 
-The placeholder syntax depends on the driver. Parameterization protects values; it does not allow table or column identifiers to be passed as ordinary value parameters.
+**Expected output**
 
-## 9. Insert and commit
+```text
+[(1001, 1200.5), (1002, 850.0)]
+```
+
+- `fetchone()` returns the next row or `None`.
+- `fetchmany(2)` returns up to two rows.
+- `fetchall()` returns every remaining row.
+
+## 12. Filter rows with WHERE
+
 ```python
-with connection.cursor() as cursor:
-    cursor.execute(
-        "INSERT INTO pipeline_audit (run_id, status) VALUES (%s, %s)",
-        ("run_001", "STARTED")
-    )
+cursor.execute(
+    "SELECT order_id, customer_name, amount FROM orders WHERE status = ?",
+    ("PAID",)
+)
+
+paid_orders = cursor.fetchall()
+
+for order in paid_orders:
+    print(order)
+```
+
+**Expected output**
+
+```text
+(1001, 'Ravi', 1200.5)
+(1003, 'Kiran', 450.0)
+(1004, 'Meena', 1500.0)
+```
+
+The comma in `("PAID",)` makes it a one-item tuple. The query returns only paid orders.
+
+## 13. Why parameterized SQL matters
+
+Never build SQL by inserting untrusted values into the query string.
+
+**Unsafe pattern — do not use:**
+
+```python
+customer_name = "Ravi"
+unsafe_sql = "SELECT * FROM orders WHERE customer_name = '" + customer_name + "'"
+```
+
+This approach becomes dangerous when values contain quotes or malicious SQL text.
+
+**Safe pattern:**
+
+```python
+customer_name = "Ravi"
+
+cursor.execute(
+    "SELECT order_id, amount FROM orders WHERE customer_name = ?",
+    (customer_name,)
+)
+
+print(cursor.fetchall())
+```
+
+**Expected output**
+
+```text
+[(1001, 1200.5)]
+```
+
+The database driver binds the value separately. Placeholder syntax differs by driver: SQLite uses `?`; other drivers may use `%s` or named placeholders. Follow the selected driver's documentation.
+
+## 14. Insert, update and delete (CRUD)
+
+CRUD means Create, Read, Update and Delete.
+
+### 14.1 Update a record
+
+```python
+cursor.execute(
+    "UPDATE orders SET status = ? WHERE order_id = ?",
+    ("SHIPPED", 1002)
+)
 
 connection.commit()
+
+print("Rows affected:", cursor.rowcount)
 ```
 
-A transaction may be rolled back if an error occurs before commit. Understand the driver's autocommit behavior.
+**Expected output**
 
-## 10. Rollback on failure
+```text
+Rows affected: 1
+```
+
+### 14.2 Verify the update
+
+```python
+cursor.execute(
+    "SELECT order_id, status FROM orders WHERE order_id = ?",
+    (1002,)
+)
+
+print(cursor.fetchone())
+```
+
+**Expected output**
+
+```text
+(1002, 'SHIPPED')
+```
+
+### 14.3 Delete a test record
+
+```python
+cursor.execute("DELETE FROM orders WHERE order_id = ?", (1004,))
+connection.commit()
+
+print("Rows deleted:", cursor.rowcount)
+```
+
+**Expected output**
+
+```text
+Rows deleted: 1
+```
+
+**Production caution:** Always understand the WHERE clause before running UPDATE or DELETE. An omitted filter can change or remove every row.
+
+## 15. Transactions: commit and rollback
+
+A transaction groups operations so that they succeed or fail together.
+
+### 15.1 Demonstrate rollback
+
 ```python
 try:
-    with connection.cursor() as cursor:
-        cursor.execute(
-            "UPDATE orders SET status = %s WHERE order_id = %s",
-            ("PAID", 501)
-        )
-    connection.commit()
-
-except Exception:
-    connection.rollback()
-    raise
-```
-
-Re-raising preserves failure visibility. A production implementation should catch expected database exceptions at the correct boundary and log safe context.
-
-## 11. Close connections
-```python
-connection.close()
-print("Connection closed")
-```
-
-Use context managers or a connection pool where appropriate. Do not create a new database connection for every row.
-
-## 12. Bulk operations
-Inserting one row at a time creates repeated network and transaction overhead. Use driver-supported batch operations or staging tables for large loads. Choose batch size based on row width, database limits and memory.
-
-A common pattern:
-1. Extract a bounded source batch.
-2. Validate and transform.
-3. Bulk load into a staging table.
-4. Merge/upsert into the target.
-5. Commit and record metrics.
-6. Advance checkpoint after safe commit.
-
-## 13. Mini-project: Database Record Extractor
-Prepare a training database with an `orders` table. Example query:
-
-```sql
-SELECT order_id, customer_id, order_date, amount, status
-FROM orders
-WHERE updated_at >= %s
-ORDER BY updated_at, order_id;
-```
-
-Python extraction:
-
-```python
-from datetime import datetime
-
-watermark = datetime(2026, 1, 1)
-
-with connection.cursor() as cursor:
     cursor.execute(
-        """
-        SELECT order_id, customer_id, amount, status
-        FROM orders
-        WHERE updated_at >= %s
-        ORDER BY updated_at, order_id
-        """,
-        (watermark,)
+        "INSERT INTO orders (order_id, customer_name, amount, status) VALUES (?, ?, ?, ?)",
+        (2001, "Test Customer", 300, "PAID")
     )
 
-    rows = cursor.fetchall()
+    cursor.execute(
+        "INSERT INTO orders (order_id, customer_name, amount, status) VALUES (?, ?, ?, ?)",
+        (1001, "Duplicate ID", 100, "PAID")
+    )
 
-print("Extracted:", len(rows))
-print(rows[:5])
+    connection.commit()
+    print("Transaction committed")
+
+except sqlite3.IntegrityError:
+    connection.rollback()
+    print("Transaction rolled back")
 ```
 
-For production, use a stable watermark strategy, account for equal timestamps and late updates, and persist the last successfully committed position.
+**Expected output**
 
-## 14. Security and operational considerations
-- Use a dedicated service account with least privilege.
-- Store credentials in approved secret storage.
-- Encrypt network connections where required.
-- Set connection and statement timeouts.
-- Avoid SELECT * for production extraction.
-- Limit query scope and avoid overwhelming OLTP systems.
-- Record query/run metadata without sensitive values.
-- Use connection pooling for repeated workloads where appropriate.
+```text
+Transaction rolled back
+```
 
-## 15. Common mistakes
-| Mistake | Better practice |
-|---|---|
-| SQL string concatenation | Parameterized queries |
-| Never committing writes | Understand transaction boundaries |
-| Committing each row | Use controlled batches |
-| Fetching huge results at once | fetchmany/keyset/server-side cursor |
-| Leaving connections open | Context managers and cleanup |
-| Using admin credentials | Dedicated least-privilege account |
-| Advancing watermark too early | Commit target then checkpoint |
+The second insert violates the primary-key constraint. The exception handler rolls back the transaction, so the first insert is also undone.
 
-## 16. Day 13 revision
+### 15.2 Verify that the first insert was rolled back
+
+```python
+cursor.execute("SELECT COUNT(*) FROM orders WHERE order_id = ?", (2001,))
+print(cursor.fetchone()[0])
+```
+
+**Expected output**
+
+```text
+0
+```
+
+**Interpretation:** The first insert did not remain in the database because both operations belonged to the same transaction.
+
+## 16. Use a connection context manager
+
+Python's SQLite connection supports a context manager for transaction handling:
+
+```python
+with sqlite3.connect("retail_orders.db") as connection:
+    cursor = connection.cursor()
+    cursor.execute(
+        "UPDATE orders SET status = ? WHERE order_id = ?",
+        ("PAID", 1002)
+    )
+
+print("Transaction block completed")
+```
+
+**Expected output**
+
+```text
+Transaction block completed
+```
+
+The context manager commits on successful completion and rolls back if an exception escapes the block. It does not mean every resource is necessarily closed at the end of the block in the same way as a file context manager; close the connection explicitly when finished.
+
+## 17. Extract query results into dictionaries
+
+By default, SQLite returns tuples. A row factory can provide named column access.
+
+```python
+connection.row_factory = sqlite3.Row
+cursor = connection.cursor()
+
+cursor.execute(
+    "SELECT order_id, customer_name, amount, status FROM orders ORDER BY order_id"
+)
+
+row = cursor.fetchone()
+
+print(row["order_id"])
+print(row["customer_name"])
+```
+
+**Expected output**
+
+```text
+1001
+Ravi
+```
+
+A named row is convenient when mapping database columns to downstream records. Set the row factory before creating the cursor you intend to use.
+
+## 18. Extract large result sets in batches
+
+Do not automatically call `fetchall()` for a huge table.
+
+```python
+cursor.execute("SELECT order_id, amount FROM orders ORDER BY order_id")
+
+total_rows = 0
+
+while True:
+    batch = cursor.fetchmany(2)
+
+    if not batch:
+        break
+
+    total_rows += len(batch)
+    print("Batch size:", len(batch))
+
+print("Total extracted:", total_rows)
+```
+
+**Expected output for the current three-row table after the delete**
+
+```text
+Batch size: 2
+Batch size: 1
+Total extracted: 3
+```
+
+**Interpretation:** The cursor returns a bounded number of rows each time. This helps control memory usage, although the database and driver may have their own buffering behavior.
+
+## 19. Close database resources
+
+```python
+cursor.close()
+connection.close()
+
+print("Database resources closed")
+```
+
+**Expected output**
+
+```text
+Database resources closed
+```
+
+Close cursors and connections when they are no longer needed. In production, use context managers or structured cleanup so resources are released even when an error occurs.
+
+## 20. PostgreSQL and MySQL: how production differs
+
+The concepts remain similar, but the driver and SQL placeholder style differ.
+
+| Area | SQLite practice | PostgreSQL example | MySQL example |
+|---|---|---|---|
+| Driver | Built-in `sqlite3` | `psycopg` | `mysql-connector-python` |
+| Server | Local file | Database server/service | Database server/service |
+| Placeholder | `?` | Commonly `%s` with psycopg | Driver-specific, commonly `%s` |
+| Connection settings | File path | Host, port, dbname, user, password | Host, port, database, user, password |
+
+Install examples:
+
+```bash
+python -m pip install "psycopg[binary]"
+python -m pip install mysql-connector-python
+```
+
+A PostgreSQL connection uses approved host/database/user settings and a secret supplied securely. Never commit credentials. Do not run the remote connection example until the server, account, network access and environment variables have been configured.
+
+## 21. Mini-project: Database Record Extractor
+
+### 21.1 Business requirement
+
+A retail analyst asks for all paid orders above a given amount. Build a small local database, query only the required columns, and export the result to CSV.
+
+### 21.2 Query using a parameter
+
+```python
+minimum_amount = 500
+
+cursor.execute(
+    """
+    SELECT order_id, customer_name, amount, status
+    FROM orders
+    WHERE status = ? AND amount >= ?
+    ORDER BY order_id
+    """,
+    ("PAID", minimum_amount)
+)
+
+extracted_rows = cursor.fetchall()
+
+for row in extracted_rows:
+    print(tuple(row))
+```
+
+**Expected output for the remaining practice records**
+
+```text
+(1001, 'Ravi', 1200.5, 'PAID')
+```
+
+The exact rows depend on whether earlier cells were executed. Restart the kernel and rerun the lesson in order for the stated sample state.
+
+### 21.3 Export the extracted rows
+
+```python
+import csv
+
+with open("paid_orders_extract.csv", "w", newline="", encoding="utf-8") as file:
+    writer = csv.writer(file)
+    writer.writerow(["order_id", "customer_name", "amount", "status"])
+    writer.writerows(extracted_rows)
+
+print("Extracted rows:", len(extracted_rows))
+```
+
+**Expected output**
+
+```text
+Extracted rows: 1
+```
+
+### 21.4 Verify the output
+
+```python
+with open("paid_orders_extract.csv", "r", encoding="utf-8") as file:
+    print(file.read())
+```
+
+**Expected output**
+
+```text
+order_id,customer_name,amount,status
+1001,Ravi,1200.5,PAID
+```
+
+### 21.5 Project explanation
+
+The Python program connects to SQLite, executes a parameterized query, retrieves only matching rows and writes them to a CSV file. The database performs filtering, so Python does not need to load unrelated records.
+
+## 22. Common errors and troubleshooting
+
+| Error | Likely reason | What to check |
+|---|---|---|
+| `OperationalError: no such table` | Table was not created in this database file | Check path and run CREATE TABLE |
+| `IntegrityError` | Duplicate key or constraint violation | Inspect primary key and constraints |
+| `ProgrammingError` | SQL or parameter mismatch | Check placeholders and parameter count |
+| Empty result | Filter does not match data | Run a simpler SELECT and inspect values |
+| Connection refused | Database server unavailable | Check host, port, service and firewall |
+| Authentication failure | Invalid credentials or permissions | Verify secret and database user grants |
+| Slow extraction | Too many rows or unindexed filter | Filter in SQL, inspect query plan and fetch in batches |
+
+## 23. Production practices
+
+- Use parameterized SQL for all data values.
+- Apply least-privilege database accounts.
+- Store credentials outside source code.
+- Use transactions for related writes.
+- Fetch only required columns and rows.
+- Use batch extraction for large datasets.
+- Set connection and query timeouts where supported.
+- Close connections and cursors reliably.
+- Record safe operational metadata; never log passwords.
+- Consider isolation, consistency and retry behavior before building production loaders.
+
+## 24. Day 13 revision
+
 - A driver connects Python to a database.
-- Cursor executes SQL and fetches rows.
-- Parameterized queries separate values from SQL text.
-- Transactions provide commit/rollback boundaries.
-- Batch extraction and loading control resource usage.
-- Connection lifecycle, security and checkpoints are part of pipeline correctness.
+- A connection represents the session; a cursor executes SQL.
+- Parameterized queries keep SQL structure separate from supplied values.
+- Commit saves changes; rollback cancels uncommitted changes.
+- `fetchone()`, `fetchmany()` and `fetchall()` retrieve result rows differently.
+- Use SQL filtering and bounded batches for larger extracts.
+- Day 14 uses Pandas to inspect and transform tabular datasets.
