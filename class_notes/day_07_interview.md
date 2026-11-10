@@ -4,70 +4,155 @@
 
 ## 1. Core questions
 
-1. **Why use functions in a pipeline?**  
-   To isolate transformations, avoid duplicated logic, improve testing and make code easier to maintain.
+1. **What is a function?**  
+   A named reusable block of code that performs a focused task.
 
-2. **Parameter vs argument?**  
-   A parameter appears in the function definition; an argument is the value passed during a call.
+2. **Why use functions in a pipeline?**  
+   To avoid duplicated logic, isolate transformations, improve testing and make code easier to maintain.
 
-3. **Return vs print?**  
-   Return sends a value to the caller. Print displays it but does not provide a reusable result.
+3. **What is a parameter?**  
+   A variable named in a function definition.
 
-4. **What is a module?**  
-   A Python file that groups related code and can be imported by another file.
+4. **What is an argument?**  
+   A value supplied when calling a function.
 
-5. **What is a docstring?**  
-   A string documenting a function, class or module's purpose and usage.
+5. **What does return do?**  
+   It sends a result back to the caller and ends that function execution.
 
-## 2. Difference-based questions
+6. **Print vs return?**  
+   Print displays a value; return makes a value available to the calling code.
 
-| Compare | Answer |
+7. **What is a default parameter?**  
+   A parameter with a fallback value used when the caller omits it.
+
+8. **What is a keyword argument?**  
+   An argument supplied using its parameter name.
+
+9. **What is local scope?**  
+   A variable created inside a function is normally available only within that function.
+
+10. **What is a module?**  
+    A Python file containing reusable code that can be imported.
+
+11. **What is a package?**  
+    A way to organize related Python modules for reuse and distribution.
+
+12. **Why split a project into modules?**  
+    It separates responsibilities and makes code easier to understand, test and maintain.
+
+13. **What happens if a function has no return statement?**  
+    It returns `None` by default.
+
+14. **Why validate function inputs?**  
+    To reject invalid values early and prevent incorrect downstream results.
+
+15. **What is a virtual environment?**  
+    An isolated environment for the dependencies of one project.
+
+## 2. Difference questions
+
+| Concept | Difference |
 |---|---|
-| Positional vs keyword argument | Matched by position vs parameter name |
-| Local vs global variable | Defined in a function scope vs module scope |
-| Function vs module | Reusable callable block vs file grouping code |
-| `return` vs `yield` | Return a function result vs produce generator values over time |
-| Import vs execute | Load module definitions vs run entry-point behavior |
+| Parameter / argument | Definition name / supplied value |
+| Print / return | Display / send result to caller |
+| Positional / keyword argument | Matched by order / matched by name |
+| Function / module | Reusable code block / Python file containing definitions |
+| Module / package | One importable module / organized collection of modules |
+| Local / global variable | Function-local name / module-level name |
+| Library / framework | Reusable tools / framework often controls application structure |
 
-## 3. Practical questions
+## 3. Practical coding questions
 
-6. **How do you prevent invalid input?**  
-   Validate at the function boundary and raise a meaningful exception or return an explicit validation result.
+**Q1. Write a function to calculate order amount.**
 
-7. **How do you organize reusable transformations?**  
-   Keep related functions in a module, give each function a focused responsibility, document assumptions and import them from the pipeline entry point.
+```python
+def calculate_amount(quantity, price):
+    return quantity * price
 
-8. **Why avoid mutable default arguments?**  
-   The same default object can be reused across calls, causing state to leak between executions. Use `None` and create a new object inside.
+print(calculate_amount(2, 250))
+```
 
-## 4. Scenario questions
+Output: `500`.
 
-### Scenario A: Revenue logic copied in three scripts
-Create one tested transformation function and reuse it. Confirm all scripts use the same approved revenue definition.
+**Q2. Use a default discount.**
 
-### Scenario B: ImportError in a project
-Check file name, import statement, package layout, working directory and active interpreter. Avoid naming project files after standard modules such as `json.py`.
+```python
+def apply_discount(amount, rate=0.10):
+    return amount * (1 - rate)
 
-### Scenario C: Function prints a value but downstream step receives None
-Replace print-only behavior with `return`, then assign the returned value to the next pipeline variable.
+print(apply_discount(1000))
+```
 
-## 5. Troubleshooting
+Output: `900.0`.
 
-- `NameError`: function or variable is not defined in the current scope.
-- `TypeError`: wrong number or type of arguments.
-- `ValueError`: argument value is invalid.
-- `ImportError`: module or requested name cannot be imported.
-- Unexpected shared list: inspect mutable defaults and global state.
+**Q3. Normalize a status.**
 
-## 6. Follow-up questions
+```python
+def normalize_status(status):
+    return status.strip().upper()
 
-- What is a pure function?
-- What is function scope?
-- Why use a main guard?
-- How do you document expected input types?
-- How would you test a transformation?
-- When should a function raise an exception?
+print(normalize_status(" shipped "))
+```
 
-## 7. Mini-project defence
+Output: `SHIPPED`.
 
-Explain each function's contract, input, output, validation and side effects. Show that the same transformation produces the same result for the same input and that invalid records fail visibly rather than being silently changed.
+**Q4. Reject invalid quantity.**
+
+```python
+def validate_quantity(quantity):
+    if quantity <= 0:
+        raise ValueError("quantity must be positive")
+    return quantity
+
+print(validate_quantity(2))
+```
+
+Output: `2`.
+
+**Q5. Return two summary values.**
+
+```python
+def summarize(values):
+    return sum(values), len(values)
+
+total, count = summarize([100, 200, 300])
+print(total, count)
+```
+
+Output: `600 3`.
+
+## 4. Scenario-based questions
+
+1. **The same transformation is copied into four pipeline steps. What would you do?**  
+   Move the shared business rule into one function, test it and call it from each step.
+
+2. **A function prints a total but the next pipeline step needs to use it. What is wrong?**  
+   It should return the total. Printed output is not a reusable program result.
+
+3. **A function accepts a negative price. How do you protect it?**  
+   Validate the input and raise a clear exception before calculation.
+
+4. **An import fails with ModuleNotFoundError. What do you inspect?**  
+   Confirm the module filename, project folder, working directory, import spelling and active Python environment.
+
+5. **A project works on one computer but not another. Why?**  
+   Dependencies or Python versions may differ. Use a virtual environment and record dependencies.
+
+## 5. Follow-up questions
+
+- Can a function return more than one value?
+- What does a function return if there is no return statement?
+- Why should functions generally have one clear responsibility?
+- What is a docstring?
+- What is the difference between importing a full module and importing selected names?
+- Why are mutable default arguments dangerous?
+- How would you test a transformation function?
+
+## 6. Strong revision points
+
+- Functions reduce duplication and make business rules reusable.
+- Parameters define inputs; arguments supply values.
+- Return values connect one pipeline step to another.
+- Validate assumptions at function boundaries.
+- Modules organize reusable code.
+- Virtual environments and dependency files support reproducible execution.
