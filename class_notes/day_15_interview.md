@@ -131,3 +131,51 @@ Output: `15.0`.
 - Understand the axis direction on a small example.
 - Treat missing values deliberately.
 - Do not assume floating-point values are exact currency values.
+
+
+---
+
+## 7. Follow-up interview questions
+
+16. What is an ndarray? NumPy's multidimensional array structure.
+17. What does ndim mean? Number of array dimensions.
+18. What does shape mean? The length along each dimension.
+19. What does size mean? Total number of array elements.
+20. What is vectorization? Applying operations to whole arrays rather than writing explicit Python loops for each element.
+21. What is broadcasting? NumPy's rules for applying operations to arrays with compatible shapes.
+22. What is a Boolean mask? A Boolean array used to select matching elements.
+23. What does axis=0 mean for a 2D sum? Reduce down rows, producing one sum per column.
+24. What does axis=1 mean? Reduce across columns, producing one sum per row.
+25. What is NaN? A special floating-point value representing not-a-number, often used for missing numerical values.
+26. What does nanmean do? Calculates a mean while ignoring NaN values.
+27. Does NumPy replace Spark? No. NumPy is generally in-memory on one machine; Spark distributes processing across a cluster.
+28. Why inspect dtype? To detect unexpected numeric types, object arrays or conversion problems.
+29. Why can broadcasting fail? The dimensions may not satisfy NumPy's compatibility rules.
+30. Why be careful with financial floats? Binary floating point cannot represent every decimal fraction exactly; financial calculations need explicit precision and rounding rules.
+
+## 8. Scenario questions
+
+A daily revenue array contains NaN. Decide whether the metric should exclude, impute or reject the missing value and document the business rule.
+
+Two arrays cannot be multiplied. Inspect their shapes and align them intentionally rather than reshaping blindly.
+
+A dataset is too large for one machine's memory. Consider database-side processing or a distributed tool such as Spark instead of assuming NumPy can scale without limit.
+
+## 9. Mini-project defense
+
+- What shape did your arrays have?
+- Which operation was vectorized?
+- How did you interpret axis?
+- What happened to NaN values?
+- How did you reconcile the computed total?
+
+## 10. Readiness rubric
+
+| Skill | Ready when the student can… |
+|---|---|
+| Structure | Explain ndim, shape, size and dtype |
+| Indexing | Select array values and slices |
+| Computation | Use vectorized operations |
+| Filtering | Apply Boolean masks |
+| Aggregation | Explain axis behavior |
+| Missing values | Identify NaN and justify a handling rule |
