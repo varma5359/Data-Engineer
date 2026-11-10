@@ -1,105 +1,338 @@
-# Day 4 — Data Architecture and Integration
-**Pathway:** TechPhile.ai Data Engineer | **Phase:** Foundations | **Level:** Beginner
+# Day 4: Data Architecture and Integration
 
-## Learning objectives
-Explain ETL and ELT, compare data lake/warehouse/lakehouse, trace a pipeline, and understand where Kafka and dbt fit.
+**Phase:** 1 — Data Engineering Foundations  
+**Learning time:** 2–3 hours  
+**Mini-project:** ETL/ELT Architecture Designer
 
-## 1. What is data integration?
-Combining data from multiple systems into a consistent destination or view. Example: customer database + product files + sales API → retail analytics dataset.
+## 1. Learning outcomes
 
-Integration challenges:
-- Different identifiers and schemas.
-- Different update frequencies.
-- Missing/duplicate records.
-- Conflicting business definitions.
-- Access restrictions and source outages.
+- Explain ETL and ELT and when each is useful.
+- Distinguish data lakes, warehouses and lakehouses.
+- Understand the purpose of a data pipeline.
+- Recognize where Kafka and dbt fit in a modern architecture.
+- Design a simple integration flow and explain its trade-offs.
 
-## 2. ETL — Extract, Transform, Load
-`Source → Extract → Transform → Load destination`
+## 2. Why data architecture matters
 
-Transformations happen before loading into the final destination. Often useful when destination should receive only prepared data or when transformations occur in an integration layer.
+A company may have orders in PostgreSQL, payments in an API, inventory in CSV files and website activity in event messages.
 
-Example: extract CSV, standardize dates and validate, then load clean rows into a database.
+Without an integration architecture:
 
-## 3. ELT — Extract, Load, Transform
-`Source → Extract → Load raw data → Transform inside destination`
+- Teams create separate extracts.
+- Business rules are duplicated.
+- Reports disagree.
+- Source systems receive unnecessary load.
+- Data lineage becomes difficult to trace.
+- Failures are hard to investigate.
 
-Raw data is loaded first; transformation uses the compute capabilities of the warehouse/lakehouse.
+A data architecture defines how data is collected, stored, transformed, protected and delivered.
 
-Example: land API data in raw tables, then use SQL/dbt models to build curated sales tables.
+## 3. What is ETL?
 
-## ETL vs ELT
-| ETL | ELT |
-|---|---|
-| Transform before final load | Load then transform |
-| Integration engine performs transform | Destination compute performs transform |
-| Useful for controlled/prepared loads | Useful for scalable warehouse-native SQL |
-| Raw retention depends on design | Raw landing is commonly retained |
+ETL means **Extract, Transform, Load**.
 
-Neither is universally best. Choose based on source, destination, security, latency, transformation complexity, and cost.
+1. Extract data from source systems.
+2. Transform it in a processing environment.
+3. Load the transformed result into the target.
 
-## 4. Data lake
-A data lake stores data in varied formats, often object storage, including raw and processed files. It can hold structured, semi-structured, and unstructured data.
+Flow:
 
-Typical organization:
-`raw/ → processed/ → curated/`
-- Raw: original ingestion.
-- Processed: standardized/cleaned.
-- Curated: approved datasets for use.
+`Sources -> Extract -> Transform -> Load -> Warehouse`
 
-A lake needs cataloging, access controls, quality, and lifecycle rules; otherwise it can become a “data swamp.”
+Example: extract order records, standardize currencies and remove invalid rows in a processing job, then load the curated sales table into the warehouse.
 
-## 5. Data warehouse
-A data warehouse is organized for analytical querying and reporting. It typically integrates historical business data and provides modeled tables, dimensions, facts, and consistent metrics.
+ETL is useful when data must be transformed before entering the target, when the target has limited transformation capability, or when sensitive fields must be filtered before loading.
 
-Example: sales fact joined with customer, product, and date dimensions.
+## 4. What is ELT?
 
-## 6. Lakehouse
-A lakehouse combines low-cost flexible lake storage with table-management and analytical capabilities commonly associated with warehouses (such as schema enforcement, transactions, and optimized querying, depending on technology).
+ELT means **Extract, Load, Transform**.
 
-Do not treat “lakehouse” as simply another folder; it includes table/metadata and processing capabilities.
+1. Extract source data.
+2. Load it into a target platform, often a cloud warehouse or lakehouse.
+3. Transform it using the target's processing capabilities.
 
-## Lake vs warehouse vs lakehouse
-| Data lake | Warehouse | Lakehouse |
+Flow:
+
+`Sources -> Extract -> Load raw data -> Transform in target -> Curated tables`
+
+Example: load source order records into a raw warehouse schema, then use SQL transformations to create cleaned order and sales tables.
+
+ELT is useful when the target can scale compute, preserve raw data and run transformations close to the stored data.
+
+## 5. ETL vs ELT
+
+| Dimension | ETL | ELT |
 |---|---|---|
-| Flexible file/object storage | Curated analytical database | Lake storage with managed analytical tables |
-| Many data types | Mostly structured analytical data | Structured + broader data |
-| Schema may be applied at read/write depending design | Strong modeled schema | Table-level schema/management features |
-| Requires governance/catalog | Strong modeling and governance | Requires governance/catalog too |
+| Order | Transform before load | Load before transform |
+| Transformation location | Separate processing layer | Target platform |
+| Raw data retention | Depends on design | Commonly retained in raw/landing layer |
+| Compute | ETL engine or application | Warehouse/lakehouse |
+| Useful when | Pre-load rules or target constraints matter | Target has scalable processing |
+| Risk | Transformation can become a bottleneck | Raw layer can become messy without governance |
 
-## 7. Kafka and dbt — introductory placement
-### Kafka
-A distributed event streaming platform. Producers publish events to topics; consumers read events. It is useful for event pipelines and streaming integration, not a replacement for every batch job or database.
+Neither approach is universally better. Many platforms combine both patterns.
 
-### dbt
-A transformation workflow/tool focused on SQL models in analytics environments. It helps organize transformations, dependencies, tests, and documentation. It is not normally the tool that extracts every source API.
+## 6. What is a data lake?
 
-## 8. Integrated retail architecture
-`Customer DB + Product CSV + Sales API`
-`→ Ingestion jobs → Raw lake/staging → Validation & transformations → Warehouse facts/dimensions → BI`
+A data lake stores large volumes of data in its original or lightly processed form, often in object storage.
 
-- Batch file and database ingestion can run on a schedule.
-- API ingestion handles pagination and rate limits.
-- Raw copies support replay.
-- SQL/dbt models build curated tables.
-- Quality tests check keys, values, and relationships.
-- Monitoring reports freshness and failures.
+It can hold:
 
-## 9. Mini-project — ETL/ELT Architecture Designer
-Draw two architectures for the same retail requirement:
-1. ETL: transform in Python/integration layer before warehouse load.
-2. ELT: land raw data, transform with SQL/dbt in warehouse.
+- CSV and JSON files.
+- Parquet datasets.
+- Application logs.
+- Images and documents.
+- Historical snapshots.
 
-For each, identify source, compute location, raw retention, quality checks, security boundary, and consumers. State why your design fits.
+Strengths:
 
-## 10. Common mistakes
-- Believing ETL is obsolete or ELT always better.
-- Calling every object-storage folder a lakehouse.
-- Forgetting raw data retention and replay strategy.
-- Treating Kafka as a database or a universal ingestion solution.
-- Assuming dbt performs source extraction and infrastructure orchestration by itself.
+- Flexible storage for varied formats.
+- Separation of storage and compute in many cloud designs.
+- Useful for retaining raw and historical data.
 
-## Quick revision
-- ETL transforms before final load; ELT loads then transforms.
-- Lake stores varied data; warehouse is modeled for analytics; lakehouse adds managed analytical table capabilities on lake storage.
-- Kafka handles event streams; dbt organizes warehouse SQL transformations.
+Risks:
+
+- Poorly governed lakes can become difficult to discover and trust.
+- Inconsistent schemas can break consumers.
+- Small files and poor partitioning can hurt performance.
+- Access control and retention need deliberate design.
+
+A data lake is not automatically a warehouse. The organization must add cataloging, quality, access rules and curated datasets.
+
+## 7. What is a data warehouse?
+
+A data warehouse is an analytical data store that integrates data and organizes it for reporting and analysis.
+
+Typical characteristics:
+
+- Consistent business definitions.
+- Historical data.
+- Curated tables.
+- Analytical query patterns.
+- Controlled access and governance.
+
+Example subject areas:
+
+- Sales.
+- Customers.
+- Products.
+- Inventory.
+- Payments.
+
+A warehouse can contain fact and dimension tables. Detailed modeling is covered later in the pathway.
+
+## 8. What is a lakehouse?
+
+A lakehouse combines aspects of data lakes and warehouses: flexible, lower-cost object storage with table management and analytical capabilities such as schema enforcement, transactions and performance optimization.
+
+The exact capabilities depend on the platform and table format.
+
+A lakehouse is not simply a folder of Parquet files. Reliable table management, metadata, concurrency and governance are important.
+
+## 9. Compare lake, warehouse and lakehouse
+
+| Dimension | Data lake | Data warehouse | Lakehouse |
+|---|---|---|---|
+| Main purpose | Store diverse data | Trusted analytics | Lake flexibility with managed analytical tables |
+| Data shape | Raw to curated, varied formats | Structured and modeled | Structured and varied |
+| Schema approach | Often schema-on-read, depending on design | Curated schemas | Table schemas and metadata |
+| Typical users | Engineers, data scientists | Analysts, BI teams | Engineers, analysts, data scientists |
+| Main risk | Data swamp | Cost or rigidity if poorly designed | Platform complexity and governance gaps |
+
+## 10. Data pipeline architecture
+
+A pipeline connects the source to a consumer through controlled stages.
+
+Example layered flow:
+
+`Source -> Landing -> Raw -> Standardized -> Curated -> Consumer`
+
+### Landing
+Temporary or initial arrival location. It may hold original files and metadata.
+
+### Raw
+Preserves received source data with minimal alteration. Supports traceability and replay.
+
+### Standardized
+Applies technical normalization such as consistent timestamps, types and naming.
+
+### Curated
+Applies approved business rules and produces consumer-ready datasets.
+
+### Consumer
+Warehouse tables, dashboards, applications, APIs or machine-learning features.
+
+Not every project needs every layer. Use layers when they improve traceability, quality or ownership.
+
+## 11. Introduction to Kafka
+
+Apache Kafka is a distributed event-streaming platform.
+
+Core terms:
+
+- Producer: publishes records.
+- Topic: named stream of records.
+- Partition: ordered subset of a topic that enables parallelism.
+- Broker: Kafka server that stores and serves partitions.
+- Consumer: reads records.
+- Consumer group: consumers cooperating to process partitions.
+- Offset: position of a record within a partition.
+
+Example: an order service publishes `OrderCreated` events to a topic. Inventory, notifications and analytics consumers independently read the events.
+
+Kafka is useful when multiple systems need durable event distribution and scalable consumption. It introduces operational concerns such as partition design, consumer lag, retention, schema compatibility and duplicate-safe processing.
+
+## 12. Introduction to dbt
+
+dbt is a transformation workflow commonly used to build and manage SQL models in a data warehouse or lakehouse.
+
+It helps teams:
+
+- Organize SQL transformations into models.
+- Define dependencies between models.
+- Add data tests.
+- Document tables and columns.
+- Generate lineage information.
+- Review transformation changes in version control.
+
+A simple conceptual flow:
+
+`Raw tables -> staging models -> intermediate models -> marts`
+
+dbt does not replace every ingestion tool or orchestration platform. It primarily manages transformations inside supported data platforms.
+
+## 13. How Kafka and dbt fit together
+
+They solve different problems:
+
+| Technology | Main responsibility |
+|---|---|
+| Kafka | Transport and retain event streams |
+| Object storage | Store files and datasets |
+| Warehouse/lakehouse | Store analytical tables |
+| dbt | Transform warehouse/lakehouse data using SQL |
+| Airflow | Schedule and coordinate workflows |
+| BI tool | Present analytical results |
+
+A system may use Kafka for event ingestion and dbt for downstream SQL modeling. They are complementary, not substitutes.
+
+## 14. Architecture selection example
+
+Requirement: management needs daily sales reporting, while operations needs payment-failure alerts within seconds.
+
+Possible design:
+
+- Orders arrive from PostgreSQL through incremental extraction.
+- Payment events arrive through an event stream.
+- Raw files/events are retained in a governed landing area.
+- Daily sales data is transformed into warehouse tables.
+- Payment events feed a low-latency operational alert process.
+- dbt models build analytical marts.
+- Airflow schedules batch dependencies.
+- Monitoring tracks freshness, failures and data quality.
+
+The architecture uses more than one processing pattern because the requirements differ.
+
+## 15. Mini-project: ETL/ELT Architecture Designer
+
+### Scenario
+
+Retail company sources:
+
+- PostgreSQL orders.
+- Payment API.
+- Inventory CSV.
+- Website events.
+
+Business needs:
+
+1. Daily finance reporting.
+2. Payment failure alert within seconds.
+3. Product performance analysis.
+4. Historical source retention.
+
+### Step 1 — Record requirements
+
+| Requirement | Target |
+|---|---|
+| Finance reporting | Daily by 7 AM |
+| Payment alert | Within 10 seconds |
+| Product analysis | Daily refresh |
+| Historical retention | Defined by data governance policy |
+
+Targets are scenario assumptions. In a real project, validate them with stakeholders.
+
+### Step 2 — Select architecture components
+
+| Need | Candidate component | Reason |
+|---|---|---|
+| Order extraction | Incremental database connector/job | Avoid full reads each run |
+| Payment events | Kafka or managed event service | Low-latency distribution |
+| File landing | Object storage | Durable file retention |
+| Analytical storage | Warehouse/lakehouse | Historical analytics |
+| SQL transformations | dbt or SQL jobs | Versioned and tested models |
+| Scheduling | Airflow | Dependency management |
+| Monitoring | Logs, metrics and alerts | Operational visibility |
+
+### Step 3 — Draw both flows
+
+Batch analytical flow:
+
+`Orders + Inventory -> Ingestion -> Raw storage -> SQL/dbt transforms -> Warehouse marts -> BI`
+
+Low-latency event flow:
+
+`Payment provider -> Event ingestion -> Stream consumer -> Payment alert`
+
+### Step 4 — Add governance
+
+Document:
+
+- Source and target owners.
+- Field definitions.
+- Data sensitivity.
+- Access roles.
+- Retention and deletion policy.
+- Quality rules.
+- Lineage.
+- Recovery and replay method.
+
+### Step 5 — Deliverable
+
+Submit a diagram and one-page design note explaining:
+
+- ETL or ELT choice.
+- Lake, warehouse or lakehouse role.
+- Why separate batch and streaming flows exist.
+- Where dbt and Kafka fit.
+- How data quality, security and monitoring work.
+
+## 16. Common mistakes
+
+| Mistake | Better practice |
+|---|---|
+| Saying ETL is old and ELT is always better | Choose based on target capability and requirements |
+| Calling object storage a warehouse | Explain modeling and query responsibilities |
+| Treating a lakehouse as just files | Include table metadata, transactions and governance |
+| Using Kafka for every file transfer | Match the tool to the need |
+| Expecting dbt to extract every source | Use ingestion tools for source movement |
+| Ignoring raw retention | Define replay and retention policy |
+| Building layers without purpose | Give each layer a clear contract and owner |
+
+## 17. Day 4 revision
+
+- ETL transforms before loading; ELT loads before transforming.
+- A lake stores diverse data; a warehouse organizes trusted analytics; a lakehouse combines capabilities.
+- Pipeline layers improve traceability when their responsibilities are clear.
+- Kafka distributes event streams.
+- dbt organizes SQL transformations, tests and documentation.
+- Architecture follows latency, volume, governance and cost requirements.
+
+## 18. Check your understanding
+
+1. When might ETL be preferable to ELT?
+2. Why does a data lake need governance?
+3. What makes a lakehouse different from a folder of Parquet files?
+4. What is a Kafka topic?
+5. What problem does dbt solve?
+6. Why might one company use batch and streaming together?
