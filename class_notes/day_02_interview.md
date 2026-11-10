@@ -1,62 +1,112 @@
-# Day 2 — Data Processing Fundamentals | Interview Preparation
+# Day 2 Interview Preparation: Data Processing Fundamentals
 
-## Core Q&A
+**Mini-project:** Data Processing Comparison Lab
+
+## 1. Core questions
 
 ### 1. What is OLTP?
-OLTP supports operational transactions such as order creation and payment updates. It handles many short reads/writes and prioritizes transaction correctness.
+OLTP supports operational transactions such as placing orders, updating inventory and recording payments. It is optimized for many concurrent, short transactions.
 
 ### 2. What is OLAP?
-OLAP supports analytical workloads such as trend analysis and large aggregations over historical data. It is optimized for reading and exploring datasets.
+OLAP supports analytical queries over integrated or historical data. It is commonly used for aggregations, trends and business reporting.
 
-### 3. Why should analytical workloads be separated from OLTP?
-Analytical scans and joins can consume resources and affect application response time. Replicating data into an analytical platform isolates workloads and enables historical modeling.
+### 3. Why separate OLTP and OLAP workloads?
+Large analytical queries can consume resources needed by customer-facing transactions. Separating workloads helps protect application performance and allows analytical storage to be organized for reporting.
 
 ### 4. What is batch processing?
-Processing a defined set of records together, usually on a schedule or trigger. Example: load yesterday's transactions and calculate daily revenue.
+Batch processing collects a bounded set of records and processes them together, often on a schedule. Daily sales aggregation is a typical example.
 
 ### 5. What is stream processing?
-Processing a continuous flow of events, often with low latency. Example: react to payment events to detect suspicious activity.
+Stream processing handles a continuous flow of events, allowing systems to react with low latency. Payment events and sensor readings are common examples.
 
-### 6. Batch vs streaming?
-Batch is bounded and periodic; streaming is continuous/event-driven. Streaming has additional operational concerns such as state, event ordering, late arrivals, checkpoints, and consumer lag.
+### 6. What is event-driven architecture?
+A design in which a producer publishes an event and one or more consumers react to it. Producers and consumers can evolve independently, but duplicate delivery, ordering and schema compatibility must be managed.
 
-### 7. Real-time vs near-real-time?
-Both require a latency target. Real-time usually has a strict response bound; near-real-time accepts a small delay. Clarify the actual SLA rather than relying on labels.
+## 2. Difference-based questions
 
-### 8. What is event-driven architecture?
-Components communicate through events representing facts that occurred. Producers publish events; consumers process them independently. This reduces coupling but requires careful handling of duplicates, failures, and schemas.
+| Compare | Answer |
+|---|---|
+| OLTP vs OLAP | Operational transactions vs analytical queries |
+| Batch vs streaming | Bounded group processing vs continuous event processing |
+| Real-time vs near-real-time | Strict or very low response target vs small acceptable delay |
+| Event time vs processing time | When event occurred vs when processor handled it |
+| Producer vs consumer | Publishes events vs reads and processes events |
+| At-most-once vs at-least-once | Possible loss without duplicates vs possible duplicates with reduced loss |
 
-## Comparison table
-| Question | OLTP | OLAP |
-|---|---|---|
-| Main purpose | Run business operations | Analyze business data |
-| Typical query | Find/update one order | Revenue by month and region |
-| Data | Current operational | Historical and integrated |
-| Workload | Transactional | Analytical |
+## 3. Practical questions
 
-## Scenario: choose processing pattern
-- Payroll calculation once per month → batch.
-- Fraud signal during payment → stream/low latency.
-- Dashboard refreshed every 10 minutes → micro-batch or scheduled batch may suffice.
-- Daily source reconciliation → batch, even if operational events are streamed.
+### 7. How would you choose batch or streaming?
+I would confirm the business latency target, data volume, event behavior, ordering requirements, recovery needs, team capability and operating cost. I would use batch when delayed results are acceptable and streaming when low latency has clear business value.
 
-## Troubleshooting stream systems
-If dashboard lag increases:
-1. Check producer rate and consumer rate.
-2. Inspect consumer lag and processing duration.
-3. Look for downstream database/API bottlenecks.
-4. Check partition/key skew.
-5. Review errors, retries, and backpressure.
-6. Scale or optimize the actual bottleneck; don't blindly add consumers.
+### 8. How would you prevent a streaming consumer from applying the same payment twice?
+Use a stable event or transaction identifier, record processed identifiers or use a target operation that is idempotent. The exact method depends on the storage system and transaction boundary.
 
-## Follow-up prompts
-- What is a processing window?
-- What is event time vs processing time?
-- What is consumer lag?
-- How do batch and streaming coexist?
-- Why can events be delivered more than once?
+### 9. How would you handle late-arriving events?
+Define an event-time policy, allow an appropriate lateness window where needed, update affected aggregates or partitions, and make corrections traceable. The policy depends on the business tolerance for revised results.
 
-## Quick revision
-- Explain OLTP/OLAP with an order application example.
-- Pick batch vs streaming from latency and failure requirements.
-- Mention duplicate events, late arrivals, and recovery for streaming scenarios.
+## 4. Scenario questions
+
+### Scenario A: A dashboard must refresh every five minutes
+**Problem:** Management asks for “real-time” inventory visibility.
+
+**Action:** Clarify whether five-minute freshness is sufficient. Consider incremental batch or micro-batch ingestion, measure end-to-end freshness and alert when the delay exceeds the target.
+
+**Reasoning:** A continuously running streaming platform may be unnecessary if five-minute latency satisfies the business need.
+
+### Scenario B: Payment events are duplicated
+**Problem:** A retry causes the same payment event to reach a consumer twice.
+
+**Action:** Use a stable payment/event ID and idempotent processing. Reconcile the resulting payment state with the authoritative payment system.
+
+**Reasoning:** At-least-once delivery can produce duplicates; the business effect must still occur only once.
+
+### Scenario C: Events arrive out of order
+**Problem:** `OrderShipped` arrives before `OrderPaid`.
+
+**Action:** Use event timestamps and entity keys, define valid state transitions, buffer or reconcile where appropriate, and avoid blindly overwriting newer state with older events.
+
+**Reasoning:** Arrival order is not always business-event order.
+
+## 5. Troubleshooting
+
+### 10. Batch completed but data is missing
+Check input discovery, source query filters, file completeness, rejected records, transformation conditions, load status and reconciliation metrics.
+
+### 11. Streaming lag is increasing
+Check consumer throughput, partition assignment, slow downstream writes, retry loops, broker health, message size and recent deployments. Compare incoming rate with processing rate.
+
+### 12. OLTP queries became slow after a report was added
+Check query plans and resource utilization. Move heavy analytical work to a reporting or warehouse environment where appropriate, and review indexing and workload scheduling.
+
+## 6. Follow-up questions
+
+- What is a micro-batch?
+- What is a dead-letter queue?
+- Why are event schemas versioned?
+- What is a consumer offset?
+- Can streaming systems lose data?
+- What does idempotency mean?
+- How would you replay an event safely?
+- How do you measure data freshness?
+
+## 7. Strong revision points
+
+- Explain workload purpose before naming a technology.
+- State the latency requirement explicitly.
+- Streaming does not remove the need for validation and recovery.
+- Duplicate-safe processing is essential for retryable systems.
+- Event time and processing time are different.
+- Measure end-to-end freshness, not only job execution time.
+
+## 8. Mini-project defence
+
+For each of the five use cases in the Data Processing Comparison Lab, defend:
+
+1. The chosen processing pattern.
+2. The required latency.
+3. Expected volume and growth.
+4. Duplicate and late-event handling.
+5. Failure recovery.
+6. Cost and operational trade-offs.
+
+A strong answer explains why a simpler alternative would or would not meet the requirement.
