@@ -4,56 +4,141 @@
 
 ## 1. Core questions
 
-1. **What is Git?** A distributed version-control system for tracking project history.
-2. **What is a commit?** A recorded snapshot of staged changes.
-3. **What is a branch?** An independent line of development.
-4. **What is a remote?** A named reference to a hosted repository.
-5. **Why use pull requests?** To review, discuss and validate changes before integration.
-6. **What is .gitignore?** A file specifying untracked paths Git should ignore.
+1. **What is Git?**  
+   A distributed version control system used to track code changes and collaborate.
 
-## 2. Difference-based questions
+2. **What is GitHub?**  
+   A hosting and collaboration platform for Git repositories.
 
-| Compare | Answer |
+3. **What is a repository?**  
+   Project files together with their version history.
+
+4. **What is the working tree?**  
+   The files currently checked out in the local project.
+
+5. **What is the staging area?**  
+   The place where selected changes are prepared for the next commit.
+
+6. **What is a commit?**  
+   A recorded snapshot of staged changes with metadata and a message.
+
+7. **What is a branch?**  
+   A separate line of development that can be changed and merged independently.
+
+8. **What is a merge?**  
+   Integrating changes from another branch.
+
+9. **What is a merge conflict?**  
+   A situation where Git cannot automatically reconcile competing changes.
+
+10. **What does git clone do?**  
+    Copies a remote repository locally, including its history.
+
+11. **What does git fetch do?**  
+    Downloads remote updates without integrating them into the current branch.
+
+12. **What does git pull do?**  
+    Fetches and integrates remote changes.
+
+13. **What does git push do?**  
+    Publishes local commits to a remote repository.
+
+14. **What is .gitignore?**  
+    A file listing untracked paths Git should ignore.
+
+15. **Does .gitignore remove a file already tracked by Git?**  
+    No. It does not automatically untrack existing files or erase history.
+
+16. **Why should secrets not be committed?**  
+    Repository history may expose credentials. Rotate any credential that is accidentally published.
+
+## 2. Difference questions
+
+| Concept | Difference |
 |---|---|
-| Git vs GitHub | Version-control tool vs hosted collaboration platform |
-| add vs commit | Stage changes vs record staged snapshot |
-| fetch vs pull | Download remote updates vs fetch and integrate |
-| merge vs rebase | Combine histories vs replay commits onto another base |
-| revert vs reset | New reversing commit vs move branch pointer/change working state |
-| tracked vs ignored | Already in repository history vs untracked path excluded by rules |
+| Git / GitHub | Version-control tool / hosted collaboration service |
+| add / commit | Stage selected changes / record staged snapshot |
+| commit / push | Save locally / publish commits to remote |
+| fetch / pull | Download remote history / download and integrate |
+| branch / tag | Movable development reference / named reference to a specific point |
+| merge / rebase | Combine histories / replay commits onto another base |
+| tracked / untracked | Already known to Git / not yet tracked |
 
-## 3. Practical questions
+## 3. Practical command questions
 
-7. **How do you create a feature branch?** `git switch -c feature/name`.
-8. **How do you inspect changes before commit?** `git status` and `git diff`.
-9. **How do you resolve a conflict?** Review both changes, edit the intended result, test, stage and complete merge.
-10. **How do you protect secrets?** Keep them outside source control, use secret management and rotate any exposed credential.
+**Q1. Initialize a repository.**
 
-## 4. Scenario questions
+```bash
+git init
+```
 
-### Scenario A: Accidentally staged a .env file
-Unstage it, ensure it is ignored, inspect whether it was committed or pushed, and rotate any exposed credentials. Removing it from the latest working tree does not erase history.
+**Q2. Check current changes.**
 
-### Scenario B: Teammate changed the same function
-Fetch latest changes, inspect conflict context, discuss intended behavior, resolve carefully and run tests.
+```bash
+git status
+```
 
-### Scenario C: Large data files make repository huge
-Remove them from tracking through an approved history/data strategy, use external object storage or Git LFS where appropriate, and document dataset access. Do not rewrite shared history without coordination.
+**Q3. Stage one file.**
 
-## 5. Troubleshooting
-- Push rejected: fetch/reconcile remote changes and check branch protection.
-- Wrong identity: inspect Git user.name and user.email.
-- Ignored file still tracked: remove it from index; ignore rules affect untracked files.
-- Conflict after pull: inspect status and resolve each file.
-- Detached HEAD: switch to a branch before continuing normal work.
+```bash
+git add pipeline.py
+```
 
-## 6. Follow-up questions
-- What is a pull request review?
-- What is a protected branch?
-- What is semantic versioning?
-- Why write small commits?
-- What is a release tag?
-- How do you roll back a bad deployment?
+**Q4. Commit staged changes.**
 
-## 7. Mini-project defence
-Demonstrate repository structure, .gitignore, requirements, tests, feature branch, commit history and remote push. Explain how code review and CI checks would improve the workflow.
+```bash
+git commit -m "Add order transformation"
+```
+
+**Q5. Create and switch to a feature branch.**
+
+```bash
+git switch -c feature/order-summary
+```
+
+**Q6. Inspect history.**
+
+```bash
+git log --oneline
+```
+
+## 4. Scenario-based questions
+
+1. **You accidentally staged a password file but have not committed. What do you do?**  
+   Unstage it, remove the secret from the working copy, add the file pattern to .gitignore if appropriate, and verify the staged changes before committing.
+
+2. **You committed and pushed an API key. What now?**  
+   Revoke or rotate the key immediately, notify the owner, inspect usage and follow the repository's secret-remediation process. Deleting the key from the latest file does not remove it from history.
+
+3. **A push is rejected because the remote has new commits. What do you do?**  
+   Fetch and inspect remote changes, integrate them safely, resolve conflicts if any, run tests and then push.
+
+4. **A teammate and you edit the same line. What is a merge conflict?**  
+   Git cannot choose the correct version automatically. Review the business intent, edit the final content, remove markers, test and commit the resolution.
+
+5. **A data folder contains large raw files. Should it be committed?**  
+   Usually not unless the project explicitly requires small, permitted sample data. Use a data storage location and document how to obtain the data.
+
+6. **Why create a feature branch?**  
+   It isolates work for review and reduces the risk of unfinished changes landing directly on main.
+
+## 5. Follow-up questions
+
+- What is HEAD?
+- What is a remote named origin?
+- What does git diff show?
+- What is the difference between git diff and git diff --staged?
+- Why use meaningful commit messages?
+- What is a pull request?
+- What should be included in a Python .gitignore?
+- How do you protect credentials in a pipeline project?
+
+## 6. Strong revision points
+
+- Check the branch and working tree before editing or committing.
+- Stage only intended files.
+- Commit small, meaningful changes.
+- Review diffs before committing.
+- Use feature branches and code review.
+- Never commit secrets or large raw datasets without an approved reason.
+- Test after resolving conflicts and before pushing.
