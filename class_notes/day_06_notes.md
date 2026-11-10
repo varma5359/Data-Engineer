@@ -6,398 +6,654 @@
 
 ## 1. Learning outcomes
 
-- Explain Python's role in data engineering.
-- Set up and verify a Python environment.
-- Understand interpreter, script, terminal and notebook.
-- Use variables, built-in data types and collections.
-- Write simple code to inspect and summarize source records.
+By the end of this lesson, you can:
 
-## 2. Why Python in data engineering?
+- Explain why Python is used in data engineering and where SQL fits.
+- Check Python installation and identify the interpreter used by a project.
+- Create and run a `.py` file from Windows Command Prompt or a terminal.
+- Understand variables, common data types and basic type conversion.
+- Store related records using lists and dictionaries.
+- Inspect a small set of order records and calculate useful totals.
 
-Python is widely used to connect to APIs and databases, process files, validate records, automate jobs and coordinate transformations. SQL is still essential for relational querying; Python complements it when a workflow needs application logic or integration.
+## 2. Why Python is important in data engineering
 
-Typical workflow: `Read source -> Validate -> Transform -> Write destination`.
+A data pipeline moves data from a source to a destination. Python is often used to connect the steps.
 
-## 3. Environment concepts
+**Example retail flow**
 
-| Term | Meaning |
-|---|---|
-| Python interpreter | Program that executes Python code |
-| Script | Saved Python source file, commonly `.py` |
-| Terminal | Text interface for running commands |
-| IDE/editor | Tool for editing and running code |
-| Virtual environment | Isolated project package environment |
-| Jupyter notebook | Interactive document with code and output cells |
-| Package | Reusable Python code installed into an environment |
+`Orders CSV -> Python validation -> Python transformation -> Database / Parquet output`
 
-Use the same interpreter for installing packages and running the project. A frequent beginner issue is installing a package into one Python environment and executing code with another.
+Python is useful for:
 
-## 4. Verify installation
+- Reading and writing files.
+- Calling REST APIs.
+- Connecting to databases.
+- Applying business rules that are awkward to express as one SQL query.
+- Scheduling and automating repeatable tasks.
+- Validating records before loading them.
 
-Open Command Prompt or terminal.
+SQL remains essential for querying and transforming relational data. Python and SQL are complementary, not competitors.
+
+## 3. Understand the development environment
+
+| Term | Simple meaning | Example |
+|---|---|---|
+| Python interpreter | Program that executes Python instructions | CPython |
+| Source file | File containing Python code | `main.py` |
+| Terminal | Place to run system commands | Windows CMD |
+| Editor / IDE | Place to write and inspect code | VS Code |
+| Notebook | Interactive document with code and output cells | Jupyter |
+| Package | Reusable code installed into Python | pandas |
+| Virtual environment | Isolated package area for one project | `.venv` |
+
+**Important:** Installing a package into one Python interpreter does not automatically install it into every other interpreter on your computer.
+
+## 4. Check whether Python is installed
+
+Open Windows Command Prompt.
 
 ```bash
 python --version
 ```
 
-If Windows does not recognize `python`, try:
+Example output (your version may differ):
+
+```text
+Python 3.12.4
+```
+
+If Windows cannot find `python`, try:
 
 ```bash
 py --version
 ```
 
-Check the executable:
+Example output:
+
+```text
+Python 3.12.4
+```
+
+Check which executable is used:
 
 ```bash
-python -c "import sys; print(sys.executable)"
+where python
 ```
 
-Expected output: a Python version and the path to the interpreter. The exact version and path depend on the machine.
+Example output varies by machine. It may show a path such as:
 
-Create a project folder and virtual environment:
+```text
+C:\Users\Student\AppData\Local\Programs\Python\Python312\python.exe
+```
+
+Do not copy the example path as if it must exist on your computer.
+
+## 5. Run your first Python statement
+
+In a terminal, enter:
 
 ```bash
-mkdir data_processing_utility
-cd data_processing_utility
-python -m venv .venv
-```
-
-Activate on Windows CMD:
-
-```bat
-.venv\Scripts\activate
-```
-
-Activate on PowerShell:
-
-```powershell
-.venv\Scripts\Activate.ps1
-```
-
-Deactivate:
-
-```bash
-deactivate
-```
-
-## 5. First Python program
-
-Create `hello.py`.
-
-```python
-print("Data Engineering with Python")
-print("Reading source data")
-print("Preparing a pipeline")
-```
-
-Run:
-
-```bash
-python hello.py
+python -c "print('Hello, Data Engineering')"
 ```
 
 Expected output:
 
 ```text
-Data Engineering with Python
-Reading source data
-Preparing a pipeline
+Hello, Data Engineering
 ```
 
-`print()` displays a value. Python executes statements from top to bottom unless control flow changes the order.
+- `python` starts the interpreter.
+- `-c` tells Python to execute the code supplied as text.
+- `print()` displays a value.
 
-## 6. Comments and indentation
+If you use the Windows launcher, the equivalent command is:
 
-```python
-# This is a comment. Python does not execute it.
-source_name = "orders.csv"
-
-if source_name.endswith(".csv"):
-    print("CSV source detected")
+```bash
+py -c "print('Hello, Data Engineering')"
 ```
 
-Indentation defines a code block. Use consistent four-space indentation. Incorrect indentation raises an error or changes the block's meaning.
+## 6. Create and run a Python file
 
-## 7. Variables and naming
+Create a folder named `day06_python`. Inside it, create `first_program.py`.
 
-A variable is a name referring to a value.
+Code in `first_program.py`:
 
 ```python
-source_name = "orders.csv"
-total_orders = 1250
-pipeline_active = True
-average_order_value = 845.75
-
-print(source_name)
-print(total_orders)
-print(pipeline_active)
-print(average_order_value)
+print("Welcome to Python")
+print("We are learning data engineering")
 ```
 
-Expected output: the four assigned values, each on a separate line.
+Run it from the folder:
 
-Naming rules:
-- Use meaningful names such as `total_orders`.
-- Use lowercase words separated by underscores.
-- Do not start a name with a number.
-- Avoid Python keywords such as `class` and `for`.
-- Constants are conventionally uppercase, e.g. `MAX_RETRIES = 3`.
+```bash
+python first_program.py
+```
 
-## 8. Core data types
+Expected output:
+
+```text
+Welcome to Python
+We are learning data engineering
+```
+
+A script is useful when you want to save, rerun and version-control a repeatable program.
+
+## 7. Comments and readable code
+
+Comments explain intent to a human reader. Python ignores a comment beginning with `#`.
 
 ```python
+# Number of orders received from the source system
+order_count = 125
+
+print(order_count)
+```
+
+Expected output:
+
+```text
+125
+```
+
+Prefer meaningful names such as `order_count` over unclear names such as `x1`.
+
+## 8. Variables
+
+A variable is a name that refers to a value.
+
+```python
+customer_name = "Asha"
 order_id = 501
-amount = 1250.50
-status = "PAID"
-is_valid = True
-missing_value = None
+order_amount = 1250.50
+is_paid = True
 
-print(type(order_id))
-print(type(amount))
-print(type(status))
-print(type(is_valid))
-print(type(missing_value))
-```
-
-| Type | Example | Use |
-|---|---|---|
-| int | `501` | Counts and whole numbers |
-| float | `1250.50` | Decimal measurements |
-| str | `"PAID"` | Text and identifiers |
-| bool | `True` | Conditions |
-| NoneType | `None` | No value / missing value marker |
-
-Important: identifiers such as postal codes and customer IDs are often strings, even if they contain digits. They are labels, not quantities.
-
-## 9. Type conversion
-
-```python
-quantity_text = "3"
-price_text = "199.50"
-
-quantity = int(quantity_text)
-price = float(price_text)
-line_total = quantity * price
-
-print(quantity)
-print(price)
-print(line_total)
+print(customer_name)
+print(order_id)
+print(order_amount)
+print(is_paid)
 ```
 
 Expected output:
 
 ```text
-3
-199.5
-598.5
+Asha
+501
+1250.5
+True
 ```
 
-Conversion can fail when text is not valid for the target type. Validate input before converting.
+Python creates the variable when the assignment statement runs. You do not declare a fixed type in advance.
+
+### Variable naming rules
+
+- Names may contain letters, digits and underscores.
+- A name cannot begin with a digit.
+- Names are case-sensitive: `order_id` and `Order_Id` are different.
+- Do not use Python reserved words such as `for`, `class` or `if`.
+- Use descriptive `snake_case` names in ordinary Python code.
+
+## 9. Inspect data types
 
 ```python
-raw_quantity = "three"
+customer_name = "Asha"
+order_id = 501
+order_amount = 1250.50
+is_paid = True
 
-print(raw_quantity.isdigit())
+print(type(customer_name))
+print(type(order_id))
+print(type(order_amount))
+print(type(is_paid))
 ```
 
-Expected output: `False`.
+Expected output:
 
-## 10. Operators
-
-```python
-quantity = 4
-unit_price = 250
-
-line_amount = quantity * unit_price
-is_large_order = line_amount >= 1000
-has_quantity = quantity > 0
-
-print(line_amount)
-print(is_large_order)
-print(has_quantity)
+```text
+<class 'str'>
+<class 'int'>
+<class 'float'>
+<class 'bool'>
 ```
 
-Operators used often:
-- Arithmetic: `+`, `-`, `*`, `/`, `//`, `%`, `**`.
-- Comparison: `==`, `!=`, `>`, `<`, `>=`, `<=`.
-- Logical: `and`, `or`, `not`.
-- Membership: `in`, `not in`.
+| Type | Meaning | Example |
+|---|---|---|
+| `str` | Text | `"Hyderabad"` |
+| `int` | Whole number | `501` |
+| `float` | Decimal number | `1250.50` |
+| `bool` | True/false value | `True` |
+| `NoneType` | Missing / no value | `None` |
 
-## 11. Strings
+## 10. Strings
+
+Strings represent text. They can use single or double quotes.
 
 ```python
 customer_name = "Asha"
 city = "Hyderabad"
 
-message = f"Customer {customer_name} is from {city}"
-print(message)
+print(customer_name)
 print(customer_name.upper())
 print(customer_name.lower())
-print(customer_name.strip())
-print("A" in customer_name)
+print(len(customer_name))
+print(customer_name + " lives in " + city)
 ```
 
-Strings are immutable: methods return new strings rather than changing the original value.
+Expected output:
 
-## 12. Lists
+```text
+Asha
+ASHA
+asha
+4
+Asha lives in Hyderabad
+```
 
-A list is an ordered, mutable collection.
+- `upper()` returns an uppercase copy.
+- `lower()` returns a lowercase copy.
+- `len()` returns the number of characters.
+- `+` joins strings.
+
+### f-strings
+
+Use an f-string to insert values into readable text.
 
 ```python
-order_amounts = [250.0, 500.0, 125.0]
+customer_name = "Asha"
+order_amount = 1250.50
 
+message = f"Customer {customer_name} placed an order worth {order_amount}"
+print(message)
+```
+
+Expected output:
+
+```text
+Customer Asha placed an order worth 1250.5
+```
+
+## 11. Numeric data and calculations
+
+```python
+quantity = 3
+unit_price = 250
+discount = 50
+
+gross_amount = quantity * unit_price
+net_amount = gross_amount - discount
+
+print(gross_amount)
+print(net_amount)
+```
+
+Expected output:
+
+```text
+750
+700
+```
+
+Common operators:
+
+| Operator | Meaning | Example result |
+|---|---|---|
+| `+` | Addition | `10 + 2 = 12` |
+| `-` | Subtraction | `10 - 2 = 8` |
+| `*` | Multiplication | `10 * 2 = 20` |
+| `/` | Division | `10 / 2 = 5.0` |
+| `//` | Floor division | `11 // 2 = 5` |
+| `%` | Remainder | `11 % 2 = 1` |
+| `**` | Power | `2 ** 3 = 8` |
+
+## 12. Type conversion
+
+Data arriving from a CSV or API may be represented as text even when it looks numeric.
+
+```python
+quantity_text = "4"
+price_text = "125.50"
+
+quantity = int(quantity_text)
+price = float(price_text)
+
+total = quantity * price
+
+print(quantity)
+print(price)
+print(total)
+print(type(quantity))
+```
+
+Expected output:
+
+```text
+4
+125.5
+502.0
+<class 'int'>
+```
+
+The conversion functions:
+
+- `int(value)`: convert a compatible value to an integer.
+- `float(value)`: convert a compatible value to a decimal number.
+- `str(value)`: convert a value to text.
+- `bool(value)`: convert according to Python truthiness rules.
+
+Invalid conversions raise an exception:
+
+```python
+quantity = int("four")
+```
+
+Expected result: Python raises `ValueError` because `"four"` is not a valid integer representation. Do not silently replace invalid business data with zero.
+
+## 13. Lists: keep ordered records
+
+A list stores multiple values in order.
+
+```python
+order_amounts = [250, 500, 125, 800]
+
+print(order_amounts)
 print(order_amounts[0])
+print(order_amounts[-1])
 print(len(order_amounts))
+```
 
-order_amounts.append(750.0)
-order_amounts[1] = 550.0
+Expected output:
+
+```text
+[250, 500, 125, 800]
+250
+800
+4
+```
+
+Indexes start at zero. The first item is at index `0`; `-1` means the last item.
+
+### Add and update list values
+
+```python
+order_amounts = [250, 500, 125]
+order_amounts.append(800)
+order_amounts[0] = 300
 
 print(order_amounts)
 ```
 
-Expected final list: `[250.0, 550.0, 125.0, 750.0]`.
+Expected output:
 
-Indexes start at zero. Use lists when order matters and values may change.
-
-## 13. Tuples
-
-A tuple is ordered and immutable.
-
-```python
-source_config = ("orders_db", "postgresql", 5432)
-print(source_config[0])
-print(source_config[1])
+```text
+[300, 500, 125, 800]
 ```
 
-Tuples are useful for fixed groups of values. Do not use them when the collection must be modified.
+- `append(value)` adds one item at the end.
+- `order_amounts[0] = 300` replaces the first item.
 
-## 14. Dictionaries
+## 14. Dictionaries: represent named fields
 
-A dictionary stores key-value pairs.
+A dictionary stores key-value pairs. It is useful for one structured record.
 
 ```python
 order = {
     "order_id": 501,
-    "customer_id": 1001,
+    "customer": "Asha",
     "amount": 1250.50,
     "status": "PAID"
 }
 
 print(order["order_id"])
+print(order["customer"])
+print(order["amount"])
+```
+
+Expected output:
+
+```text
+501
+Asha
+1250.5
+```
+
+A key gives meaning to a value. This is clearer than remembering that position 0 means order ID and position 1 means customer.
+
+### Safely access an optional key
+
+```python
+order = {"order_id": 501, "status": "PAID"}
+
+print(order.get("customer", "UNKNOWN"))
 print(order.get("status"))
-print(order.get("payment_method", "UNKNOWN"))
 ```
 
-Use `.get()` when a key may be absent. Direct indexing raises `KeyError` if the key does not exist.
+Expected output:
 
-## 15. Sets
+```text
+UNKNOWN
+PAID
+```
 
-A set stores unique values and does not preserve a meaningful positional index.
+`get(key, default)` returns a default when a key is absent. Direct access such as `order["customer"]` raises `KeyError` if the key does not exist.
+
+## 15. Tuples and sets
+
+A tuple is an ordered collection that cannot be changed after creation.
+
+```source_columns = ("order_id", "customer", "amount")
+print(source_columns)
+print(source_columns[0])
+```
+
+Expected output:
+
+```text
+('order_id', 'customer', 'amount')
+order_id
+```
+
+A set stores unique values and is useful for simple uniqueness checks.
+
+```statuses = {"PAID", "PENDING", "PAID", "CANCELLED"}
+print(sorted(statuses))
+```
+
+Expected output:
+
+```text
+['CANCELLED', 'PAID', 'PENDING']
+```
+
+A set does not preserve duplicate entries. Sorting is used here to make the displayed order predictable.
+
+## 16. Loop through records
+
+A loop repeats a block for each item.
 
 ```python
-statuses = ["PAID", "PENDING", "PAID", "CANCELLED"]
-unique_statuses = set(statuses)
+order_amounts = [250, 500, 125]
 
-print(unique_statuses)
-print(len(unique_statuses))
+for amount in order_amounts:
+    print(amount)
 ```
 
-Set display order is not guaranteed. Use sets for membership checks and uniqueness, not for ordered reporting.
+Expected output:
 
-## 16. Conditional logic
-
-```python
-amount = 1500
-
-if amount >= 1000:
-    category = "HIGH_VALUE"
-elif amount >= 500:
-    category = "MEDIUM_VALUE"
-else:
-    category = "LOW_VALUE"
-
-print(category)
+```text
+250
+500
+125
 ```
 
-Conditions let a pipeline apply business rules. Keep thresholds documented and confirmed by the business owner.
+The variable `amount` receives one list value during each iteration.
 
-## 17. Loops
+## 17. Mini-project: Data Processing Utility
 
-```python
-order_ids = [501, 502, 503]
+**Business scenario:** A retail company receives a small list of order records. Before learning files and databases, create a basic in-memory utility that checks each order and calculates order totals.
 
-for order_id in order_ids:
-    print("Processing order:", order_id)
-```
-
-A loop processes each item. Avoid changing a collection while iterating over it unless the behavior is deliberate.
-
-## 18. Mini-project: Data Processing Utility
-
-Create a small in-memory order dataset.
+### Step 1 — Create sample order records
 
 ```python
 orders = [
-    {"order_id": 501, "quantity": 2, "unit_price": 300, "status": "PAID"},
-    {"order_id": 502, "quantity": 1, "unit_price": 800, "status": "PENDING"},
-    {"order_id": 503, "quantity": 3, "unit_price": 150, "status": "PAID"}
+    {"order_id": 1001, "customer": "Asha", "quantity": 2, "unit_price": 250},
+    {"order_id": 1002, "customer": "Ravi", "quantity": 1, "unit_price": 800},
+    {"order_id": 1003, "customer": "Meena", "quantity": 3, "unit_price": 150}
 ]
 
 print(len(orders))
 print(orders[0])
 ```
 
-Calculate line amounts:
+Expected output:
+
+```text
+3
+{'order_id': 1001, 'customer': 'Asha', 'quantity': 2, 'unit_price': 250}
+```
+
+Each list item is a dictionary representing one order.
+
+### Step 2 — Inspect every order
 
 ```python
 for order in orders:
-    order["line_amount"] = order["quantity"] * order["unit_price"]
+    print(order["order_id"], order["customer"])
+```
+
+Expected output:
+
+```text
+1001 Asha
+1002 Ravi
+1003 Meena
+```
+
+The loop reads one dictionary at a time. The keys make each field explicit.
+
+### Step 3 — Calculate each order amount
+
+```python
+for order in orders:
+    order_amount = order["quantity"] * order["unit_price"]
+    print(order["order_id"], order_amount)
+```
+
+Expected output:
+
+```text
+1001 500
+1002 800
+1003 450
+```
+
+The calculation is quantity multiplied by unit price. Real projects may also need discounts, tax, refunds and currency rules.
+
+### Step 4 — Add the calculated amount to each record
+
+```python
+for order in orders:
+    order["order_amount"] = order["quantity"] * order["unit_price"]
 
 print(orders)
 ```
 
-Filter paid orders:
+Expected output:
+
+```text
+[{'order_id': 1001, 'customer': 'Asha', 'quantity': 2, 'unit_price': 250, 'order_amount': 500}, {'order_id': 1002, 'customer': 'Ravi', 'quantity': 1, 'unit_price': 800, 'order_amount': 800}, {'order_id': 1003, 'customer': 'Meena', 'quantity': 3, 'unit_price': 150, 'order_amount': 450}]
+```
+
+The new key is added to each dictionary. The original records in memory are modified.
+
+### Step 5 — Calculate total sales
 
 ```python
-paid_orders = []
+total_sales = 0
 
 for order in orders:
-    if order["status"] == "PAID":
-        paid_orders.append(order)
+    total_sales = total_sales + order["order_amount"]
 
-print(paid_orders)
+print(total_sales)
 ```
 
-Calculate paid revenue:
+Expected output:
+
+```text
+1750
+```
+
+The running total starts at zero and increases for every order. This is an aggregation pattern used frequently in data processing.
+
+### Step 6 — Find high-value orders
 
 ```python
-paid_revenue = 0
-
-for order in paid_orders:
-    paid_revenue = paid_revenue + order["line_amount"]
-
-print(paid_revenue)
+for order in orders:
+    if order["order_amount"] >= 500:
+        print(order["order_id"], order["order_amount"])
 ```
 
-Expected result: `1950`. This is a learning example; a real pipeline must handle currency, refunds, duplicate orders, nulls and approved revenue definitions.
+Expected output:
 
-## 19. Common errors
+```text
+1001 500
+1002 800
+```
 
-| Error | Cause | Fix |
+The condition includes values equal to 500 because the operator is `>=`.
+
+### Step 7 — Produce a small summary
+
+```python
+order_count = len(orders)
+total_sales = 0
+
+for order in orders:
+    total_sales += order["order_amount"]
+
+average_order_value = total_sales / order_count
+
+print("Order count:", order_count)
+print("Total sales:", total_sales)
+print("Average order value:", average_order_value)
+```
+
+Expected output:
+
+```text
+Order count: 3
+Total sales: 1750
+Average order value: 583.3333333333334
+```
+
+The repeating decimal is normal floating-point display. For currency presentation, use formatting such as `round(average_order_value, 2)`; financial systems may require decimal arithmetic for exact monetary calculations.
+
+## 18. Common beginner mistakes
+
+| Mistake | Why it happens | Better approach |
 |---|---|---|
-| NameError | Variable name is undefined | Check spelling and execution order |
-| TypeError | Operation not supported for types | Convert or validate types |
-| ValueError | Value cannot be converted | Inspect input before conversion |
-| KeyError | Dictionary key missing | Check schema or use `.get()` |
-| IndexError | Index outside collection | Check length and index |
-| IndentationError | Invalid indentation | Align code blocks |
+| `"10" + 5` | Text and integer cannot be added directly | Convert intentionally with `int()` |
+| `order[customer]` | Text key is not quoted | Use `order["customer"]` |
+| IndexError | List index is outside its range | Check `len(list)` and valid indexes |
+| KeyError | Dictionary key is absent | Check schema or use `.get()` |
+| Wrong Python version | Different interpreter is used | Check `python --version` and executable path |
+| Package not found | Package installed in another environment | Install using the same interpreter: `python -m pip` |
 
-## 20. Day 6 revision and practice
+## 19. Practical exercises
 
-- Python runs through an interpreter.
-- A virtual environment isolates project packages.
-- Variables refer to values; types determine supported operations.
-- Lists are mutable; tuples are immutable; dictionaries map keys to values; sets hold unique values.
-- Validate types and business assumptions before processing records.
+1. Create a list of five product prices and print the first and last values.
+2. Create a dictionary for a customer with ID, name and city.
+3. Convert the text value `"250"` into an integer and add 50.
+4. Given three order dictionaries, calculate each line amount.
+5. Calculate the total and average order amount.
+6. Identify orders with an amount greater than 1,000.
 
-Practice: add a `currency` field, count paid and pending orders separately, and reject an order with a non-positive quantity.
+## 20. Interview revision
+
+- Python is a general-purpose language used for automation, integration and data transformation.
+- A variable is a name referring to a value.
+- Lists are ordered and mutable; tuples are ordered and immutable; sets contain unique values; dictionaries map keys to values.
+- `type()` inspects a value's type.
+- `int()`, `float()` and `str()` perform explicit conversions.
+- A loop processes collection members one at a time.
+- Python is dynamically typed; values have types, while variable names can be reassigned to values of different types.
+
+**Day 6 checkpoint:** You should be able to run a Python script, explain common data types, work with lists and dictionaries, and calculate a simple order summary without copying a complete solution blindly.
