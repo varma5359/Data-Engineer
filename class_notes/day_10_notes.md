@@ -571,3 +571,133 @@ The new file contains only validated rows. In a production workflow, also write 
 - A pipeline must define whether errors fail the whole batch or quarantine individual records.
 
 **Day 10 checkpoint:** You should be able to diagnose a traceback, handle expected file and data errors, log useful context and build a processor that separates accepted and rejected records.
+
+
+---
+
+# Beginner Teaching Extension — Day 10
+
+## A. Read an error as a message
+
+A syntax error means Python cannot parse the code. A runtime exception happens while valid code is executing. A traceback shows the exception type, message and line where execution failed. Read the final lines first, then inspect the named source line and its inputs.
+
+## B. Catch a known conversion error
+
+```python
+raw_quantity = "unknown"
+try:
+    quantity = int(raw_quantity)
+    print("Quantity:", quantity)
+except ValueError:
+    print("Rejected: quantity is not an integer")
+```
+
+Expected output:
+
+```text
+Rejected: quantity is not an integer
+```
+
+The try block contains a statement that may fail. The except block handles ValueError specifically. It does not hide unrelated errors such as a misspelled variable name.
+
+## C. Understand else and finally
+
+```python
+try:
+    quantity = int("4")
+except ValueError:
+    print("Invalid quantity")
+else:
+    print("Valid quantity:", quantity)
+finally:
+    print("Validation attempt finished")
+```
+
+Expected output:
+
+```text
+Valid quantity: 4
+Validation attempt finished
+```
+
+else runs only when try completes without an exception. finally runs during normal completion and exception handling, making it useful for cleanup.
+
+## D. Separate invalid data from business-rule failures
+
+```python
+raw_values = ["10", "unknown", "0", "25"]
+accepted = []
+rejected = []
+
+for raw_value in raw_values:
+    try:
+        number = int(raw_value)
+        if number <= 0:
+            rejected.append((raw_value, "Must be positive"))
+        else:
+            accepted.append(number)
+    except ValueError:
+        rejected.append((raw_value, "Not an integer"))
+
+print("Accepted:", accepted)
+print("Rejected:", rejected)
+```
+
+Expected output:
+
+```text
+Accepted: [10, 25]
+Rejected: [('unknown', 'Not an integer'), ('0', 'Must be positive')]
+```
+
+The conversion error and business rule are different. Retain the raw value and rejection reason so a source owner can investigate.
+
+## E. Raise a clear error
+
+```python
+def validate_quantity(quantity):
+    if quantity <= 0:
+        raise ValueError("Quantity must be greater than zero")
+    return quantity
+
+print(validate_quantity(3))
+```
+
+Expected output: 3. Passing zero raises ValueError. Raising an exception makes a failure explicit to the caller; expected bad rows may instead be collected as rejected records.
+
+## F. Logging records operational events
+
+```python
+import logging
+logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
+logging.info("File processing started")
+logging.warning("One row was rejected")
+logging.error("Destination load failed")
+```
+
+Expected output:
+
+```text
+INFO: File processing started
+WARNING: One row was rejected
+ERROR: Destination load failed
+```
+
+INFO is a normal operational event; WARNING is an unexpected condition; ERROR is a failed operation. Do not log passwords, tokens or unnecessary personal data. Existing logging configuration in a notebook may affect formatting.
+
+## G. Retry only failures that may recover
+
+A temporary network interruption may recover on retry. An invalid integer string will not become valid merely by retrying. A permission error usually requires configuration correction. A retry policy should be bounded, delayed, logged and limited to transient failures.
+
+## H. Debugging sequence
+
+1. Reproduce the issue with the smallest input.
+2. Read the exception type and traceback line.
+3. Inspect the input value and its type.
+4. Check the assumption made by the failing statement.
+5. Correct one cause and rerun the same test.
+6. Add a test so the failure is not reintroduced.
+
+## I. Readiness check
+
+Students should explain ValueError versus a business-rule rejection, use a specific except clause, explain else/finally, identify a transient failure, and state why a pipeline must not report success after a required step failed.
