@@ -1,178 +1,230 @@
 # Day 28 Interview Preparation: Database Administration Fundamentals
 
-**Pathway:** TechPhile.ai — Data Engineer Career Pathway  
 **Phase:** 3 — SQL and Database Engineering  
 **Level:** Beginner to junior Data Engineer  
 **Mini-project:** Database Operations Checklist  
-**Coverage:** MySQL and PostgreSQL administration, users, roles, permissions, backup, restore, connection management
+**Databases:** PostgreSQL and MySQL
 
 ---
 
-## 1. How to answer
+## 1. Core questions with complete answers
 
-For every question, define the concept, explain why a Data Engineer uses it, give a TechStore example, describe the result and mention a limitation or common mistake. Avoid memorizing only one-line definitions.
+### 1. What is database administration?
 
-## 2. Core interview questions
+Database administration includes keeping databases available, secure, recoverable and performant. It includes user management, permissions, backup and restore, connection management, monitoring and operational maintenance.
 
-### 1. What does database administration cover?
+### 2. Why should a Data Engineer understand database administration?
 
-**Answer guidance:** Explain in plain English, show the smallest relevant SQL/Python example from the class notes, describe the expected behavior and mention one edge case or trade-off.
+Data pipelines depend on databases being reachable, correctly permissioned and recoverable. A Data Engineer should be able to diagnose basic connection and access problems, validate pipeline permissions and understand recovery procedures.
 
-**Follow-up:** How would you verify this on the TechStore training database?
+### 3. What is the difference between a database server and a database?
 
-### 2. What is a database role?
+The server is the running database software/service. A database is a named collection of objects and data managed by that server.
 
-**Answer guidance:** Explain in plain English, show the smallest relevant SQL/Python example from the class notes, describe the expected behavior and mention one edge case or trade-off.
+### 4. What is a schema?
 
-**Follow-up:** How would you verify this on the TechStore training database?
+A schema is a namespace that organizes database objects. In PostgreSQL, tables and views can be referenced with schema-qualified names such as public.orders.
 
-### 3. What does LOGIN mean in PostgreSQL?
+### 5. What is a database role in PostgreSQL?
 
-**Answer guidance:** Explain in plain English, show the smallest relevant SQL/Python example from the class notes, describe the expected behavior and mention one edge case or trade-off.
+A role is a database identity or permission-bearing principal. It can have LOGIN capability and can also act as a group role whose privileges are inherited by members.
 
-**Follow-up:** How would you verify this on the TechStore training database?
+### 6. How does MySQL identify a user?
 
-### 4. What is least privilege?
+A MySQL account includes a user name and host component, such as 'report_user'@'localhost'. Different host definitions can represent different account entries and privileges.
 
-**Answer guidance:** Explain in plain English, show the smallest relevant SQL/Python example from the class notes, describe the expected behavior and mention one edge case or trade-off.
+### 7. What is least privilege?
 
-**Follow-up:** How would you verify this on the TechStore training database?
+Least privilege means giving an account only the permissions needed for its task. A read-only reporting job should not receive broad UPDATE, DELETE or administrative rights.
 
-### 5. Why not run ETL as superuser?
+### 8. What is the difference between authentication and authorization?
 
-**Answer guidance:** Explain in plain English, show the smallest relevant SQL/Python example from the class notes, describe the expected behavior and mention one edge case or trade-off.
+Authentication verifies who or what is connecting. Authorization determines what that identity is allowed to do.
 
-**Follow-up:** How would you verify this on the TechStore training database?
+### 9. What is CONNECT privilege in PostgreSQL?
 
-### 6. What does GRANT do?
+CONNECT allows a role to connect to a specified database. The role may still need schema and table privileges to access objects after connecting.
 
-**Answer guidance:** Explain in plain English, show the smallest relevant SQL/Python example from the class notes, describe the expected behavior and mention one edge case or trade-off.
+### 10. What is USAGE on a PostgreSQL schema?
 
-**Follow-up:** How would you verify this on the TechStore training database?
+USAGE allows a role to access objects in a schema when it also has the required object privileges. It does not by itself grant SELECT on every table.
 
-### 7. What does REVOKE do?
+### 11. What is a database connection?
 
-**Answer guidance:** Explain in plain English, show the smallest relevant SQL/Python example from the class notes, describe the expected behavior and mention one edge case or trade-off.
+A connection is an active client session to the database server. It uses connection details such as host, port, database, user and authentication method.
 
-**Follow-up:** How would you verify this on the TechStore training database?
+### 12. What are common default ports?
 
-### 8. What does USAGE on a schema allow?
+PostgreSQL commonly uses 5432 and MySQL commonly uses 3306. Administrators can configure different ports, so verify the actual environment.
 
-**Answer guidance:** Explain in plain English, show the smallest relevant SQL/Python example from the class notes, describe the expected behavior and mention one edge case or trade-off.
+### 13. What causes a connection failure?
 
-**Follow-up:** How would you verify this on the TechStore training database?
+Possible causes include wrong host, port, database name, credentials, stopped service, firewall/network restrictions, TLS certificate issues, connection limits or authentication configuration.
 
-### 9. How can role membership affect privileges?
+### 14. What is an active session?
 
-**Answer guidance:** Explain in plain English, show the smallest relevant SQL/Python example from the class notes, describe the expected behavior and mention one edge case or trade-off.
+An active session is a client connection currently executing a query. Database monitoring views can show session state and query information, subject to privileges.
 
-**Follow-up:** How would you verify this on the TechStore training database?
+### 15. What is an idle-in-transaction session?
 
-### 10. What is a logical backup?
+It is a connected session with an open transaction but no statement currently running. It can hold locks and old snapshots, so applications should commit or roll back promptly.
 
-**Answer guidance:** Explain in plain English, show the smallest relevant SQL/Python example from the class notes, describe the expected behavior and mention one edge case or trade-off.
+### 16. What is a database backup?
 
-**Follow-up:** How would you verify this on the TechStore training database?
+A backup is a copy or recovery artifact used to restore data and objects after loss, corruption or an operational mistake. A backup strategy must define scope, frequency, retention, security and recovery objectives.
 
-### 11. What is a physical backup?
+### 17. What is a restore?
 
-**Answer guidance:** Explain in plain English, show the smallest relevant SQL/Python example from the class notes, describe the expected behavior and mention one edge case or trade-off.
+A restore rebuilds a database or selected objects from a backup. It should be validated to confirm the restored data and objects meet the recovery requirement.
 
-**Follow-up:** How would you verify this on the TechStore training database?
+### 18. What is a logical backup?
 
-### 12. What does pg_dump do?
+A logical backup exports database objects and data in a logical representation such as SQL statements or an archive. It can be selective and useful for migrations or object-level recovery.
 
-**Answer guidance:** Explain in plain English, show the smallest relevant SQL/Python example from the class notes, describe the expected behavior and mention one edge case or trade-off.
+### 19. What is a physical backup?
 
-**Follow-up:** How would you verify this on the TechStore training database?
+A physical backup copies database storage files or uses a database-native physical backup process. It is commonly used for large systems and point-in-time recovery strategies.
 
-### 13. What does pg_restore do?
+### 20. What is pg_dump?
 
-**Answer guidance:** Explain in plain English, show the smallest relevant SQL/Python example from the class notes, describe the expected behavior and mention one edge case or trade-off.
+pg_dump is PostgreSQL's logical backup utility for a database. It can produce plain SQL or archive formats and supports selective backup options.
 
-**Follow-up:** How would you verify this on the TechStore training database?
+### 21. What is pg_restore?
 
-### 14. What does mysqldump do?
+pg_restore restores PostgreSQL archive formats created by tools such as pg_dump using custom or directory formats. Plain SQL dumps are commonly restored with psql.
 
-**Answer guidance:** Explain in plain English, show the smallest relevant SQL/Python example from the class notes, describe the expected behavior and mention one edge case or trade-off.
+### 22. What is mysqldump?
 
-**Follow-up:** How would you verify this on the TechStore training database?
+mysqldump is a MySQL logical backup utility that exports database objects and data as SQL statements. The restore is commonly performed using the mysql client.
 
-### 15. Why test a restore?
+### 23. Does pg_dump back up every PostgreSQL role in the cluster?
 
-**Answer guidance:** Explain in plain English, show the smallest relevant SQL/Python example from the class notes, describe the expected behavior and mention one edge case or trade-off.
+No. pg_dump backs up a database. Cluster-wide roles and tablespaces are global objects and can be exported using pg_dumpall options.
 
-**Follow-up:** How would you verify this on the TechStore training database?
+### 24. Why restore to a separate test database?
 
-### 16. What is point-in-time recovery?
+It proves the backup can be restored without damaging the source. It allows validation of tables, data, constraints and business totals in isolation.
 
-**Answer guidance:** Explain in plain English, show the smallest relevant SQL/Python example from the class notes, describe the expected behavior and mention one edge case or trade-off.
+### 25. Why is a successful backup command not enough?
 
-**Follow-up:** How would you verify this on the TechStore training database?
+The file may be incomplete, corrupt, inaccessible or missing required objects. Only a restore test demonstrates that the backup can be used for recovery.
 
-### 17. What is RPO?
+### 26. What should be checked after a restore?
 
-**Answer guidance:** Explain in plain English, show the smallest relevant SQL/Python example from the class notes, describe the expected behavior and mention one edge case or trade-off.
+Check object names, schemas, tables, views, constraints, row counts, key uniqueness, sample records, permissions and important business totals. Compare against the source or a trusted baseline.
 
-**Follow-up:** How would you verify this on the TechStore training database?
+### 27. What is RPO?
 
-### 18. What is RTO?
+Recovery Point Objective is the maximum acceptable amount of data loss measured in time. For example, an RPO of 15 minutes means the organization aims to recover to a point no more than 15 minutes before the failure.
 
-**Answer guidance:** Explain in plain English, show the smallest relevant SQL/Python example from the class notes, describe the expected behavior and mention one edge case or trade-off.
+### 28. What is RTO?
 
-**Follow-up:** How would you verify this on the TechStore training database?
+Recovery Time Objective is the target time to restore service after an outage. A system with an RTO of one hour should be designed and tested to recover within that target.
 
-### 19. What details are needed for a connection?
+### 29. What is point-in-time recovery?
 
-**Answer guidance:** Explain in plain English, show the smallest relevant SQL/Python example from the class notes, describe the expected behavior and mention one edge case or trade-off.
+Point-in-time recovery restores a database to a specific time using a base backup and required log records. PostgreSQL commonly uses WAL archiving for this type of recovery.
 
-**Follow-up:** How would you verify this on the TechStore training database?
+### 30. Why should credentials not be stored in GitHub?
 
-### 20. Why use connection pooling?
+A repository may be shared, copied or exposed. Committed credentials can give unauthorized access. Use secret managers or secure environment configuration, restrict access and rotate credentials if exposed.
 
-**Answer guidance:** Explain in plain English, show the smallest relevant SQL/Python example from the class notes, describe the expected behavior and mention one edge case or trade-off.
+### 31. Why should a pipeline avoid using a database superuser?
 
-**Follow-up:** How would you verify this on the TechStore training database?
+A superuser has broad authority. A pipeline usually needs only limited read/write privileges. Least privilege reduces the damage if code or credentials are compromised.
 
-## 3. Scenario-based discussion
+### 32. What is connection pooling?
 
-1. **A pipeline account has superuser access. What would you change?**
+Connection pooling reuses a controlled set of database connections instead of creating a new connection for every operation. It reduces connection setup overhead and helps control database connection counts.
 
-   Discuss business impact, inspect source and target state, choose the correct SQL/Python behavior, and explain verification and failure handling.
+### 33. What can happen if too many connections are opened?
 
-2. **A backup succeeds but restore fails. What lesson?**
+The database may reach its connection limit, consume memory and resources, and reject new clients. Applications should reuse connections or use an appropriate pool.
 
-   Discuss business impact, inspect source and target state, choose the correct SQL/Python behavior, and explain verification and failure handling.
+### 34. What is a database maintenance window?
 
-3. **A service cannot connect after deployment. What do you check?**
+It is an agreed period for operational work such as upgrades, maintenance or changes that may affect availability. Changes should follow approval, backup and rollback procedures.
 
-   Discuss business impact, inspect source and target state, choose the correct SQL/Python behavior, and explain verification and failure handling.
+### 35. What is the difference between a backup and replication?
 
-## 4. Mini-project defence — Database Operations Checklist
+A backup is a recovery copy. Replication maintains another copy of data for availability or read scaling. Replication can also replicate accidental deletion or corruption, so it does not replace backups.
 
-Prepare a 2–3 minute explanation:
-- What business problem did it solve?
-- Which tables or components did you use?
-- Why did you choose this approach?
-- What output did you verify?
-- Which edge case or failure did you test?
-- What would you improve before production?
+---
 
-## 5. Common interview mistakes
+## 2. Scenario-based interview questions
 
-- Reciting syntax without explaining the result.
-- Ignoring NULL values, duplicate rows and one-to-many relationships.
-- Claiming performance improved without measuring it.
-- Ignoring transaction boundaries and error handling.
-- Using administrator privileges for routine jobs.
-- Exposing credentials in code or logs.
-- Failing to verify row counts and business totals.
+### Scenario 1: The pipeline suddenly cannot connect to PostgreSQL
 
-## 6. Readiness checklist
+**Good answer:** I would verify the host, port, database name and service availability. Then I would check network/firewall and TLS configuration, authentication, database CONNECT privilege, and whether the server has reached its connection limit. I would capture the exact error rather than immediately changing credentials or permissions.
 
-- [ ] I can explain every key concept in today's syllabus.
-- [ ] I can write or interpret the main SQL/Python pattern.
-- [ ] I can explain the expected output.
-- [ ] I can identify common mistakes and trade-offs.
-- [ ] I can defend the mini-project.
-- [ ] I can explain production validation and failure handling.
+### Scenario 2: The pipeline can connect but receives permission denied on a table
+
+**Good answer:** Authentication succeeded, so I would inspect authorization. Check database CONNECT, schema USAGE and table privileges. Confirm the pipeline uses the intended role and grant only the required SELECT or DML privileges.
+
+### Scenario 3: A backup file exists but restore fails
+
+**Good answer:** File existence does not prove backup integrity. I would inspect the backup command's exit status and logs, verify format and tool version compatibility, restore into an isolated target, and investigate missing dependencies, permissions or corruption.
+
+### Scenario 4: A developer asks for superuser credentials for a pipeline
+
+**Good answer:** I would not share an administrator credential. I would identify the exact required operations and create or request a dedicated least-privilege service account. Administrative actions should be separated and audited.
+
+### Scenario 5: The database has too many idle connections
+
+**Good answer:** I would inspect connection owners and application names, check whether connections are being closed or pooled correctly, and identify idle-in-transaction sessions. I would not terminate sessions without understanding transaction and application impact.
+
+### Scenario 6: A database was accidentally deleted
+
+**Good answer:** I would follow the incident and recovery procedure, identify the required recovery point based on RPO, restore to an isolated environment, apply required logs if point-in-time recovery is available, validate data and permissions, then obtain approval before redirecting production traffic.
+
+### Scenario 7: Replication is enabled, so the team wants to stop backups
+
+**Good answer:** Replication is not a replacement for backup. Deletes and corrupt changes may replicate. Maintain tested backups and a recovery plan.
+
+---
+
+## 3. Mini-project defence
+
+Be ready to explain:
+
+1. Which database and role did you connect with?
+2. How did you verify the environment?
+3. What permissions did the pipeline user require?
+4. How did you apply least privilege?
+5. How did you inspect active sessions?
+6. Which backup utility did you use?
+7. What backup format did you create?
+8. Where did you restore it?
+9. How did you validate row counts and business totals?
+10. What would you do if the restore failed?
+
+---
+
+## 4. Common interview traps
+
+- Confusing authentication with authorization.
+- Granting broad privileges to a pipeline.
+- Assuming CONNECT grants table access.
+- Assuming a backup file is recoverable without a restore test.
+- Treating replication as a backup.
+- Forgetting that pg_dump does not include all cluster-wide globals.
+- Running administrative commands in the wrong client.
+- Exposing passwords in source code or terminal history.
+- Terminating sessions without understanding locks and transactions.
+- Failing to validate a restored database.
+
+---
+
+## 5. Readiness checklist
+
+- [ ] I can explain server, database and schema.
+- [ ] I understand PostgreSQL roles and MySQL accounts.
+- [ ] I can explain least privilege.
+- [ ] I can diagnose common connection failures.
+- [ ] I can inspect active sessions.
+- [ ] I understand logical and physical backup concepts.
+- [ ] I can explain pg_dump and pg_restore.
+- [ ] I can explain mysqldump.
+- [ ] I understand why restore testing is mandatory.
+- [ ] I can explain RPO and RTO.
+- [ ] I know not to commit credentials.
