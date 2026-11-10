@@ -142,3 +142,51 @@ git log --oneline
 - Use feature branches and code review.
 - Never commit secrets or large raw datasets without an approved reason.
 - Test after resolving conflicts and before pushing.
+
+
+---
+
+## 7. Follow-up interview questions
+
+16. What is Git? A distributed version-control system that records changes and repository history.
+17. Git versus GitHub? Git is the version-control tool; GitHub is a hosting and collaboration platform.
+18. What is a repository? Project files and their version history.
+19. What is the working tree? The checked-out files currently being edited.
+20. What is the staging area? The set of changes selected for the next commit.
+21. What is a commit? A recorded snapshot of staged changes with metadata and a message.
+22. What is a branch? A movable reference used to develop a line of work independently.
+23. What is a merge conflict? A case where Git cannot automatically combine changes.
+24. What does git diff show? Changes not yet staged by default.
+25. What does git diff --staged show? Changes currently in the staging area compared with the latest commit.
+26. What is a remote? A named reference to another repository, commonly hosted on GitHub.
+27. Why use .gitignore? To prevent selected generated, local or sensitive files from being added accidentally.
+28. Is deleting a leaked API key from the latest commit enough? No. Rotate the secret and follow the history cleanup and incident process.
+29. Why use feature branches? They isolate changes for review and reduce interference with the main development line.
+30. What makes a good commit message? It briefly describes the purpose of the change in clear, specific language.
+
+## 8. Scenario questions
+
+A virtual environment appears in git status. Add the appropriate environment directory to .gitignore and ensure no secrets or needed source files are hidden.
+
+Two developers edit the same lines. Resolve the conflict by understanding both changes, combining the intended result and running relevant tests before committing.
+
+An API key was pushed to a public repository. Revoke or rotate it immediately; then follow the organization's incident and repository-history cleanup process.
+
+## 9. Mini-project defense
+
+- What did you stage and why?
+- What does the commit preserve?
+- Why did you create a feature branch?
+- How did you resolve or avoid conflicts?
+- How did you verify secrets and generated files were excluded?
+
+## 10. Readiness rubric
+
+| Skill | Ready when the student can… |
+|---|---|
+| Git basics | Initialize, inspect and commit a repository |
+| Staging | Explain add and staged differences |
+| Branching | Create, switch and merge a branch |
+| Conflict | Explain and resolve a merge conflict |
+| Hygiene | Use .gitignore and protect secrets |
+| Collaboration | Explain remote and push workflow |
