@@ -8,7 +8,7 @@ The course is being rebuilt phase by phase to one consistent beginner-first teac
 
 | Phase | Days | Status | Rebuild progress |
 |---|---:|---|---:|
-| Phase 1 — Data Engineering Foundations | 1–5 | In progress | 3/5 days verified |
+| Phase 1 — Data Engineering Foundations | 1–5 | In progress | 4/5 days verified |
 | Phase 2 — Python for Data Engineering | 6–18 | Pending | 0/13 days verified |
 | Phase 3 — SQL and Database Engineering | 19–29 | Pending | 0/11 days verified |
 | Phase 4 — Data Processing and Pipelines | 30–39 | Pending | 0/10 days verified |
