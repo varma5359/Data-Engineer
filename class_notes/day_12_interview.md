@@ -140,3 +140,51 @@
 - Use documented pagination and bounded retries.
 - Protect tokens and sensitive response data.
 - Validate schema and business rules after parsing.
+
+
+---
+
+## 7. Follow-up interview questions
+
+16. What is an API? A defined interface through which software systems exchange data or request operations.
+17. What is REST? An architectural style commonly implemented over HTTP using resources and standard methods.
+18. GET versus POST? GET generally retrieves a resource; POST commonly submits data or requests creation/processing.
+19. What is an endpoint? The URL path representing an API resource or operation.
+20. What is a query parameter? A value appended to a URL to filter, sort or paginate a request.
+21. What is an HTTP status code? A numeric response indicating the result category of the request.
+22. Why set a timeout? To prevent a client from waiting indefinitely for a response.
+23. What does raise_for_status() do? Raises an HTTPError for unsuccessful HTTP response status codes.
+24. What is pagination? Splitting a large result set across multiple responses.
+25. Offset versus cursor pagination? Offset uses positions/page numbers; cursor pagination uses a continuation token or record position provided by the service.
+26. What is a rate limit? A restriction on how many requests a client may make in a period.
+27. Why not retry every error? Some failures are permanent, such as invalid credentials or malformed requests.
+28. How protect API credentials? Store them in environment variables or a secrets manager and never commit them to source control.
+29. Why validate the JSON schema? A syntactically valid response can still be missing required fields or contain unexpected types.
+30. How prevent missing pages? Follow the documented next-page/cursor contract and persist progress safely.
+
+## 8. Scenario questions
+
+The API returns HTTP 429. Respect the provider's rate-limit guidance and retry-after information if supplied; do not send requests in a tight loop.
+
+The API returns HTTP 200 but omits a required order_id. Treat it as a schema/data-quality problem, not a successful valid record.
+
+The network request times out. Use a bounded retry strategy for this transient possibility and record attempts. Ensure repeated requests do not create duplicate side effects.
+
+## 9. Mini-project defense
+
+- Which endpoint did you call?
+- What response fields did you validate?
+- How did you handle a timeout and unsuccessful status?
+- How would you resume pagination after a failure?
+- Where are credentials stored?
+
+## 10. Readiness rubric
+
+| Skill | Ready when the student can… |
+|---|---|
+| HTTP | Explain request, response, method and endpoint |
+| Requests | Make a GET request with timeout |
+| Parsing | Parse and inspect JSON response data |
+| Errors | Check status and distinguish network from HTTP errors |
+| Pagination | Explain page/cursor continuation |
+| Security | Keep credentials out of code and logs |
