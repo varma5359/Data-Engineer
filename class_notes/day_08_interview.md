@@ -153,3 +153,53 @@ A good junior answer should mention validation, source retention, clear failure 
 - Iterate over large files instead of reading everything at once.
 - Verify outputs before archiving source data.
 - Use structured parsers for CSV/JSON/XML rather than manual string splitting.
+
+
+---
+
+## 7. Follow-up interview questions
+
+16. **What is a file path?** A location that identifies a file or directory.
+17. **Absolute versus relative path?** An absolute path starts from a filesystem root; a relative path is interpreted from a current base directory.
+18. **What is the current working directory?** The directory from which the process resolves relative paths.
+19. **What does file mode `r` mean?** Open for reading.
+20. **What does `w` mean?** Open for writing and replace existing content or create a new file.
+21. **What does `a` mean?** Open for appending at the end of the file.
+22. **Why use `with` when opening a file?** It ensures the file is closed when the block finishes, even if an exception occurs.
+23. **What is encoding?** A rule for converting text characters to bytes and bytes back to text.
+24. **Why specify UTF-8?** It makes the intended text encoding explicit and supports a broad range of characters.
+25. **What is the difference between `read()` and line-by-line iteration?** `read()` can load the entire content; iteration processes one line at a time.
+26. **Why use pathlib?** It provides a consistent object-oriented interface for paths and path operations across operating systems.
+27. **What does `mkdir(parents=True, exist_ok=True)` do?** Creates missing parent folders and does not fail if the target directory already exists.
+28. **Why verify a copied file?** A successful-looking workflow should confirm that the destination exists and contains expected data.
+29. **When should a source file be archived?** After successful processing and validation, with a recovery plan for failures.
+30. **What is a safe file-ingestion practice?** Use deterministic naming, validate the input, write output to a separate destination, verify it, and only then mark the source as processed.
+
+## 8. Scenario questions
+
+**The file exists in Explorer but Python reports FileNotFoundError.** The script may be running from a different working directory. Print `Path.cwd()`, inspect the resolved path and use a deliberate project-relative or absolute path.
+
+**The output file contains only the latest record.** The code may be opening the file with `w` on every iteration. Open once or use append mode where appropriate, and understand the overwrite behavior.
+
+**A file contains accented or non-English names incorrectly.** Confirm the source encoding and decode it consistently. Do not guess encodings silently in a production ingestion process.
+
+**The input file is very large.** Avoid reading the whole file into memory. Iterate over lines or use a format-aware chunking strategy, while accounting for headers, quoted delimiters and multi-line records.
+
+## 9. Mini-project defense
+
+- How does the script identify the input file?
+- How does it behave if the file is missing?
+- How do you know the output is complete?
+- Why keep input and processed folders separate?
+- When is it safe to archive the source?
+
+## 10. Readiness rubric
+
+| Skill | Ready when the student can… |
+|---|---|
+| Paths | Explain relative paths and inspect current directory |
+| File modes | Choose read, write or append correctly |
+| Safety | Use context managers and preserve source data |
+| Folders | Create and inspect directories |
+| Verification | Confirm output exists and contains expected content |
+| Operations | Explain validation-before-archive |
