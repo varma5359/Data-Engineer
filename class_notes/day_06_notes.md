@@ -439,7 +439,8 @@ PAID
 
 A tuple is an ordered collection that cannot be changed after creation.
 
-```source_columns = ("order_id", "customer", "amount")
+```python
+source_columns = ("order_id", "customer", "amount")
 print(source_columns)
 print(source_columns[0])
 ```
