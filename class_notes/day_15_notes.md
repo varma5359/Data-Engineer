@@ -580,3 +580,154 @@ January is above target by 70; February is below by 35; March is below by 60.
 - NumPy is useful for numerical computation, while Pandas provides higher-level labeled tabular operations.
 
 **Day 15 checkpoint:** You should be able to create arrays, inspect shapes, calculate vectorized values, filter with masks, aggregate along axes and explain how missing values affect numerical results.
+
+
+---
+
+# Beginner Teaching Extension — Day 15
+
+## A. Why NumPy arrays?
+
+A NumPy array stores values in a structured, typed, multidimensional container. It is designed for numerical operations and can perform many calculations across an array without writing a Python loop for every element. NumPy is an in-memory numerical tool, not a database or distributed storage system.
+
+## B. Create an array and inspect it
+
+```python
+import numpy as np
+
+sales = np.array([100, 200, 300, 400])
+print(sales)
+print(sales.ndim)
+print(sales.shape)
+print(sales.size)
+print(sales.dtype)
+```
+
+Expected output:
+
+```text
+[100 200 300 400]
+1
+(4,)
+4
+int64
+```
+
+The exact integer dtype can vary by platform. ndim is the number of dimensions, shape gives the size along each dimension, and size is the total number of elements.
+
+## C. Two-dimensional arrays
+
+```python
+sales_by_day = np.array([[100, 120], [200, 220], [300, 320]])
+print(sales_by_day)
+print(sales_by_day.shape)
+print(sales_by_day[0, 1])
+```
+
+Expected output:
+
+```text
+[[100 120]
+ [200 220]
+ [300 320]]
+(3, 2)
+120
+```
+
+There are three rows and two columns. Index [0, 1] selects the first row and second column.
+
+## D. Vectorized calculations
+
+```python
+prices = np.array([100, 200, 300])
+quantities = np.array([2, 1, 3])
+amounts = prices * quantities
+print(amounts)
+print(amounts.sum())
+```
+
+Expected output:
+
+```text
+[200 200 900]
+1300
+```
+
+The multiplication is applied element by element. sum() adds all array elements. The arrays must have compatible shapes for element-wise operations.
+
+## E. Boolean filtering
+
+```python
+amounts = np.array([200, 200, 900])
+large_orders = amounts[amounts >= 500]
+print(large_orders)
+```
+
+Expected output: [900]. The comparison creates a Boolean mask, and the mask selects only matching elements.
+
+## F. Understand axes
+
+```python
+matrix = np.array([[10, 20, 30], [40, 50, 60]])
+print(matrix.sum(axis=0))
+print(matrix.sum(axis=1))
+```
+
+Expected output:
+
+```text
+[50 70 90]
+[ 60 150]
+```
+
+For this two-dimensional array, axis=0 reduces down the rows and returns one result per column. axis=1 reduces across columns and returns one result per row. Draw the table and trace the addition rather than memorizing the numbers.
+
+## G. Broadcasting
+
+```python
+prices = np.array([100, 200, 300])
+with_tax = prices * 1.05
+print(with_tax)
+```
+
+Expected output:
+
+```text
+[105. 210. 315.]
+```
+
+NumPy broadcasts the single scalar 1.05 across the array. More complex broadcasting requires compatible dimensions; incompatible shapes raise an error rather than guessing the intended alignment.
+
+## H. Missing numerical values
+
+```python
+values = np.array([10.0, np.nan, 30.0])
+print(np.isnan(values))
+print(np.nanmean(values))
+```
+
+Expected output:
+
+```text
+[False  True False]
+20.0
+```
+
+NaN represents a missing or undefined numerical value in many numerical workflows. nanmean ignores NaN values; decide whether ignoring missing values is appropriate for the business metric.
+
+## I. Mini-project: Numerical Transformation Lab
+
+Create arrays for daily units sold and unit prices. Calculate line revenue using vectorized multiplication, filter high-value days, calculate total revenue and average, and compare the result with a small manual calculation. Include one missing value and explain the selected policy.
+
+## J. Common mistakes
+
+- Confusing shape with size.
+- Using an invalid index.
+- Combining arrays with incompatible shapes.
+- Assuming axis=0 means rows are returned; test with a small matrix.
+- Ignoring NaN without a business decision.
+- Using floating-point values for exact financial accounting without an appropriate decimal/rounding strategy.
+
+## K. Readiness check
+
+The student can create 1D and 2D arrays, inspect shape and dtype, index values, perform vectorized operations, use Boolean masks, explain axes and identify NaN.
