@@ -625,3 +625,129 @@ The transformation filters to paid orders with known amounts, joins customer att
 - Validate joins to prevent unexpected row multiplication.
 - Missing-value handling must follow a business rule.
 - Export and reload outputs to verify the result.
+
+
+---
+
+# Beginner Teaching Extension — Day 14
+
+## A. Think of a DataFrame as a table
+
+A Pandas DataFrame has rows and named columns. A Series is one labeled column. Pandas is useful for local data exploration and transformation, but a DataFrame usually lives in memory; it is not a replacement for a database or distributed engine when data exceeds available resources.
+
+## B. Create a tiny DataFrame
+
+```python
+import pandas as pd
+
+orders = pd.DataFrame({"order_id": [1, 2, 3], "city": ["Hyderabad", "Chennai", "Hyderabad"], "amount": [500, 800, 300]})
+print(orders)
+```
+
+Expected output:
+
+```text
+   order_id       city  amount
+0         1  Hyderabad     500
+1         2    Chennai     800
+2         3  Hyderabad     300
+```
+
+The dictionary keys become column names. Each list supplies values for that column. The leftmost 0, 1, 2 are DataFrame row indexes, not order IDs.
+
+## C. Inspect before transforming
+
+```python
+print(orders.head(2))
+print(orders.shape)
+print(orders.columns.tolist())
+print(orders.dtypes)
+print(orders.isna().sum())
+```
+
+head(2) shows the first two rows. shape returns row and column counts. columns lists field names. dtypes reports column types. isna().sum() counts missing values by column. Inspecting is the first step before applying business rules.
+
+## D. Select columns and filter rows
+
+```python
+print(orders["city"])
+print(orders[["order_id", "amount"]])
+print(orders[orders["amount"] >= 500])
+```
+
+The first expression selects one Series. The second selects a DataFrame with two columns. The third keeps rows where amount is at least 500. Expected matching order IDs are 1 and 2.
+
+## E. Sort and create a calculated column
+
+```python
+orders = orders.sort_values("amount", ascending=False)
+orders["tax"] = orders["amount"] * 0.05
+print(orders[["order_id", "amount", "tax"]])
+```
+
+Expected values in descending amount order: order 2 has 800 and tax 40.0; order 1 has 500 and tax 25.0; order 3 has 300 and tax 15.0. sort_values() orders rows by a column. ascending=False means largest first. The new column is calculated for each row.
+
+## F. Handle missing values with a business rule
+
+```python
+customers = pd.DataFrame({"customer": ["Asha", None, "Ravi"], "city": ["Hyd", "Chennai", None]})
+print(customers.isna().sum())
+customers["customer"] = customers["customer"].fillna("UNKNOWN")
+print(customers)
+```
+
+The missing customer count is one and missing city count is one. fillna() replaces missing values. The replacement must be chosen by business meaning; UNKNOWN is not automatically correct for every field.
+
+## G. Remove duplicates carefully
+
+```python
+duplicates = pd.DataFrame({"order_id": [1, 1, 2], "amount": [100, 100, 200]})
+print(duplicates.duplicated().sum())
+cleaned = duplicates.drop_duplicates()
+print(cleaned)
+```
+
+Expected duplicate count is 1. drop_duplicates() removes duplicate rows according to the selected subset (all columns by default). If duplicate order IDs have different amounts, decide which record is authoritative before removing anything.
+
+## H. Group and aggregate
+
+```python
+sales_by_city = orders.groupby("city")["amount"].sum()
+print(sales_by_city)
+```
+
+Groupby forms groups by city and sum adds amounts in each group. In real work, confirm the grouping key and aggregation rule with the business owner.
+
+## I. Merge two DataFrames
+
+```python
+customers = pd.DataFrame({"customer_id": [10, 20], "name": ["Asha", "Ravi"]})
+orders_small = pd.DataFrame({"order_id": [1, 2], "customer_id": [10, 20], "amount": [500, 800]})
+combined = orders_small.merge(customers, on="customer_id", how="left")
+print(combined)
+```
+
+Expected output:
+
+```text
+   order_id  customer_id  amount  name
+0         1           10     500  Asha
+1         2           20     800  Ravi
+```
+
+A left merge retains every row from the left DataFrame and attaches matching customer information. Check row counts and unmatched keys after joins; duplicate keys on the right can multiply rows.
+
+## J. Export and mini-project
+
+```python
+combined.to_csv("orders_enriched.csv", index=False)
+print("Export complete")
+```
+
+Expected output: Export complete. index=False prevents Pandas from writing its row index as an extra CSV column.
+
+For the Dataset Transformation Tool, load a small file, inspect schema and missing values, select required fields, filter invalid records, calculate a derived field, aggregate by a business dimension, merge a lookup table, and export. Verify row counts and totals before and after each major step.
+
+## K. Readiness check
+
+The student can explain Series and DataFrame, inspect shape and dtypes, select and filter rows, sort, handle missing values, remove duplicates with a justified key, group and aggregate, merge and export.
