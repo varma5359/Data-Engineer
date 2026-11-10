@@ -4,55 +4,137 @@
 
 ## 1. Core questions
 
-1. **What is an exception?** A runtime event that interrupts normal program flow.
-2. **Why use try/except?** To handle expected failure conditions and take a controlled action.
-3. **What is finally?** A block that runs whether an exception occurs or not, commonly used for cleanup.
-4. **What is logging?** Recording application events with severity and context for debugging and operations.
-5. **Why prefer specific exceptions?** They prevent unrelated failures from being hidden by overly broad handling.
+1. **What is an exception?**  
+   A runtime event that interrupts normal program execution.
 
-## 2. Difference-based questions
+2. **Syntax error vs exception?**  
+   A syntax error prevents code from being parsed; an exception occurs while valid code runs.
 
-| Compare | Answer |
+3. **Why use try/except?**  
+   To handle expected failures and take a controlled action.
+
+4. **What is a traceback?**  
+   A report showing the call path and the location where an exception occurred.
+
+5. **Why catch specific exceptions?**  
+   Different failures need different responses. Broad handlers can hide programming defects.
+
+6. **What does else do in try/except?**  
+   It runs when the try block completes without an exception.
+
+7. **What does finally do?**  
+   It runs whether an exception occurred or not and is useful for cleanup.
+
+8. **What does raise do?**  
+   It signals an error when the current operation cannot safely continue.
+
+9. **What is logging?**  
+   Recording application events with levels and useful context.
+
+10. **Name common logging levels.**  
+    DEBUG, INFO, WARNING, ERROR and CRITICAL.
+
+11. **What is logging.exception()?**  
+    It records an error message and the current exception traceback from inside an exception handler.
+
+12. **Why avoid empty except blocks?**  
+    They hide the real failure and make diagnosis difficult.
+
+13. **What is a rejected-record pattern?**  
+    A design where invalid records are separated with their identifiers and rejection reasons.
+
+14. **What is the difference between batch failure and row rejection?**  
+    Batch failure stops the batch; row rejection quarantines an invalid record while allowing other rows to continue.
+
+## 2. Difference questions
+
+| Concept | Difference |
 |---|---|
-| Syntax error vs exception | Parsing/grammar problem vs runtime failure |
-| print vs logging | Simple display vs configurable operational event record |
-| warning vs error | Unexpected recoverable condition vs failed operation |
-| raise vs return | Signal failure vs return a normal result |
-| DEBUG vs INFO | Diagnostic detail vs normal execution milestone |
+| Syntax error / runtime exception | Parse-time issue / runtime failure |
+| `except` / `finally` | Handles a matching error / executes during cleanup |
+| `print` / logging | Simple display / configurable operational event record |
+| WARNING / ERROR | Unexpected condition / operation failed |
+| Retry / reject | Repeat a transient operation / isolate invalid input |
+| FileNotFoundError / PermissionError | Missing path / access denied |
 
-## 3. Practical questions
+## 3. Practical coding questions
 
-6. **How do you log a traceback?** Use `logger.exception()` inside an exception handler.
-7. **Should every invalid row stop a pipeline?** Not necessarily. Follow a defined reject policy and threshold; preserve rejected records and report counts.
-8. **What should not be logged?** Passwords, tokens, payment secrets and unnecessary personal information.
+**Q1. Handle invalid integer input.**
 
-## 4. Scenario questions
+```python
+try:
+    quantity = int("many")
+except ValueError:
+    print("Invalid quantity")
+```
 
-### Scenario A: A file is missing
-Log the source path and run context, mark the stage failed, alert the owner and follow the missing-file policy. Do not create an empty success output.
+Output: `Invalid quantity`.
 
-### Scenario B: One row has an invalid amount
-Quarantine the row with line number and reason if the contract allows record-level rejection. Track the rejection count and fail the batch if the threshold is exceeded.
+**Q2. Raise an error for negative amount.**
 
-### Scenario C: A pipeline catches Exception and reports success
-Change the boundary behavior to log the traceback, mark the run failed and re-raise or return a failed status. Never convert an unknown failure into success.
+```python
+amount = -50
+if amount < 0:
+    raise ValueError("amount cannot be negative")
+```
 
-## 5. Troubleshooting
+Expected: `ValueError` with the stated message.
 
-- No useful traceback: preserve exception context and use logger.exception.
-- Too many log messages: select appropriate levels and include run identifiers.
-- Error cannot be reproduced: retain safe input samples and environment/version metadata.
-- Repeated failure: distinguish transient infrastructure problems from permanent data/schema errors.
+**Q3. Log pipeline progress.**
+
+```python
+import logging
+logging.basicConfig(level=logging.INFO, format="%(levelname)s:%(message)s")
+logging.info("Loaded 25 records")
+```
+
+Output: `INFO:Loaded 25 records`.
+
+**Q4. Explain a file context manager.**  
+`with open(...)` closes the file automatically when the block ends, including when an exception occurs.
+
+## 4. Scenario-based questions
+
+1. **A source file is missing. Should the pipeline continue?**  
+   It depends on whether the source is optional. Log the missing path and either stop the batch or record an explicit skipped-source status.
+
+2. **One row has a non-numeric quantity among 10,000 rows. What do you do?**  
+   Apply a documented row-level policy: reject or quarantine that row, retain its identifier and reason, and continue only if business rules allow.
+
+3. **An API request times out. What is the correct response?**  
+   Record the timeout and apply bounded retries with backoff if the operation is safe to retry. Do not retry forever.
+
+4. **A database authentication error occurs. Should it be retried repeatedly?**  
+   Usually not. Invalid credentials are not transient; stop and alert the owner rather than creating repeated failed attempts.
+
+5. **The pipeline reports success despite a failed write. What is wrong?**  
+   The error was swallowed or success was logged too early. Only report success after the required write and verification complete.
+
+## 5. Troubleshooting checklist
+
+- Read the final exception type and message.
+- Locate the failing line.
+- Inspect input values and types.
+- Confirm the file path and permissions.
+- Reproduce with the smallest input.
+- Catch only expected exceptions.
+- Log context without secrets.
+- Decide whether to retry, reject or fail the batch.
 
 ## 6. Follow-up questions
 
-- What is exception chaining?
-- When would you define a custom exception?
-- What is log rotation?
-- How do you correlate logs across pipeline stages?
-- What is a dead-letter or quarantine location?
-- Why should retries be bounded?
+- When should an exception be re-raised?
+- Why can retries make an incident worse?
+- What is exponential backoff?
+- Why should passwords never be logged?
+- What information belongs in a rejected-record file?
+- How would you distinguish a data error from an infrastructure error?
 
-## 7. Mini-project defence
+## 7. Strong revision points
 
-Explain how the Resilient File Processor separates valid and rejected records, records operational context, handles a missing file and decides whether a partial batch is acceptable. State the agreed policy rather than inventing a rejection threshold.
+- Error handling should make failure visible, not hide it.
+- Catch specific exception types.
+- Use context managers for resource cleanup.
+- Log source name, batch ID and counts where appropriate.
+- Never log credentials or sensitive data.
+- Define the batch-failure and record-rejection policy before production.
