@@ -10,7 +10,7 @@ The course is being rebuilt phase by phase to one consistent beginner-first teac
 |---|---:|---|---:|
 | Phase 1 — Data Engineering Foundations | 1–5 | Complete | 5/5 days rebuilt and verified |
 | Phase 2 — Python for Data Engineering | 6–18 | Complete | 13/13 days rebuilt and verified |
-| Phase 3 — SQL and Database Engineering | 19–29 | Complete | 11/11 days rebuilt and verified |
+| Phase 3 — SQL and Database Engineering | 19–29 | Rebuilt; final technical review | 9/11 days rebuilt and verified; Days 19–20 retained for cross-check |
 | Phase 4 — Data Processing and Pipelines | 30–39 | Pending | 0/10 days verified |
 | Phase 5 — Data Warehousing and Modeling | 40–49 | Pending | 0/10 days verified |
 | Phase 6 — Cloud and Distributed Processing | 50–59 | Pending | 0/10 days verified |
@@ -105,38 +105,33 @@ The course is being rebuilt phase by phase to one consistent beginner-first teac
 | 28 | Database Administration Fundamentals | Database Operations Checklist | [Notes](day_28_notes.md) | [Interview](day_28_interview.md) |
 | 29 | Python and Database Integration | Database Loader | [Notes](day_29_notes.md) | [Interview](day_29_interview.md) |
 
-## Phase 3 completion summary — SQL and Database Engineering (Days 19–29)
+## Phase 3 rebuild status — SQL and Database Engineering (Days 19–29)
 
-**Phase outcome:** Students can design relational tables, define constraints, retrieve and combine data, build business summaries, perform analytical window calculations, manage transactions, investigate query performance, normalize models, create database objects, understand administration fundamentals and load data from Python.
+**Current status:** Days 21–29 have been rebuilt with beginner-first class notes and complete interview answers. Days 19–20 are retained because their class notes already have substantial depth; they are included in the final cross-check for terminology, schema and sample-data consistency.
 
-| Day | Learning outcome | Mini-project |
-|---|---|---|
-| 21 | SELECT, WHERE, ORDER BY, LIMIT, DISTINCT, filtering, INNER JOIN, LEFT JOIN, RIGHT JOIN. | Multi-Table Extraction Queries |
-| 22 | GROUP BY, HAVING, aggregate functions, subqueries, correlated subqueries, CTEs. | Business Data Aggregation |
-| 23 | ROW_NUMBER, RANK, DENSE_RANK, LAG, LEAD, PARTITION BY, ORDER BY, analytical queries. | Historical Trend Query Engine |
-| 24 | Transactions, COMMIT, ROLLBACK, ACID, isolation levels, concurrency, transaction consistency. | Transaction Simulation |
-| 25 | Indexes, clustered and non-clustered index concepts, query execution plans, EXPLAIN, query performance. | Query Performance Investigation |
-| 26 | 1NF, 2NF, 3NF, normalization, denormalization, data redundancy, database design trade-offs. | Data Model Comparison |
-| 27 | Views, stored procedures, triggers, functions, database automation concepts. | Database Automation Lab |
-| 28 | MySQL and PostgreSQL administration, users, roles, permissions, backup, restore, connection management. | Database Operations Checklist |
-| 29 | Python database drivers, connection handling, bulk inserts, batch operations, transaction handling, database loading. | Database Loader |
+**Teaching standard applied to Days 21–29**
+- Start from the student's prior knowledge and explain why the topic is needed.
+- Introduce one concept at a time, then show runnable SQL and expected results.
+- Explain query clauses, parameters, output rows and business meaning.
+- Use the shared TechStore sample database and identify PostgreSQL-specific syntax.
+- Include common mistakes, debugging guidance, practical mini-projects and validation.
+- Provide a separate interview guide with written answers and scenario questions rather than generic answer prompts.
 
-**Completion checklist**
+| Day | Rebuild status | Class notes | Interview guide |
+|---|---|---:|---:|
+| 19 | Retained; cross-check | 1,552 lines | 438 lines |
+| 20 | Retained; cross-check | 1,288 lines | 385 lines |
+| 21 | Rebuilt | 1,606 lines | 549 lines |
+| 22 | Rebuilt | 1,379 lines | 374 lines |
+| 23 | Rebuilt | 931 lines | 254 lines |
+| 24 | Rebuilt | 798 lines | 221 lines |
+| 25 | Rebuilt | 698 lines | 233 lines |
+| 26 | Rebuilt | 718 lines | 202 lines |
+| 27 | Rebuilt | 750 lines | 206 lines |
+| 28 | Rebuilt | 706 lines | 231 lines |
+| 29 | Rebuilt | 1,184 lines | 250 lines |
 
-- [x] Day 21 class notes and interview guide rebuilt and verified.
-- [x] Day 22 class notes and interview guide rebuilt and verified.
-- [x] Day 23 class notes and interview guide rebuilt and verified.
-- [x] Day 24 class notes and interview guide rebuilt and verified.
-- [x] Day 25 class notes and interview guide rebuilt and verified.
-- [x] Day 26 class notes and interview guide rebuilt and verified.
-- [x] Day 27 class notes and interview guide rebuilt and verified.
-- [x] Day 28 class notes and interview guide rebuilt and verified.
-- [x] Day 29 class notes and interview guide rebuilt and verified.
-- [x] Day titles and mini-project names checked against career_path.md.
-- [x] All 22 Phase 3 class-note and interview files published and verified.
-- [x] README updated after the complete phase batch.
-
-**Phase 3 is complete.** Students are ready to begin Phase 4 — Data Processing and Pipelines.
+**Important:** Line count is a verification aid, not a quality score. SQL examples still require execution in the course's supported PostgreSQL/MySQL environments before the phase is marked fully complete. The Phase 3 status will be changed to Complete only after the Day 19–20 cross-check and final review.
 
 ## Future phases
 - Phase 3: SQL and Database Engineering (Days 19–29)
