@@ -1,53 +1,121 @@
-# Day 3 — Data Sources and Formats | Interview Preparation
+# Day 3 Interview Preparation: Data Sources and Formats
 
-## Core Q&A
+**Mini-project:** Data Source Inventory
 
-### 1. Name common data sources.
-Relational databases, REST APIs, files/object storage, logs, message brokers, SaaS platforms, and IoT devices.
+## 1. Core questions
 
-### 2. Structured vs semi-structured vs unstructured?
-Structured data follows a predefined tabular schema. Semi-structured data uses labels/nesting but allows variation (JSON/XML). Unstructured data includes images, audio, video, and free text without a simple row/column model.
+### 1. What is a data source?
+A system or location where data originates, such as a relational database, API, file, event stream or media store.
 
-### 3. CSV vs JSON?
-CSV is row/column text and suits simple flat exports. JSON supports nested objects and arrays and is common in APIs. CSV has weak type/schema metadata; JSON can have variable structures.
+### 2. What is structured data?
+Data organized into defined fields and types, commonly stored in relational tables.
 
-### 4. Why use Parquet?
-Parquet is columnar, supports compression and schema metadata, and can read selected columns efficiently for analytics. It is usually more suitable than CSV for large analytical datasets.
+### 3. What is semi-structured data?
+Data with keys, tags or nested structures but not necessarily a fixed tabular schema. JSON and XML are common examples.
 
-### 5. What is a schema?
-A definition of fields and their data types, often including constraints and meaning. Schema helps validate records and communicate expectations between producers and consumers.
+### 4. What is unstructured data?
+Data without a consistent tabular layout, such as images, audio, video and free-form documents.
 
-### 6. How do you assess a new source?
-Confirm ownership, access/authentication, source of truth, unique key, update pattern, volume, schema, deletion behavior, timezone, rate limits, and quality expectations.
+### 5. What is CSV?
+A text format that represents rows and columns using delimiters. It is easy to exchange but does not reliably preserve rich data types.
 
-### 7. What problems occur during file ingestion?
-Wrong encoding, malformed rows, delimiter/quote issues, duplicate files, unexpected columns, type conversion errors, missing files, and partial uploads.
+### 6. What is JSON?
+A text format built from objects, arrays and primitive values. It is common in REST APIs and event messages.
 
-## Format decision matrix
-| Requirement | Suggested format/pattern |
+### 7. What is XML?
+A tag-based hierarchical format. It supports nested elements, attributes and schema definitions.
+
+### 8. What is Parquet?
+A columnar binary file format commonly used for analytical storage and processing. It supports efficient column reads and compression.
+
+## 2. Difference-based questions
+
+| Compare | Strong answer |
 |---|---|
-| Small flat exchange | CSV |
-| API payload / nested data | JSON |
-| Tag-based integration | XML |
-| Large analytics dataset | Parquet |
-| Continuous events | Broker/event format (often JSON/Avro/Protobuf depending on platform) |
+| Structured vs semi-structured | Fixed tabular schema vs keys/tags and flexible nesting |
+| Semi-structured vs unstructured | Machine-readable structural markers vs no consistent tabular structure |
+| CSV vs JSON | Tabular delimited text vs nested objects and arrays |
+| JSON vs XML | Key-value/array representation vs tag-based hierarchy |
+| CSV vs Parquet | Text row format vs columnar binary analytics format |
+| Database vs API | Persistent queryable data store vs interface for requesting resources or actions |
 
-## Scenario: API adds a new field
-- Do not assume it is harmless or automatically mapped.
-- Check schema contract and downstream consumers.
-- Decide whether to ignore, capture, or map it.
-- Test compatibility and update documentation.
-- Monitor unexpected fields or breaking changes.
+## 3. Practical implementation questions
 
-## Scenario: customer IDs lose leading zeros
-Treat identifier as string, inspect source/export behavior, restore from authoritative source if already lost, and add schema validation to prevent numeric coercion.
+### 9. What do you inspect before ingesting a new source?
+Owner, access method, authentication, schema, key, data types, volume, refresh frequency, update/delete behavior, latency, sensitivity, retention and quality expectations.
 
-## Follow-up questions
+### 10. How would you ingest a paginated API?
+Read the API documentation, authenticate securely, request one page, validate the response, follow the next-page token or link, handle rate limits and retries, and persist progress so the extraction can resume safely.
+
+### 11. How would you process nested JSON for analytics?
+Parse the JSON, validate required fields, decide how arrays map to relational rows, preserve parent-child identifiers, and write the normalized result with source lineage.
+
+### 12. Why should an ID such as 00045 remain text?
+It is an identifier, not a quantity. Numeric conversion removes leading zeros and can change the key.
+
+## 4. Scenario questions
+
+### Scenario A: Supplier sends a malformed CSV
+**Problem:** The file has an unexpected delimiter and missing column.
+
+**Action:** Quarantine the file, record the validation failure, compare it with the agreed schema, contact the supplier owner and process only after an approved correction or compatibility rule.
+
+**Reasoning:** Guessing columns can silently corrupt downstream data.
+
+### Scenario B: API adds a nested field
+**Problem:** A response now contains `customer.address.postal_code`.
+
+**Action:** Check whether the field is optional, update schema documentation and tests, and assess downstream consumers before deployment.
+
+**Reasoning:** Schema evolution must be managed deliberately.
+
+### Scenario C: A Parquet dataset has thousands of tiny files
+**Problem:** Query performance is poor despite columnar storage.
+
+**Action:** Inspect file sizes and partition design, compact small files where appropriate, and review query filters and selected columns.
+
+**Reasoning:** A good format does not compensate for poor file layout.
+
+## 5. Troubleshooting
+
+### 13. CSV values appear corrupted
+Check encoding, delimiter, quoting, line endings, decimal conventions and type inference.
+
+### 14. JSON parser fails
+Inspect malformed syntax, encoding, unexpected nulls, wrong data types and truncated responses. Capture a safe sample without exposing secrets or personal data.
+
+### 15. Source and target counts differ
+Check pagination, filters, late records, duplicate handling, rejected rows and the time window used for comparison.
+
+## 6. Follow-up questions
+
+- What is a schema contract?
+- What is a primary key?
+- What is a composite key?
+- What is a nullable field?
 - What is schema evolution?
-- Why is a primary key useful for ingestion?
-- How do you handle source deletes?
-- What is a data contract?
-- Why is Parquet not ideal for manual inspection?
+- What is a partition column?
+- Why is source lineage useful?
+- How would you store an image and its metadata?
 
-## Quick revision
-Discuss source format based on structure, volume, query pattern, and compatibility—not just file extension.
+## 7. Strong revision points
+
+- Never design ingestion from a file extension alone; inspect actual content.
+- Confirm identity and update behavior with the source owner.
+- Keep source identifiers stable.
+- Validate schema before applying transformations.
+- Preserve rejected records and failure reasons.
+- Treat sensitive source data according to its classification.
+
+## 8. Mini-project defence
+
+Explain your inventory for the five retail sources:
+
+1. Why each source belongs to its data category.
+2. How it will be accessed.
+3. What uniquely identifies a record.
+4. How often it changes.
+5. Which validation checks apply.
+6. What security and retention rules are needed.
+
+A strong candidate identifies unknowns and asks the source owner rather than inventing assumptions.
