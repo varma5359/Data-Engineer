@@ -1,172 +1,205 @@
 # Day 27 Interview Preparation: Database Objects and Automation
 
-**Pathway:** TechPhile.ai — Data Engineer Career Pathway  
 **Phase:** 3 — SQL and Database Engineering  
 **Level:** Beginner to junior Data Engineer  
 **Mini-project:** Database Automation Lab  
-**Coverage:** Views, stored procedures, triggers, functions, database automation concepts
+**Database:** PostgreSQL
 
 ---
 
-## 1. How to answer
+## 1. Core questions with complete answers
 
-For every question, define the concept, explain why a Data Engineer uses it, give a TechStore example, describe the result and mention a limitation or common mistake. Avoid memorizing only one-line definitions.
+### 1. What are database objects?
 
-## 2. Core interview questions
+Database objects are named structures stored in a database schema. Examples include tables, views, materialized views, indexes, functions, procedures, triggers and sequences. Each object serves a different purpose in storing, querying, securing or automating data.
 
-### 1. What is a database view?
+### 2. What is a view?
 
-**Answer guidance:** Explain in plain English, show the smallest relevant SQL/Python example from the class notes, describe the expected behavior and mention one edge case or trade-off.
+A view is a named query that can be queried like a table for many SELECT operations. It can simplify repeated joins, provide a reusable interface and expose selected columns to users.
 
-**Follow-up:** How would you verify this on the TechStore training database?
+### 3. Does a normal PostgreSQL view store data?
 
-### 2. Does a normal view store result rows?
+A normal view stores the query definition, not a separate copy of its result rows. When queried, it reads the underlying data according to the current transaction's visibility rules.
 
-**Answer guidance:** Explain in plain English, show the smallest relevant SQL/Python example from the class notes, describe the expected behavior and mention one edge case or trade-off.
+### 4. What is a materialized view?
 
-**Follow-up:** How would you verify this on the TechStore training database?
+A materialized view stores the result of a query physically. It can make repeated analytical reads faster, but its result may become stale until refreshed.
 
-### 3. What is a materialized view?
+### 5. View versus materialized view?
 
-**Answer guidance:** Explain in plain English, show the smallest relevant SQL/Python example from the class notes, describe the expected behavior and mention one edge case or trade-off.
+A normal view stores a query definition and reflects current underlying data when queried. A materialized view stores a result snapshot and needs a refresh to reflect later source changes.
 
-**Follow-up:** How would you verify this on the TechStore training database?
+### 6. What is REFRESH MATERIALIZED VIEW?
 
-### 4. Why refresh it?
+In PostgreSQL it recomputes the materialized view's stored result from its defining query. It is used when source data has changed and the materialized result needs updating.
 
-**Answer guidance:** Explain in plain English, show the smallest relevant SQL/Python example from the class notes, describe the expected behavior and mention one edge case or trade-off.
+### 7. What is a database function?
 
-**Follow-up:** How would you verify this on the TechStore training database?
+A function is a named reusable routine that accepts parameters and returns a value or a table. It can encapsulate a calculation or query logic.
 
-### 5. Are all views updatable?
+### 8. What is a stored procedure?
 
-**Answer guidance:** Explain in plain English, show the smallest relevant SQL/Python example from the class notes, describe the expected behavior and mention one edge case or trade-off.
+A stored procedure is a named database routine invoked as an operation. In PostgreSQL it is called using CALL. It is commonly used to execute a sequence of database actions.
 
-**Follow-up:** How would you verify this on the TechStore training database?
+### 9. Function versus procedure in PostgreSQL?
 
-### 6. What is a database function?
+Functions declare a return type and are commonly used in expressions or SELECT statements. Procedures are invoked with CALL and have different transaction-control capabilities. Exact behavior and syntax vary across database products.
 
-**Answer guidance:** Explain in plain English, show the smallest relevant SQL/Python example from the class notes, describe the expected behavior and mention one edge case or trade-off.
+### 10. Can a function accept parameters?
 
-**Follow-up:** How would you verify this on the TechStore training database?
+Yes. A function can accept input parameters with declared types. For example, calculate_line_total(quantity INTEGER, unit_price NUMERIC) can return the product of those values.
 
-### 7. How do you call a PostgreSQL function?
+### 11. What is PL/pgSQL?
 
-**Answer guidance:** Explain in plain English, show the smallest relevant SQL/Python example from the class notes, describe the expected behavior and mention one edge case or trade-off.
+PL/pgSQL is PostgreSQL's procedural language. It supports variables, conditions, loops, exceptions and SQL statements inside database functions and procedures.
 
-**Follow-up:** How would you verify this on the TechStore training database?
+### 12. What is a trigger?
 
-### 8. What is a procedure?
+A trigger is database logic that runs automatically in response to a specified event on a table or view, such as INSERT, UPDATE or DELETE.
 
-**Answer guidance:** Explain in plain English, show the smallest relevant SQL/Python example from the class notes, describe the expected behavior and mention one edge case or trade-off.
+### 13. What is a trigger function in PostgreSQL?
 
-**Follow-up:** How would you verify this on the TechStore training database?
+A PostgreSQL trigger executes a function that returns the special TRIGGER type. The trigger definition specifies the event, timing, table and whether it runs per row or per statement.
 
-### 9. How do you call a PostgreSQL procedure?
+### 14. What is the difference between BEFORE and AFTER triggers?
 
-**Answer guidance:** Explain in plain English, show the smallest relevant SQL/Python example from the class notes, describe the expected behavior and mention one edge case or trade-off.
+A BEFORE trigger runs before the row operation and can validate or modify NEW. An AFTER trigger runs after the row operation and is useful for actions such as audit inserts. Both participate in the surrounding transaction.
 
-**Follow-up:** How would you verify this on the TechStore training database?
+### 15. What are OLD and NEW in a trigger?
 
-### 10. Function versus procedure?
+OLD represents the row before the operation. NEW represents the new row for INSERT or UPDATE. Availability depends on the trigger event; for DELETE, OLD is available and NEW is not.
 
-**Answer guidance:** Explain in plain English, show the smallest relevant SQL/Python example from the class notes, describe the expected behavior and mention one edge case or trade-off.
+### 16. What does FOR EACH ROW mean?
 
-**Follow-up:** How would you verify this on the TechStore training database?
+It means the trigger fires once for every affected row. A statement-level trigger runs once for the SQL statement, regardless of the number of rows affected.
 
-### 11. What is a trigger?
+### 17. What is an audit trigger?
 
-**Answer guidance:** Explain in plain English, show the smallest relevant SQL/Python example from the class notes, describe the expected behavior and mention one edge case or trade-off.
+An audit trigger automatically records information about a data change, such as the affected key, old value, new value and timestamp. It supports traceability, but audit access and retention must be secured.
 
-**Follow-up:** How would you verify this on the TechStore training database?
+### 18. Does an audit trigger run in a separate transaction?
 
-### 12. What are trigger events?
+No. A trigger's database writes normally participate in the same transaction as the statement that fired it. If that transaction rolls back, the trigger's audit insert rolls back too.
 
-**Answer guidance:** Explain in plain English, show the smallest relevant SQL/Python example from the class notes, describe the expected behavior and mention one edge case or trade-off.
+### 19. What happens if a trigger function raises an error?
 
-**Follow-up:** How would you verify this on the TechStore training database?
+The triggering statement fails. If it is inside a transaction, the transaction may enter an aborted state and need rollback or rollback to a savepoint, depending on the context.
 
-### 13. What are OLD and NEW?
+### 20. Can a trigger cause recursion?
 
-**Answer guidance:** Explain in plain English, show the smallest relevant SQL/Python example from the class notes, describe the expected behavior and mention one edge case or trade-off.
+Yes. A trigger that updates the same table or another table with triggers can cause repeated trigger execution. Design and test trigger logic carefully to prevent recursion and unexpected side effects.
 
-**Follow-up:** How would you verify this on the TechStore training database?
+### 21. Why should triggers be used carefully?
 
-### 14. What is a row-level trigger?
+Triggers hide work behind ordinary table statements. They can affect performance, complicate debugging and create unexpected side effects. Use them when a database-level guarantee is important and document their behavior.
 
-**Answer guidance:** Explain in plain English, show the smallest relevant SQL/Python example from the class notes, describe the expected behavior and mention one edge case or trade-off.
+### 22. What is a sequence?
 
-**Follow-up:** How would you verify this on the TechStore training database?
+A sequence is a database object that generates numeric values, often used for identifiers. PostgreSQL identity columns use sequence-backed generation.
 
-### 15. What is an audit trigger?
+### 23. What is a schema?
 
-**Answer guidance:** Explain in plain English, show the smallest relevant SQL/Python example from the class notes, describe the expected behavior and mention one edge case or trade-off.
+A schema is a namespace within a database that organizes objects and helps manage naming and permissions. For example, automation_lab.orders identifies the orders table in the automation_lab schema.
 
-**Follow-up:** How would you verify this on the TechStore training database?
+### 24. What is a database index?
 
-### 16. What risks do triggers introduce?
+An index is a data structure that can help locate rows efficiently. It is covered in detail in Day 25.
 
-**Answer guidance:** Explain in plain English, show the smallest relevant SQL/Python example from the class notes, describe the expected behavior and mention one edge case or trade-off.
+### 25. Can a view improve security?
 
-**Follow-up:** How would you verify this on the TechStore training database?
+A view can expose only selected columns or rows, and privileges can be granted on the view rather than directly on base tables. However, security behavior depends on ownership, privileges, security options and database configuration. A view alone is not automatically a complete security boundary.
 
-### 17. What is an identity column?
+### 26. What is an updatable view?
 
-**Answer guidance:** Explain in plain English, show the smallest relevant SQL/Python example from the class notes, describe the expected behavior and mention one edge case or trade-off.
+Some simple views allow INSERT, UPDATE or DELETE operations to affect underlying tables. Complex views with joins, grouping or aggregates may not be directly updatable without additional mechanisms. Check the database's rules before relying on updates through a view.
 
-**Follow-up:** How would you verify this on the TechStore training database?
+### 27. What is the difference between a view and a table?
 
-### 18. When should logic live in the database?
+A table stores data rows. A normal view stores a query definition and presents a result derived from underlying objects. A materialized view stores a query result.
 
-**Answer guidance:** Explain in plain English, show the smallest relevant SQL/Python example from the class notes, describe the expected behavior and mention one edge case or trade-off.
+### 28. How do you inspect database objects?
 
-**Follow-up:** How would you verify this on the TechStore training database?
+Use database catalog views, information_schema views, or client tools such as pgAdmin and psql. Inspect object definitions and dependencies before changing or dropping objects.
 
-### 19. When should orchestration live outside it?
+### 29. What is CREATE OR REPLACE used for?
 
-**Answer guidance:** Explain in plain English, show the smallest relevant SQL/Python example from the class notes, describe the expected behavior and mention one edge case or trade-off.
+In PostgreSQL it replaces the definition of a supported existing object, such as a function or view, while preserving the object identity where supported. It does not mean all dependent objects or interfaces are automatically safe; review compatibility before replacing production definitions.
 
-**Follow-up:** How would you verify this on the TechStore training database?
+### 30. How would you automate a daily summary?
 
-## 3. Scenario-based discussion
+I could create a query or view for reusable logic, use a procedure or scheduled orchestration job to refresh or populate a summary, and validate row counts and totals. The scheduler and retry strategy should be designed explicitly rather than assuming a database object schedules itself.
 
-1. **Five teams repeat the same reporting query. How might a view help?**
+---
 
-   Discuss business impact, inspect source and target state, choose the correct SQL/Python behavior, and explain verification and failure handling.
+## 2. Scenario-based interview questions
 
-2. **A materialized view is stale. What process is missing?**
+### Scenario 1: Analysts repeat the same multi-table query
 
-   Discuss business impact, inspect source and target state, choose the correct SQL/Python behavior, and explain verification and failure handling.
+**Good answer:** I would consider creating a view that exposes the required columns and joins. This provides a reusable interface. I would document its grain and permissions, and inspect the query plan if it becomes slow.
 
-3. **A team wants a cross-system workflow inside a trigger. What would you recommend?**
+### Scenario 2: A dashboard repeatedly calculates the same expensive summary
 
-   Discuss business impact, inspect source and target state, choose the correct SQL/Python behavior, and explain verification and failure handling.
+**Good answer:** I would measure the query and consider a materialized view or summary table. I would define its refresh frequency, freshness requirement, failure handling and reconciliation checks.
 
-## 4. Mini-project defence — Database Automation Lab
+### Scenario 3: A status change must be audited
 
-Prepare a 2–3 minute explanation:
-- What business problem did it solve?
-- Which tables or components did you use?
-- Why did you choose this approach?
-- What output did you verify?
-- Which edge case or failure did you test?
-- What would you improve before production?
+**Good answer:** A database trigger can write old and new status values to an audit table. I would ensure the audit table is protected, test multi-row updates and understand that audit writes roll back with the original transaction.
 
-## 5. Common interview mistakes
+### Scenario 4: A trigger slows down a bulk load
 
-- Reciting syntax without explaining the result.
-- Ignoring NULL values, duplicate rows and one-to-many relationships.
-- Claiming performance improved without measuring it.
-- Ignoring transaction boundaries and error handling.
-- Using administrator privileges for routine jobs.
-- Exposing credentials in code or logs.
-- Failing to verify row counts and business totals.
+**Good answer:** A row-level trigger may execute once per inserted or updated row. I would measure its work, determine whether it is required during the load, and consider staging plus controlled audit processing without weakening required integrity or audit guarantees.
 
-## 6. Readiness checklist
+### Scenario 5: A function is called from a SELECT statement
 
-- [ ] I can explain every key concept in today's syllabus.
-- [ ] I can write or interpret the main SQL/Python pattern.
-- [ ] I can explain the expected output.
-- [ ] I can identify common mistakes and trade-offs.
-- [ ] I can defend the mini-project.
-- [ ] I can explain production validation and failure handling.
+**Good answer:** In PostgreSQL, a function that returns a compatible value can be used in an expression. A procedure is invoked with CALL and is not used as a scalar expression.
+
+### Scenario 6: A procedure attempts to COMMIT but errors
+
+**Good answer:** PostgreSQL procedure transaction control is allowed only in specific CALL contexts and is restricted by how the procedure is invoked. I would check the execution context and avoid assuming a procedure can commit in every situation.
+
+---
+
+## 3. Mini-project defence
+
+Be ready to explain:
+
+1. What problem did the view solve?
+2. What is stored in a normal view?
+3. Why did the materialized view need refresh?
+4. What parameters did your function accept?
+5. What did your procedure update?
+6. What event fired the trigger?
+7. What do OLD and NEW mean?
+8. Why did a no-op status update not create an audit record?
+9. What happens to the audit row if the transaction rolls back?
+10. What are the risks of hidden trigger logic?
+
+---
+
+## 4. Common interview traps
+
+- Saying a normal view stores rows.
+- Saying materialized views automatically refresh.
+- Calling a procedure as a scalar function.
+- Forgetting PostgreSQL trigger functions return TRIGGER.
+- Confusing OLD and NEW.
+- Saying AFTER trigger writes survive rollback.
+- Assuming triggers fire only once for a multi-row statement.
+- Ignoring recursion and bulk-load impact.
+- Assuming view privileges automatically solve every security problem.
+- Assuming PostgreSQL and MySQL routine syntax is identical.
+
+---
+
+## 5. Readiness checklist
+
+- [ ] I can explain tables, views and materialized views.
+- [ ] I can create and query a view.
+- [ ] I understand materialized-view refresh.
+- [ ] I can create and call a simple function.
+- [ ] I can create and call a procedure.
+- [ ] I can explain function versus procedure.
+- [ ] I can create a PostgreSQL trigger function and trigger.
+- [ ] I understand OLD and NEW.
+- [ ] I understand trigger transaction behavior.
+- [ ] I can explain why triggers need careful testing.
