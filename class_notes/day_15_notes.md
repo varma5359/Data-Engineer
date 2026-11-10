@@ -267,7 +267,7 @@ Expected output (standard deviation shown approximately):
 462.5
 200
 750
-204.022... 
+198.037... 
 ```
 
 - `sum`: total.
