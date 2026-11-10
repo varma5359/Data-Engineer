@@ -138,3 +138,47 @@ Output: `INFO:Loaded 25 records`.
 - Log source name, batch ID and counts where appropriate.
 - Never log credentials or sensitive data.
 - Define the batch-failure and record-rejection policy before production.
+
+
+---
+
+## 7. Follow-up interview questions
+
+16. What is a traceback? Python's report of the call stack and source locations involved in an exception.
+17. Why catch specific exceptions? To handle known failures without hiding unrelated programming errors.
+18. When does else run? When the try block completes without an exception.
+19. When does finally run? During normal completion and exception handling; it is useful for cleanup.
+20. What does raise do? Explicitly raises an exception.
+21. Should every invalid row stop a pipeline? Follow an agreed policy based on severity, quality thresholds and business impact.
+22. What is a transient error? A temporary failure that may succeed later, such as a short network interruption.
+23. Should invalid text conversion be retried? Usually not; the source value must be corrected.
+24. INFO versus WARNING versus ERROR? Normal event, unexpected condition and failed operation.
+25. Why avoid bare except? It can hide defects and make diagnosis difficult.
+26. What should be logged for a rejected row? Safe identifier, source location, reason and run context; avoid secrets and sensitive payloads.
+27. How debug a wrong result without an exception? Inspect input values, types, intermediate calculations and business assumptions.
+
+## 8. Scenario questions
+
+A network request times out once but succeeds on a later attempt. It may be transient; use bounded retries with delay and timeout.
+
+A row contains an invalid date. Preserve its raw value and rejection reason or stop according to the source contract.
+
+A database reports permission denied. Investigate credentials and grants rather than retrying indefinitely.
+
+## 9. Mini-project defense
+
+- Which exceptions did the processor expect?
+- How did it separate conversion failure from a business rule?
+- How were rejected values preserved?
+- When should the complete pipeline fail?
+
+## 10. Readiness rubric
+
+| Skill | Ready when the student can… |
+|---|---|
+| Traceback | Identify exception type and failing statement |
+| Handling | Catch a specific expected exception |
+| Business rules | Separate invalid data from code failures |
+| Logging | Select safe and useful log context |
+| Reliability | Explain when to continue, stop or retry |
+|
