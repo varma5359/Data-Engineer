@@ -5,223 +5,547 @@
 **Learning time:** 2–3 hours
 
 ## 1. Learning outcomes
-- Explain version control and Git.
-- Understand repository, commit, branch and remote.
-- Use essential Git commands.
-- Create feature branches and merge changes.
-- Resolve simple merge conflicts.
-- Organize a small ETL project.
-- Protect secrets and generated files.
+
+- Explain version control and why data engineers use Git.
+- Understand repository, working tree, staging area, commit, branch and remote.
+- Configure Git and create a local repository.
+- Stage and commit selected changes.
+- Create a feature branch and merge it.
+- Understand and resolve a simple merge conflict.
+- Use `.gitignore` to exclude generated files and local secrets.
+- Organize a small ETL project for collaboration.
 
 ## 2. Why version control?
-Git records code history and supports collaboration. Engineers can review changes, restore earlier versions, work independently and connect code changes to issues and deployments.
 
-Git is distributed: each clone contains repository history, while GitHub or another hosting service commonly provides a shared remote.
+Git records how code changes over time. It helps engineers:
+- Review who changed code and why.
+- Restore an earlier working version.
+- Develop features independently.
+- Collaborate without sending files back and forth.
+- Connect code changes to reviews and deployments.
 
-## 3. Key concepts
+Git is distributed. Each clone contains repository history. GitHub is a hosting and collaboration service that commonly stores a shared remote repository.
+
+## 3. Important Git concepts
 
 | Term | Meaning |
 |---|---|
-| Repository | Project plus version history |
+| Repository | Project files and version history |
 | Working tree | Current checked-out files |
-| Staging area | Changes selected for next commit |
-| Commit | Snapshot with message and metadata |
+| Staging area | Changes selected for the next commit |
+| Commit | Recorded snapshot of staged changes |
 | Branch | Movable line of development |
-| Merge | Combine histories/changes |
-| Remote | Hosted repository reference |
-| Clone | Create a local copy |
+| Merge | Integrate changes from another branch |
+| Remote | Named reference to a hosted repository |
+| Clone | Copy a remote repository locally |
+| Fetch | Download remote history without integrating it |
 | Pull | Fetch and integrate remote changes |
-| Push | Publish local commits |
+| Push | Publish local commits to a remote |
 
-## 4. Configure Git
+## 4. Install and verify Git
+
+Download Git for your operating system from the official Git website if it is not installed. Then open CMD:
+
 ```bash
 git --version
+```
+
+Example output:
+
+```text
+git version 2.46.0.windows.1
+```
+
+Your installed version will differ.
+
+## 5. Configure your identity
+
+```bash
 git config --global user.name "Your Name"
 git config --global user.email "you@example.com"
 ```
 
-Use the email associated with your Git identity. Do not put access tokens in commands that may be saved in shell history.
+Verify:
 
-## 5. Initialize or clone
-Create a repository:
+```bash
+git config --global --list
+```
+
+The email should be an address you intend to associate with your commits. Do not place passwords or access tokens in Git configuration.
+
+## 6. Create a project folder
+
+```bash
+mkdir retail_etl_project
+cd retail_etl_project
+```
+
+Initialize Git:
 
 ```bash
 git init
 ```
 
-Clone an existing repository:
+Expected output includes a message similar to:
+
+```text
+Initialized empty Git repository in .../retail_etl_project/.git/
+```
+
+The exact path depends on your computer.
+
+## 7. Understand git status
+
+```bash
+git status
+```
+
+Expected key message for a new empty repository:
+
+```text
+On branch main
+No commits yet
+nothing to commit
+```
+
+Some Git installations may initially name the default branch `master`. You can rename it:
+
+```bash
+git branch -M main
+```
+
+## 8. Create a source file
+
+Create `pipeline.py`:
+
+```python
+orders = [
+    {"order_id": 1001, "amount": 250},
+    {"order_id": 1002, "amount": 500}
+]
+
+total_sales = 0
+
+for order in orders:
+    total_sales += order["amount"]
+
+print("Total sales:", total_sales)
+```
+
+Run it:
+
+```bash
+python pipeline.py
+```
+
+Expected output:
+
+```text
+Total sales: 750
+```
+
+## 9. Stage a file
+
+Check status:
+
+```bash
+git status
+```
+
+The new file appears as untracked. Stage it:
+
+```bash
+git add pipeline.py
+```
+
+Check status again:
+
+```bash
+git status
+```
+
+Expected key message:
+
+```text
+Changes to be committed:
+    new file:   pipeline.py
+```
+
+Staging selects what will be included in the next commit. It does not yet create a commit.
+
+## 10. Create a commit
+
+```bash
+git commit -m "Add initial retail sales pipeline"
+```
+
+Expected output contains a commit summary similar to:
+
+```text
+[main (root-commit) abc1234] Add initial retail sales pipeline
+ 1 file changed, 10 insertions(+)
+ create mode 100644 pipeline.py
+```
+
+The short commit ID and insertion count depend on your file and repository.
+
+## 11. Review history
+
+```bash
+git log --oneline
+```
+
+Example output:
+
+```text
+abc1234 Add initial retail sales pipeline
+```
+
+Your commit ID will be different. A useful commit message describes the change, not just "update".
+
+## 12. Modify a tracked file
+
+Add this line at the end of `pipeline.py`:
+
+```python
+print("Pipeline completed")
+```
+
+Check the difference:
+
+```bash
+git diff
+```
+
+Expected diff includes the added line prefixed by `+`.
+
+`git diff` shows unstaged changes. After staging, use `git diff --staged` to inspect what is prepared for commit.
+
+## 13. Stage and commit the update
+
+```bash
+git add pipeline.py
+git diff --staged
+git commit -m "Print pipeline completion status"
+```
+
+The new commit records the update. The previous commit remains in history.
+
+## 14. Create a feature branch
+
+A branch lets you work on a change without immediately changing the main branch.
+
+```bash
+git switch -c feature/order-summary
+```
+
+Expected output:
+
+```text
+Switched to a new branch 'feature/order-summary'
+```
+
+Check:
+
+```bash
+git branch
+```
+
+The current branch is marked with an asterisk.
+
+## 15. Make a branch change
+
+Add to `pipeline.py`:
+
+```python
+average_order = total_sales / len(orders)
+print("Average order:", average_order)
+```
+
+Run:
+
+```bash
+python pipeline.py
+```
+
+Expected output:
+
+```text
+Total sales: 750
+Pipeline completed
+Average order: 375.0
+```
+
+Stage and commit the feature:
+
+```bash
+git add pipeline.py
+git commit -m "Add average order summary"
+```
+
+## 16. Merge a feature branch
+
+Return to main:
+
+```bash
+git switch main
+```
+
+Merge the feature:
+
+```bash
+git merge feature/order-summary
+```
+
+If main has not changed the same lines, Git may perform a fast-forward merge. The feature commit becomes part of main's history.
+
+Check:
+
+```bash
+git log --oneline --all
+```
+
+## 17. Understand a merge conflict
+
+A merge conflict happens when Git cannot automatically combine competing edits.
+
+Example:
+- Main changes a line to `tax_rate = 0.05`.
+- A feature branch changes the same line to `tax_rate = 0.08`.
+- Git needs a human to decide the correct business rule.
+
+Conflict markers look like:
+
+```text
+<<<<<<< HEAD
+tax_rate = 0.05
+=======
+tax_rate = 0.08
+>>>>>>> feature/tax-change
+```
+
+Edit the file to keep the intended final value and remove all marker lines. Then:
+
+```bash
+git add pipeline.py
+git commit -m "Resolve tax rate merge conflict"
+```
+
+Do not choose a tax value arbitrarily. Confirm the business rule with the responsible owner.
+
+## 18. Use gitignore
+
+Generated files, local environments and secrets usually should not be committed.
+
+Create `.gitignore`:
+
+```text
+.venv/
+__pycache__/
+*.pyc
+.env
+.ipynb_checkpoints/
+data/raw/
+```
+
+This excludes virtual environments, Python cache files, environment-variable files, notebook checkpoints and raw data folder contents.
+
+Be careful: if a file is already tracked, adding it to `.gitignore` does not automatically remove it from Git history or tracking.
+
+## 19. Never commit secrets
+
+Do not commit:
+- Database passwords.
+- API keys and access tokens.
+- Private certificates.
+- Personal credentials.
+- Production connection strings containing secrets.
+
+Use environment variables or a managed secret store. If a secret is accidentally pushed, removing it from the latest file is not enough; rotate or revoke the exposed credential.
+
+## 20. Clone a repository
+
+To copy an existing repository:
 
 ```bash
 git clone https://github.com/owner/repository.git
 cd repository
 ```
 
-## 6. Inspect repository state
+Replace the URL with the real repository address. The clone command creates a local copy and configures a remote commonly named `origin`.
+
+## 21. Inspect remote settings
+
 ```bash
-git status
-git log --oneline
 git remote -v
 ```
 
-Check status before staging, committing, pulling or pushing. Understand which branch and remote are active.
+Example output:
 
-## 7. Stage and commit
-```bash
-git add transformations.py
-git status
-git commit -m "Add order transformation logic"
+```text
+origin  https://github.com/owner/repository.git (fetch)
+origin  https://github.com/owner/repository.git (push)
 ```
 
-Stage only intended files. Avoid blindly using `git add .` when notebooks, data exports or secrets may be present.
+The URL is an example. Your actual remote depends on the repository you cloned or configured.
 
-A useful commit message states the change, not a vague phrase such as "update".
+## 22. Push and pull
 
-## 8. Branch workflow
+Push a local branch:
+
 ```bash
-git switch -c feature/order-validation
+git push -u origin main
 ```
 
-Make and test changes, then commit. Switch back and merge:
+The `-u` option sets the upstream relationship so future pushes and pulls can use the configured branch.
+
+Get and integrate remote changes:
 
 ```bash
-git switch main
 git pull
-git merge feature/order-validation
 ```
 
-Push branch:
+In a team, inspect your working tree and coordinate before pulling or pushing. Never overwrite another person's work without understanding the branch history.
 
-```bash
-git push -u origin feature/order-validation
+## 23. Mini-project: Version-Controlled ETL Project
+
+**Scenario:** A junior data engineer creates a small order transformation script and tracks each meaningful improvement in Git.
+
+### Step 1 — Create project structure
+
+```text
+retail_etl_project/
+    pipeline.py
+    README.md
+    .gitignore
 ```
 
-Exact team workflow may use pull requests and protected branches. Do not push directly to a protected production branch unless policy allows it.
+### Step 2 — Add a simple pipeline
 
-## 9. Merge conflicts
-A conflict occurs when Git cannot automatically combine overlapping changes.
+In `pipeline.py`:
 
-Workflow:
-1. Run `git status`.
-2. Open each conflicted file.
-3. Review both versions and understand intent.
-4. Edit the final desired content.
-5. Remove conflict markers.
-6. Run tests.
-7. Stage resolved files.
-8. Complete the merge commit if required.
+```python
+orders = [
+    {"order_id": 1001, "quantity": 2, "unit_price": 250},
+    {"order_id": 1002, "quantity": 1, "unit_price": 800},
+    {"order_id": 1003, "quantity": 3, "unit_price": 150}
+]
 
-Never resolve a conflict by blindly choosing "ours" or "theirs" without reviewing the logic.
+total_sales = 0
 
-## 10. Undo carefully
-- `git restore file.py`: discard unstaged changes to a file.
-- `git restore --staged file.py`: unstage a file.
-- `git revert <commit>`: create a new commit that reverses a prior commit.
-- `git reset`: move branch history; use carefully, especially if changes are shared.
+for order in orders:
+    order_amount = order["quantity"] * order["unit_price"]
+    total_sales += order_amount
 
-Before destructive commands, inspect status and ensure important work is backed up.
+print("Orders processed:", len(orders))
+print("Total sales:", total_sales)
+```
 
-## 11. .gitignore
-Example:
+Expected output:
 
-```gitignore
+```text
+Orders processed: 3
+Total sales: 1750
+```
+
+### Step 3 — Document the project
+
+In `README.md`:
+
+```markdown
+# Retail ETL Project
+
+A beginner project that calculates sales from sample order records.
+
+## Run
+
+python pipeline.py
+```
+
+### Step 4 — Ignore local files
+
+In `.gitignore`:
+
+```text
 .venv/
 __pycache__/
 *.pyc
 .env
-*.log
-data/raw/
-.ipynb_checkpoints/
 ```
 
-Do not ignore source code or required small test fixtures. Raw datasets may be excluded due to size, licensing or privacy. Track a README describing how to obtain permitted data.
-
-If a secret was committed, deleting it in a later commit is not enough. Revoke/rotate the credential and follow repository incident procedures.
-
-## 12. Organize an ETL project
-```text
-version_controlled_etl/
-    README.md
-    requirements.txt
-    .gitignore
-    config/
-    data/
-        raw/
-        processed/
-    src/
-        extract.py
-        transform.py
-        load.py
-    tests/
-        test_transform.py
-    main.py
-```
-
-Keep responsibilities clear:
-- extract: obtain source data.
-- transform: apply deterministic business rules.
-- load: write to destination.
-- tests: verify transformations and validation.
-- config: non-secret configuration.
-- README: setup, run instructions and assumptions.
-
-Avoid unnecessary abstractions. A junior project should be understandable and testable.
-
-## 13. requirements.txt
-Create a dependency file:
-
-```text
-pandas==2.2.3
-requests==2.32.3
-```
-
-Install:
+### Step 5 — Initialize and commit
 
 ```bash
-python -m pip install -r requirements.txt
+git init
+git branch -M main
+git add pipeline.py README.md .gitignore
+git commit -m "Create retail ETL starter project"
 ```
 
-Pin or constrain dependencies according to the project's reproducibility policy. Validate versions against the environment before committing.
+### Step 6 — Create a feature branch
 
-## 14. Mini-project: Version-Controlled ETL Project
-1. Create the project structure.
-2. Add a README with purpose, setup and execution steps.
-3. Add a small transformation module.
-4. Add unit tests.
-5. Add .gitignore.
-6. Initialize Git and commit the baseline.
-7. Create a feature branch.
-8. Add a validation rule and tests.
-9. Commit the feature.
-10. Merge through the team's approved process.
-11. Push and verify remote history.
+```bash
+git switch -c feature/order-count
+```
 
-Useful commands:
+Add a count or summary to the script, run it, and verify the output before committing.
+
+### Step 7 — Commit and merge
+
+```bash
+git add pipeline.py
+git commit -m "Add order processing summary"
+git switch main
+git merge feature/order-count
+```
+
+### Step 8 — Verify the final history
 
 ```bash
 git status
-git diff
-git add src/transform.py tests/test_transform.py
-git commit -m "Add order validation"
-git log --oneline --graph
-git push
+git log --oneline --all
 ```
 
-## 15. Common mistakes
-| Mistake | Better practice |
-|---|---|
-| Commit secrets | Use secret storage and .gitignore |
-| Commit huge raw data | Store data externally and document retrieval |
-| One giant commit | Make small logical commits |
-| Work directly on shared main | Use feature branches and review |
-| Ignore failing tests | Fix or explain before merge |
-| Force push shared branch | Coordinate and follow team policy |
-| Commit generated files | Ignore caches and build artifacts |
+Expected status after a clean merge:
 
-## 16. Day 18 revision
-- Git tracks project history.
-- Staging selects what enters a commit.
-- Branches isolate changes.
-- Pull requests support review.
-- Conflicts require understanding both changes.
-- .gitignore reduces accidental commits but does not remove already tracked files.
-- Secrets must be revoked if exposed.
+```text
+nothing to commit, working tree clean
+```
+
+The history should show the initial project commit and the feature commit.
+
+## 24. Common mistakes
+
+| Mistake | Why it happens | Fix |
+|---|---|---|
+| Changes missing from commit | File was not staged | Run `git status` and `git add` |
+| Wrong branch updated | Current branch was not checked | Run `git branch` before editing |
+| Merge conflict left unresolved | Conflict markers remain | Edit file, remove markers, test, stage and commit |
+| Secret committed | `.env` not ignored or secret copied into code | Rotate credential and use a secret store |
+| Huge files committed | Data folders not excluded | Review `.gitignore` and staged changes |
+| Push rejected | Remote contains commits not present locally | Fetch, inspect and integrate safely |
+
+## 25. Practical exercises
+
+1. Initialize a Git repository for a Python script.
+2. Make two commits with meaningful messages.
+3. Create a feature branch and add a small improvement.
+4. Merge the branch into main.
+5. Create a `.gitignore` for Python and local environment files.
+6. Explain the difference between `git add`, `git commit` and `git push`.
+7. Explain why deleting an exposed API key from the latest file does not make it safe.
+
+## 26. Interview revision
+
+- Git is a distributed version control system.
+- A repository contains project files and history.
+- The staging area selects content for the next commit.
+- A commit records a snapshot of staged changes.
+- A branch supports isolated development.
+- A merge integrates branch changes.
+- A merge conflict requires a deliberate human resolution.
+- `.gitignore` excludes untracked matching files but does not erase tracked history.
+- Secrets should never be committed; exposed credentials must be rotated.
+- GitHub hosts repositories and adds collaboration features; Git itself is the version control tool.
+
+**Day 18 checkpoint:** You should be able to create a repository, stage and commit changes, work on a feature branch, merge it, resolve a basic conflict and protect local secrets and generated files.
