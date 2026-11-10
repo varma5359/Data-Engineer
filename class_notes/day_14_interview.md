@@ -142,3 +142,51 @@
 - Validate join cardinality.
 - Use vectorized operations and filter early.
 - Verify exported output with row counts and key checks.
+
+
+---
+
+## 7. Follow-up interview questions
+
+16. What is a Series? A one-dimensional labeled Pandas structure.
+17. What is a DataFrame? A two-dimensional labeled table with rows and columns.
+18. What does head() do? Displays the first rows for inspection.
+19. What does shape return? A tuple containing row and column counts.
+20. What does dtypes show? The data type of each column.
+21. What does isna().sum() provide? Missing-value counts per column.
+22. loc versus iloc? loc selects by labels; iloc selects by integer position.
+23. How filter rows? Use a Boolean condition such as df[df['amount'] > 100].
+24. What does groupby do? Splits rows into groups so aggregations can be calculated per group.
+25. What is a merge? A relational-style join between DataFrames using one or more keys.
+26. What can cause a merge to multiply rows? Duplicate matching keys on the join side.
+27. Why check row counts after a merge? To detect unexpected row multiplication or dropped/unmatched records.
+28. What does drop_duplicates do? Removes duplicate rows based on all columns or a selected subset.
+29. Should missing values always be filled with zero? No. The replacement must reflect the field's business meaning.
+30. Why use index=False when exporting CSV? To avoid adding the DataFrame's row index as an unintended data column.
+
+## 8. Scenario questions
+
+A merge unexpectedly doubles the number of orders. Check whether the lookup table has multiple rows per join key and verify expected join cardinality.
+
+A revenue total falls after filtering. Identify which rows were excluded and confirm that the filter matches the business definition.
+
+A column contains numbers and text. Inspect dtypes and raw values, convert using a controlled rule, and preserve invalid records for review.
+
+## 9. Mini-project defense
+
+- What did you inspect before transformation?
+- Which missing-value rules did you apply and why?
+- Which key did you use for merging?
+- How did you verify that the merge did not multiply records?
+- How did you reconcile the final total?
+
+## 10. Readiness rubric
+
+| Skill | Ready when the student can… |
+|---|---|
+| Inspect | Use head, shape, columns, dtypes and isna |
+| Transform | Select, filter, sort and calculate columns |
+| Clean | Handle missing values and duplicates deliberately |
+| Aggregate | Group records and calculate totals |
+| Join | Merge DataFrames and validate cardinality |
+| Export | Write output and verify it |
