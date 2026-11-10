@@ -94,6 +94,7 @@ The course is being rebuilt phase by phase to one consistent beginner-first teac
 | Day | Syllabus topic | Mini-project | Class notes | Interview |
 |---|---|---|---|---|
 | 19 | Database Fundamentals | Operational Database Design | [Notes](day_19_notes.md) | [Interview](day_19_interview.md) |
+| 20 | SQL DDL, DML and Constraints | Database Creation Lab | [Notes](day_20_notes.md) | [Interview](day_20_interview.md) |
 
 ## Future phases
 - Phase 3: SQL and Database Engineering (Days 19–29)
