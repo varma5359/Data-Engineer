@@ -607,3 +607,114 @@ Accepted + rejected: 8
 - Keep accepted and rejected records separately.
 - Record rejection reasons and reconcile input counts.
 - Day 17 teaches how to test transformation and validation logic automatically.
+
+
+---
+
+# Beginner Teaching Extension — Day 16
+
+## A. Why validation comes before loading
+
+A script can finish without a Python exception and still produce incorrect data. Validation checks whether the incoming records meet technical and business expectations before they affect reports or downstream systems.
+
+## B. Separate parsing, schema and business rules
+
+- Parsing: can the input be read? Example: can text be converted to a date?
+- Schema: are required fields present with expected types?
+- Business rule: is the value allowed by the business? Example: quantity must be positive.
+
+A record can pass parsing but fail a business rule.
+
+## C. Create a small dataset
+
+```python
+orders = [
+    {"order_id": 101, "quantity": "2", "status": "PAID"},
+    {"order_id": 102, "quantity": "zero", "status": "PAID"},
+    {"order_id": 103, "quantity": "-1", "status": "UNKNOWN"}
+]
+```
+
+The quantity values arrive as strings. Do not assume they are valid integers just because the field is named quantity.
+
+## D. Validate one field at a time
+
+```python
+for order in orders:
+    try:
+        quantity = int(order["quantity"])
+        if quantity <= 0:
+            print(order["order_id"], "Rejected: quantity must be positive")
+        else:
+            print(order["order_id"], "Valid quantity:", quantity)
+    except ValueError:
+        print(order["order_id"], "Rejected: quantity is not an integer")
+```
+
+Expected output:
+
+```text
+101 Valid quantity: 2
+102 Rejected: quantity is not an integer
+103 Rejected: quantity must be positive
+```
+
+Conversion checks representation. The condition checks business meaning.
+
+## E. Check required fields and allowed values
+
+```python
+required_fields = ["order_id", "quantity", "status"]
+allowed_statuses = ["PAID", "PENDING", "CANCELLED"]
+
+for order in orders:
+    missing_fields = []
+    for field in required_fields:
+        if field not in order or order[field] is None or order[field] == "":
+            missing_fields.append(field)
+    if missing_fields:
+        print("Missing:", missing_fields)
+    elif order["status"] not in allowed_statuses:
+        print("Invalid status:", order["order_id"])
+```
+
+This checks presence and allowed values. Real validation should also define whitespace behavior, case normalization, null semantics and type expectations.
+
+## F. Detect duplicate identifiers
+
+```python
+seen_ids = set()
+for order in orders:
+    order_id = order.get("order_id")
+    if order_id in seen_ids:
+        print("Duplicate order:", order_id)
+    else:
+        seen_ids.add(order_id)
+```
+
+A set is useful for remembering identifiers already encountered. For large data, duplicate checking may need database constraints or distributed processing.
+
+## G. Accepted and rejected records
+
+A validation report should keep accepted records separate from rejected records and preserve a reason. Do not discard invalid input without traceability. A rejection record should include a safe identifier, source file or row context, raw value and validation message.
+
+## H. Schema drift
+
+Schema drift is an unexpected change in source structure: a required column disappears, a new field appears, or a type changes. Decide whether unknown fields are allowed, whether missing fields stop processing, and how changes are communicated to downstream users. These expectations form part of a data contract.
+
+## I. Mini-project: Data Validation Engine
+
+Use sample order records. Validate required keys, convert quantity and amount, check allowed statuses, detect duplicate order IDs, and produce accepted/rejected collections with reasons. Summarize input count, accepted count and rejected count. Verify that accepted plus rejected equals input count.
+
+## J. Common mistakes
+
+- Treating missing, empty string and zero as the same value.
+- Converting invalid values to zero without approval.
+- Checking only data types and ignoring business rules.
+- Dropping rejected records without a reason.
+- Treating every new optional field as a breaking change.
+- Reporting success when required quality thresholds fail.
+
+## K. Readiness check
+
+The student can distinguish parsing, schema and business validation, validate required fields and allowed values, detect duplicates, preserve rejection reasons and explain schema drift.
