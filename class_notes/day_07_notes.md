@@ -613,3 +613,206 @@ The terminal should display the outputs from the previous steps in order. If Pyt
 - Reusable transformations are easier to test and maintain than duplicated logic.
 
 **Day 7 checkpoint:** You should be able to write a function, validate its inputs, return a result, import it from another Python file and explain how a virtual environment keeps project dependencies separate.
+
+
+---
+
+# Beginner Teaching Extension — Day 7
+
+## A. Why a function exists
+
+Imagine the pipeline calculates an order total in three places. If tax rules change, copying and editing the same calculation three times is risky. A function gives one operation one named implementation. A function does not make code magically faster; it makes repeated logic easier to reuse, test and maintain.
+
+## B. First function: define, call, observe
+
+```python
+def greet_student():
+    print("Welcome to Python functions")
+
+greet_student()
+```
+
+Expected output:
+
+```text
+Welcome to Python functions
+```
+
+Read the syntax:
+- `def` begins a function definition.
+- `greet_student` is the function name.
+- Parentheses contain optional parameters.
+- The colon starts the indented function body.
+- The body does not run merely because it was defined. The call `greet_student()` runs it.
+
+## C. Parameter versus argument
+
+```python
+def greet_customer(customer_name):
+    print("Hello", customer_name)
+
+greet_customer("Asha")
+greet_customer("Ravi")
+```
+
+Expected output:
+
+```text
+Hello Asha
+Hello Ravi
+```
+
+The parameter `customer_name` is the name used inside the definition. The arguments `"Asha"` and `"Ravi"` are the actual values supplied during calls.
+
+## D. Return a result instead of only printing it
+
+```python
+def calculate_order_amount(quantity, unit_price):
+    amount = quantity * unit_price
+    return amount
+
+first_amount = calculate_order_amount(2, 250)
+second_amount = calculate_order_amount(3, 100)
+print(first_amount)
+print(second_amount)
+print(first_amount + second_amount)
+```
+
+Expected output:
+
+```text
+500
+300
+800
+```
+
+- `return` sends a result back to the caller.
+- The caller stores that result in a variable.
+- A returned value can be printed, added, tested or passed to another operation.
+- `print()` displays information; it does not replace returning a value.
+
+## E. Default and keyword arguments
+
+```python
+def calculate_discount(amount, discount_rate=0.10):
+    discount = amount * discount_rate
+    return amount - discount
+
+print(calculate_discount(1000))
+print(calculate_discount(1000, 0.20))
+print(calculate_discount(amount=1000, discount_rate=0.15))
+```
+
+Expected output:
+
+```text
+900.0
+800.0
+850.0
+```
+
+A default argument is used when the caller does not supply that parameter. A keyword argument names the parameter explicitly, which can make a call easier to read.
+
+## F. Understand local variables
+
+```python
+def calculate_total(price, quantity):
+    total = price * quantity
+    return total
+
+result = calculate_total(50, 4)
+print(result)
+```
+
+Expected output: `200`.
+
+The variable `total` is created inside the function. It is local to that function. The caller receives the returned value through `result`; it does not directly access the local variable `total`.
+
+## G. Import a built-in module
+
+```python
+import math
+
+print(math.ceil(12.2))
+print(math.floor(12.8))
+```
+
+Expected output:
+
+```text
+13
+12
+```
+
+A module is a Python file or library that groups related code. `import math` makes names from the math module available through the `math` prefix. `ceil()` rounds upward to the next integer; `floor()` rounds downward.
+
+## H. Build a reusable transformation library
+
+Create `transformations.py`:
+
+```python
+def calculate_line_amount(quantity, unit_price):
+    return quantity * unit_price
+
+def normalize_status(status):
+    return status.strip().upper()
+
+def is_valid_quantity(quantity):
+    return quantity > 0
+```
+
+Create `main.py` in the same folder:
+
+```python
+import transformations
+
+amount = transformations.calculate_line_amount(3, 120)
+status = transformations.normalize_status(" paid ")
+valid = transformations.is_valid_quantity(3)
+
+print(amount)
+print(status)
+print(valid)
+```
+
+Expected output:
+
+```text
+360
+PAID
+True
+```
+
+The module name is the filename without `.py`. The dot accesses a function defined inside that module. Keep both files in the same project folder for this first exercise.
+
+## I. Common function mistakes
+
+| Mistake | What happens | Correction |
+|---|---|---|
+| Define but never call | Body does not execute | Call the function by name with parentheses |
+| Forget colon | SyntaxError | Put `:` after the definition line |
+| Wrong indentation | SyntaxError or wrong block | Indent the complete body consistently |
+| Print instead of return | Caller receives no calculated result | Return values needed by later steps |
+| Wrong argument count | TypeError | Match required parameters or define defaults |
+| Import file not found | ModuleNotFoundError | Check filename and current project folder |
+
+## J. Mini-project practice sequence
+
+1. Create a function that accepts quantity and unit price and returns line amount.
+2. Create a function that removes surrounding spaces from a status and converts it to uppercase.
+3. Create a function that returns True only for a positive quantity.
+4. Put these functions in `transformations.py`.
+5. Import the module in `main.py` and call each function.
+6. Run the file from the project directory and compare the output.
+
+**Expected project output:**
+
+```text
+Line amount: 360
+Normalized status: PAID
+Quantity valid: True
+```
+
+## K. Student readiness check
+
+A student is ready to continue when they can explain the difference between defining and calling a function, parameter and argument, print and return, and module and package. They should be able to create two files and import a function from one into the other without copying code.
