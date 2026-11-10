@@ -1,178 +1,201 @@
 # Day 26 Interview Preparation: Database Normalization
 
-**Pathway:** TechPhile.ai — Data Engineer Career Pathway  
 **Phase:** 3 — SQL and Database Engineering  
 **Level:** Beginner to junior Data Engineer  
-**Mini-project:** Data Model Comparison  
-**Coverage:** 1NF, 2NF, 3NF, normalization, denormalization, data redundancy, database design trade-offs
+**Mini-project:** Data Model Comparison
 
 ---
 
-## 1. How to answer
+## 1. Core questions with complete answers
 
-For every question, define the concept, explain why a Data Engineer uses it, give a TechStore example, describe the result and mention a limitation or common mistake. Avoid memorizing only one-line definitions.
+### 1. What is database normalization?
 
-## 2. Core interview questions
+Normalization is a database design process that organizes facts into related tables to reduce unnecessary duplication and prevent insert, update and delete anomalies. It uses keys and functional dependencies to decide where each fact belongs.
 
-### 1. What is normalization?
+### 2. Why do we normalize a database?
 
-**Answer guidance:** Explain in plain English, show the smallest relevant SQL/Python example from the class notes, describe the expected behavior and mention one edge case or trade-off.
+We normalize to reduce inconsistent repeated facts, make updates safer, support independent entity creation and deletion, and improve data integrity. Normalization does not mean avoiding every repeated value; it means storing each fact at the correct grain.
 
-**Follow-up:** How would you verify this on the TechStore training database?
+### 3. What is data redundancy?
 
-### 2. What is data redundancy?
+Data redundancy is repeated storage of the same fact. For example, storing the same customer's email on every order line repeats a customer fact that should normally belong to the customer record.
 
-**Answer guidance:** Explain in plain English, show the smallest relevant SQL/Python example from the class notes, describe the expected behavior and mention one edge case or trade-off.
+### 4. What is an update anomaly?
 
-**Follow-up:** How would you verify this on the TechStore training database?
+An update anomaly occurs when one fact is stored in several rows and only some copies are updated. The database then contains conflicting values, such as two different emails for the same customer.
 
-### 3. What is an update anomaly?
+### 5. What is an insert anomaly?
 
-**Answer guidance:** Explain in plain English, show the smallest relevant SQL/Python example from the class notes, describe the expected behavior and mention one edge case or trade-off.
+An insert anomaly occurs when the table design prevents an entity from being stored independently without inventing unrelated data. For example, a combined order-line table may make it difficult to add a product before it has been ordered.
 
-**Follow-up:** How would you verify this on the TechStore training database?
+### 6. What is a delete anomaly?
 
-### 4. What is an insertion anomaly?
+A delete anomaly occurs when deleting one record unintentionally removes another fact. If a product's only description is stored in its last order line, deleting that line may remove the only record of the product.
 
-**Answer guidance:** Explain in plain English, show the smallest relevant SQL/Python example from the class notes, describe the expected behavior and mention one edge case or trade-off.
+### 7. What is a functional dependency?
 
-**Follow-up:** How would you verify this on the TechStore training database?
+A functional dependency means one attribute or set of attributes determines another attribute. For example, customer_id -> customer_name, email means a customer ID identifies the customer's name and email.
 
-### 5. What is a deletion anomaly?
+### 8. What is a candidate key?
 
-**Answer guidance:** Explain in plain English, show the smallest relevant SQL/Python example from the class notes, describe the expected behavior and mention one edge case or trade-off.
+A candidate key is a minimal set of attributes that uniquely identifies a row. One candidate key is selected as the primary key; other candidate keys are alternate keys.
 
-**Follow-up:** How would you verify this on the TechStore training database?
+### 9. What is a composite key?
 
-### 6. What is 1NF?
+A composite key uses more than one column to identify a row. For example, (order_id, line_number) can identify a line within an order if line_number is unique within each order.
 
-**Answer guidance:** Explain in plain English, show the smallest relevant SQL/Python example from the class notes, describe the expected behavior and mention one edge case or trade-off.
+### 10. What is 1NF?
 
-**Follow-up:** How would you verify this on the TechStore training database?
+In the simple relational model taught here, first normal form requires each cell to hold one atomic value from its domain and avoids repeating groups or multi-valued cells. A comma-separated list of product names in one column is a common violation.
 
-### 7. What is an atomic value?
+### 11. Does 1NF mean every value in a column must be unique?
 
-**Answer guidance:** Explain in plain English, show the smallest relevant SQL/Python example from the class notes, describe the expected behavior and mention one edge case or trade-off.
+No. A city column can contain Hyderabad for many customers. 1NF concerns atomic values and row structure, not uniqueness of every value. Keys provide uniqueness rules.
 
-**Follow-up:** How would you verify this on the TechStore training database?
+### 12. What is 2NF?
 
-### 8. What is a repeating group?
+A table is in 2NF when it is in 1NF and every non-key attribute depends on the whole of every candidate key, not only part of a composite key. It is especially relevant when candidate keys contain multiple columns.
 
-**Answer guidance:** Explain in plain English, show the smallest relevant SQL/Python example from the class notes, describe the expected behavior and mention one edge case or trade-off.
+### 13. What is a partial dependency?
 
-**Follow-up:** How would you verify this on the TechStore training database?
+A partial dependency occurs when a non-key attribute depends on only part of a composite candidate key. If (order_id, product_id) is the key but order_date depends only on order_id, order_date has a partial dependency.
 
-### 9. What is 2NF?
+### 14. Does a single-column primary key automatically satisfy 2NF?
 
-**Answer guidance:** Explain in plain English, show the smallest relevant SQL/Python example from the class notes, describe the expected behavior and mention one edge case or trade-off.
+If the table is already in 1NF and all candidate keys are single-column, there is no proper subset of a candidate key on which a partial dependency can exist. So 2NF is satisfied.
 
-**Follow-up:** How would you verify this on the TechStore training database?
+### 15. What is 3NF?
 
-### 10. What is a partial dependency?
+In the standard beginner explanation, a table is in 3NF when it is in 2NF and non-key attributes do not depend transitively on a key through another non-key attribute. Formal definitions use candidate keys and prime attributes, but the practical goal is to keep independent facts in their proper tables.
 
-**Answer guidance:** Explain in plain English, show the smallest relevant SQL/Python example from the class notes, describe the expected behavior and mention one edge case or trade-off.
+### 16. What is a transitive dependency?
 
-**Follow-up:** How would you verify this on the TechStore training database?
+A transitive dependency occurs when a key determines a non-key attribute through another non-key attribute. For example, customer_id determines city_id, and city_id determines city_name. Storing city_name in every customer row repeats a city fact.
 
-### 11. Why is 2NF relevant to composite keys?
+### 17. 2NF versus 3NF?
 
-**Answer guidance:** Explain in plain English, show the smallest relevant SQL/Python example from the class notes, describe the expected behavior and mention one edge case or trade-off.
+2NF addresses partial dependencies on part of a composite candidate key. 3NF addresses transitive dependencies of non-key facts through other non-key facts. Both reduce anomalies, but they solve different dependency problems.
 
-**Follow-up:** How would you verify this on the TechStore training database?
+### 18. Does normalization remove all duplication?
 
-### 12. What is 3NF?
+No. It reduces unnecessary duplication of facts. Repeated foreign keys are necessary to represent relationships. Transaction facts may also legitimately repeat values such as the price charged on different order lines.
 
-**Answer guidance:** Explain in plain English, show the smallest relevant SQL/Python example from the class notes, describe the expected behavior and mention one edge case or trade-off.
+### 19. Why do normalized databases need JOINs?
 
-**Follow-up:** How would you verify this on the TechStore training database?
+Related facts are stored in separate entity tables. A JOIN reconstructs the combined view when a report needs customer, order and product information together. The separation protects update consistency.
 
-### 13. What is a transitive dependency?
+### 20. Why is unit_price stored in order_items if products already has price?
 
-**Answer guidance:** Explain in plain English, show the smallest relevant SQL/Python example from the class notes, describe the expected behavior and mention one edge case or trade-off.
+products.current_price represents the current catalogue price. order_items.unit_price represents the price actually charged at the time of the order. Product prices can change, so the historical transaction value must be preserved.
 
-**Follow-up:** How would you verify this on the TechStore training database?
+### 21. What is denormalization?
 
-### 14. What is a functional dependency?
+Denormalization introduces controlled redundancy to improve reporting simplicity or performance. Examples include a precomputed daily sales summary or a star-schema dimension that stores descriptive attributes together.
 
-**Answer guidance:** Explain in plain English, show the smallest relevant SQL/Python example from the class notes, describe the expected behavior and mention one edge case or trade-off.
+### 22. Is denormalization bad?
 
-**Follow-up:** How would you verify this on the TechStore training database?
+No. It is a design trade-off. It can improve analytical query performance and usability, but duplicated facts need a reliable refresh and reconciliation strategy to prevent inconsistencies.
 
-### 15. What is a candidate key?
+### 23. What is the difference between OLTP and analytical design?
 
-**Answer guidance:** Explain in plain English, show the smallest relevant SQL/Python example from the class notes, describe the expected behavior and mention one edge case or trade-off.
+Operational OLTP systems prioritize reliable transactions, updates and integrity; normalized designs are commonly useful. Analytical systems prioritize reporting and aggregation; dimensional models often denormalize dimensions for simpler queries. Actual design depends on workload.
 
-**Follow-up:** How would you verify this on the TechStore training database?
+### 24. What is a surrogate key?
 
-### 16. Why separate customers and orders?
+A surrogate key is a generated identifier with no direct business meaning, such as an integer customer_id. It provides a stable key even if business attributes such as email or name change.
 
-**Answer guidance:** Explain in plain English, show the smallest relevant SQL/Python example from the class notes, describe the expected behavior and mention one edge case or trade-off.
+### 25. What is a natural key?
 
-**Follow-up:** How would you verify this on the TechStore training database?
+A natural key is an attribute with business meaning that can identify a record, such as a government-issued identifier or a carefully governed product code. Natural keys can change or have privacy constraints, so they need careful selection.
 
-### 17. Why separate products and order items?
+### 26. Can a foreign key contain duplicate values?
 
-**Answer guidance:** Explain in plain English, show the smallest relevant SQL/Python example from the class notes, describe the expected behavior and mention one edge case or trade-off.
+Yes. A foreign key commonly repeats in a one-to-many relationship. Many orders can reference the same customer_id. A foreign key does not have to be unique unless an additional uniqueness rule is declared.
 
-**Follow-up:** How would you verify this on the TechStore training database?
+### 27. How do you identify the correct table for a column?
 
-### 18. Why store unit_price on order_items?
+Ask what real-world entity or event the fact describes and what key determines it. Customer email belongs to customer; order_date belongs to order; quantity belongs to an order item; the charged unit price belongs to the transaction line.
 
-**Answer guidance:** Explain in plain English, show the smallest relevant SQL/Python example from the class notes, describe the expected behavior and mention one edge case or trade-off.
+### 28. What are the limitations of normalization?
 
-**Follow-up:** How would you verify this on the TechStore training database?
+A highly normalized model may require more joins for reporting, and complex analytical queries can become harder to write. Normalization also does not automatically solve all business-rule or data-quality problems.
 
-### 19. What is denormalization?
+### 29. When would you denormalize?
 
-**Answer guidance:** Explain in plain English, show the smallest relevant SQL/Python example from the class notes, describe the expected behavior and mention one edge case or trade-off.
+When measured reporting workloads benefit from a precomputed or repeated representation, such as a summary table or dimensional model, and the team can maintain consistency through controlled refreshes.
 
-**Follow-up:** How would you verify this on the TechStore training database?
+### 30. Does adding a surrogate primary key guarantee 3NF?
 
-### 20. Why may a warehouse be denormalized?
+No. A surrogate key guarantees a convenient row identifier, but the table may still contain partial or transitive dependencies among non-key attributes. Normalization depends on functional dependencies, not merely the existence of an ID column.
 
-**Answer guidance:** Explain in plain English, show the smallest relevant SQL/Python example from the class notes, describe the expected behavior and mention one edge case or trade-off.
+---
 
-**Follow-up:** How would you verify this on the TechStore training database?
+## 2. Scenario-based questions
 
-## 3. Scenario-based discussion
+### Scenario 1: Customer email is repeated on every order line
 
-1. **Customer email is repeated in hundreds of order rows. What anomalies can occur?**
+**Good answer:** Customer email is a customer fact. I would store it once in customers and reference customer_id from orders. This avoids update anomalies when the email changes.
 
-   Discuss business impact, inspect source and target state, choose the correct SQL/Python behavior, and explain verification and failure handling.
+### Scenario 2: A new product must be added before its first sale
 
-2. **An order-line table stores order_date and product_name with a composite key. What dependencies exist?**
+**Good answer:** Product details should be stored independently in a products table. Order items reference product_id only when the product is purchased. This avoids an insert anomaly.
 
-   Discuss business impact, inspect source and target state, choose the correct SQL/Python behavior, and explain verification and failure handling.
+### Scenario 3: Deleting the last order line removes product details
 
-3. **A warehouse requests a wide sales table. Is that always a bad design?**
+**Good answer:** Product master data is mixed with transactional order data. I would separate products from order_items so deleting a transaction does not delete the product record.
 
-   Discuss business impact, inspect source and target state, choose the correct SQL/Python behavior, and explain verification and failure handling.
+### Scenario 4: A product's catalogue price changes
 
-## 4. Mini-project defence — Data Model Comparison
+**Good answer:** Update the current product price in products, but retain unit_price on historical order_items. The order line records the actual price charged at purchase time.
 
-Prepare a 2–3 minute explanation:
-- What business problem did it solve?
-- Which tables or components did you use?
-- Why did you choose this approach?
-- What output did you verify?
-- Which edge case or failure did you test?
-- What would you improve before production?
+### Scenario 5: A report needs customer name, order date and product name
 
-## 5. Common interview mistakes
+**Good answer:** Store those facts in their appropriate normalized tables and join customers, orders, order_items and products for the report. Normalization does not mean the report cannot combine them.
 
-- Reciting syntax without explaining the result.
-- Ignoring NULL values, duplicate rows and one-to-many relationships.
-- Claiming performance improved without measuring it.
-- Ignoring transaction boundaries and error handling.
-- Using administrator privileges for routine jobs.
-- Exposing credentials in code or logs.
-- Failing to verify row counts and business totals.
+### Scenario 6: A dashboard query has too many joins
 
-## 6. Readiness checklist
+**Good answer:** First measure the workload and understand the query. A reporting layer or star schema may intentionally denormalize data. I would not weaken operational integrity without a clear performance and maintenance plan.
 
-- [ ] I can explain every key concept in today's syllabus.
-- [ ] I can write or interpret the main SQL/Python pattern.
-- [ ] I can explain the expected output.
-- [ ] I can identify common mistakes and trade-offs.
-- [ ] I can defend the mini-project.
-- [ ] I can explain production validation and failure handling.
+---
+
+## 3. Mini-project defence
+
+Be ready to explain:
+
+1. What was wrong with the combined order spreadsheet?
+2. Which update anomaly did you identify?
+3. What was the composite candidate key in the 2NF example?
+4. Which attributes had partial dependencies?
+5. What was the transitive dependency in the customer-city example?
+6. Which tables did you create for TechStore?
+7. Why does order_items have a foreign key to products?
+8. Why is historical unit_price stored on order_items?
+9. How did you reconstruct the combined report?
+10. When would you choose a denormalized reporting model?
+
+---
+
+## 4. Common interview traps
+
+- Saying every repeated value is a normalization violation.
+- Saying 1NF means all column values must be unique.
+- Confusing partial dependency with transitive dependency.
+- Claiming a surrogate key automatically makes a table normalized.
+- Saying foreign keys must be unique.
+- Replacing historical transaction price with current product price.
+- Saying normalization removes JOINs.
+- Saying denormalization is always bad.
+- Forgetting that functional dependencies and candidate keys drive normalization.
+
+---
+
+## 5. Readiness checklist
+
+- [ ] I can explain redundancy and all three anomalies.
+- [ ] I can explain functional dependencies.
+- [ ] I can identify candidate and composite keys.
+- [ ] I can explain 1NF, 2NF and 3NF.
+- [ ] I can distinguish partial and transitive dependencies.
+- [ ] I can design customers, products, orders and order_items.
+- [ ] I understand why historical transaction values are preserved.
+- [ ] I can explain normalization versus denormalization.
