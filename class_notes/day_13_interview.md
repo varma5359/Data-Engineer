@@ -141,3 +141,51 @@
 - Use transactions for related writes.
 - Filter and batch large extracts.
 - Protect credentials and close resources.
+
+
+---
+
+## 7. Follow-up interview questions
+
+16. What is a database driver? A library that implements communication between an application and a database.
+17. What is a connection? An active session through which an application communicates with the database.
+18. What is a cursor? An object used by many database APIs to execute statements and retrieve results.
+19. What does commit do? Makes the current transaction's changes durable.
+20. What does rollback do? Cancels uncommitted transaction changes.
+21. Why use parameterized SQL? It separates values from SQL syntax, handles data safely and helps prevent SQL injection.
+22. What is SQL injection? A vulnerability where untrusted input changes the meaning of a SQL statement.
+23. fetchone versus fetchall? fetchone returns one row; fetchall returns all remaining rows.
+24. Why can fetchall be risky for huge results? It materializes all returned rows in memory.
+25. What is SQLite? An embedded relational database commonly stored in a local file.
+26. Is SQLite identical to PostgreSQL? No. They differ in deployment, concurrency, features, types and SQL/driver behavior.
+27. Why close a connection? To release resources and avoid leaving sessions open.
+28. What happens if a primary key is duplicated? The database rejects the row because the key must be unique.
+29. Why inspect affected rows after UPDATE? To confirm the intended records changed and detect an incorrect filter.
+30. What is a transaction? A logical unit of database work that is committed or rolled back.
+
+## 8. Scenario questions
+
+The script inserts duplicate records on every run. Define a stable key and an intentional idempotent load strategy, such as checking existing records or using a database-supported upsert.
+
+A query returns millions of rows. Avoid fetching everything at once; select only needed columns and retrieve in manageable batches.
+
+The script builds SQL using a customer-supplied name. Replace string concatenation with parameterized SQL.
+
+## 9. Mini-project defense
+
+- Which database did you use and why?
+- What does the driver do?
+- How did you protect values in SQL statements?
+- When did you commit or roll back?
+- How would you adapt the code to PostgreSQL or MySQL?
+
+## 10. Readiness rubric
+
+| Skill | Ready when the student can… |
+|---|---|
+| Connection | Open and close a database connection |
+| SQL execution | Create, insert and select records |
+| Parameters | Execute a parameterized query |
+| Transactions | Explain commit and rollback |
+| Results | Retrieve and inspect rows |
+| Scale | Explain why large results need batching |
