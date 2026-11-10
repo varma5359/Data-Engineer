@@ -619,3 +619,127 @@ The Python program connects to SQLite, executes a parameterized query, retrieves
 - `fetchone()`, `fetchmany()` and `fetchall()` retrieve result rows differently.
 - Use SQL filtering and bounded batches for larger extracts.
 - Day 14 uses Pandas to inspect and transform tabular datasets.
+
+
+---
+
+# Beginner Teaching Extension — Day 13
+
+## A. Understand the connection parts
+
+Python does not speak directly to every database protocol. A database driver provides the communication layer. A connection represents a session with the database. A cursor executes SQL and retrieves results. A transaction groups changes that should succeed or fail together.
+
+## B. Create a local SQLite database
+
+SQLite is included with Python and stores a database in a local file, making it useful for beginner practice. It is not the same deployment model as a shared PostgreSQL or MySQL server.
+
+```python
+import sqlite3
+
+connection = sqlite3.connect("shop.db")
+print("Database connection created")
+connection.close()
+```
+
+Expected output: Database connection created. connect() opens or creates the database file. close() releases the connection.
+
+## C. Create a table and insert rows
+
+```python
+import sqlite3
+
+connection = sqlite3.connect("shop.db")
+cursor = connection.cursor()
+cursor.execute("CREATE TABLE IF NOT EXISTS orders (order_id INTEGER PRIMARY KEY, customer TEXT, amount REAL)")
+cursor.execute("INSERT INTO orders (order_id, customer, amount) VALUES (1, 'Asha', 500)")
+connection.commit()
+print("Table ready and row inserted")
+connection.close()
+```
+
+Expected output: Table ready and row inserted. execute() runs SQL. commit() makes the transaction's changes durable. Running the INSERT again with the same primary key will fail because the key must be unique; reset the sample database or use a deliberate upsert strategy for repeatable practice.
+
+## D. Query and fetch records
+
+```python
+import sqlite3
+
+connection = sqlite3.connect("shop.db")
+cursor = connection.cursor()
+cursor.execute("SELECT order_id, customer, amount FROM orders ORDER BY order_id")
+rows = cursor.fetchall()
+for row in rows:
+    print(row)
+connection.close()
+```
+
+Expected first-run output:
+
+```text
+(1, 'Asha', 500.0)
+```
+
+fetchall() returns all selected rows as a list of tuples. For a large result, fetching all rows may consume significant memory; use fetchmany() or iteration when appropriate.
+
+## E. Parameterized queries
+
+Never build SQL by joining untrusted text into the query string. Use placeholders:
+
+```python
+import sqlite3
+
+connection = sqlite3.connect("shop.db")
+cursor = connection.cursor()
+customer_name = "Ravi"
+amount = 800
+cursor.execute("INSERT INTO orders (order_id, customer, amount) VALUES (?, ?, ?)", (2, customer_name, amount))
+connection.commit()
+print("Parameterized insert completed")
+connection.close()
+```
+
+Expected output: Parameterized insert completed. The question-mark placeholders are SQLite syntax. Other database drivers may use different placeholder styles. Parameters are supplied separately from SQL text, which helps prevent SQL injection and handles quoting correctly.
+
+## F. Update and delete carefully
+
+```python
+cursor.execute("UPDATE orders SET amount = ? WHERE order_id = ?", (550, 1))
+connection.commit()
+```
+
+Before a DELETE or UPDATE in a real system, inspect the WHERE condition and affected row count. An omitted or incorrect WHERE clause can change every row.
+
+## G. Transaction rollback
+
+```python
+connection = sqlite3.connect("shop.db")
+cursor = connection.cursor()
+try:
+    cursor.execute("UPDATE orders SET amount = ? WHERE order_id = ?", (999, 1))
+    raise ValueError("Simulated failure before commit")
+    connection.commit()
+except ValueError:
+    connection.rollback()
+    print("Changes rolled back")
+finally:
+    connection.close()
+```
+
+Expected output: Changes rolled back. rollback() cancels uncommitted transaction changes. This is a teaching simulation; do not use an artificial raise in normal production business logic.
+
+## H. Mini-project: Database Record Extractor
+
+Create a local orders table, insert a few sample rows using parameterized statements, select records, and print them. Compare the number of inserted rows with the number retrieved. Test an invalid duplicate key and explain why the database rejects it. Ensure the connection is closed after work.
+
+## I. Common mistakes
+
+- Forgetting commit after changes.
+- Forgetting to close the connection.
+- Building SQL by string concatenation with user input.
+- Calling fetchall() for a result too large for memory.
+- Re-running sample INSERT statements with duplicate primary keys.
+- Assuming SQLite file behavior is identical to a managed PostgreSQL/MySQL service.
+
+## J. Readiness check
+
+The student can explain driver, connection, cursor, query, result row, commit, rollback and parameterized query. They can create a local SQLite table, insert and retrieve rows, and explain why SQL parameters matter.
