@@ -4,11 +4,11 @@
 
 ## Rebuild progress
 
-The course is being rebuilt phase by phase to one consistent beginner-first teaching standard. A phase is marked **Complete** only after every day's class notes and interview file in that phase have been rebuilt, committed, and verified in GitHub. A phase-level summary and completion checklist will be added here when that phase is finished.
+The course is being rebuilt phase by phase to one consistent beginner-first teaching standard. A phase is marked **Complete** only after every day's class notes and interview file in that phase have been rebuilt, committed, and verified in GitHub. Completed phases include a phase-level summary and completion checklist.
 
 | Phase | Days | Status | Rebuild progress |
 |---|---:|---|---:|
-| Phase 1 — Data Engineering Foundations | 1–5 | In progress | 4/5 days verified |
+| Phase 1 — Data Engineering Foundations | 1–5 | Complete | 5/5 days rebuilt and verified |
 | Phase 2 — Python for Data Engineering | 6–18 | Pending | 0/13 days verified |
 | Phase 3 — SQL and Database Engineering | 19–29 | Pending | 0/11 days verified |
 | Phase 4 — Data Processing and Pipelines | 30–39 | Pending | 0/10 days verified |
@@ -28,7 +28,7 @@ The course is being rebuilt phase by phase to one consistent beginner-first teac
 | 4 | Data Architecture and Integration | ETL/ELT Architecture Designer | [Notes](day_04_notes.md) | [Interview](day_04_interview.md) |
 | 5 | Data Pipeline Fundamentals | Pipeline Requirements Document | [Notes](day_05_notes.md) | [Interview](day_05_interview.md) |
 
-## Phase 2 — Python for Data Engineering (Days 6–18)
+## Phase 1 completion summary — Data Engineering Foundations (Days 1–5)\n\n**Phase outcome:** Students can explain the role of data engineering, distinguish common processing patterns, identify data sources and formats, understand ETL/ELT architecture, and plan a reliable and secure data pipeline.\n\n**Day-wise learning outcomes**\n\n| Day | What students should now be able to do | Mini-project evidence |\n|---|---|---|\n| 1 | Explain Data Engineering responsibilities, the data lifecycle and a high-level data architecture. | Data Engineering Architecture Map |\n| 2 | Compare OLTP/OLAP, batch/streaming, real-time/near-real-time and event-driven processing. | Data Processing Comparison Lab |\n| 3 | Classify structured, semi-structured and unstructured data and select appropriate source formats. | Data Source Inventory |\n| 4 | Explain ETL/ELT, lakes, warehouses, lakehouses and integration architecture; recognize Kafka and dbt roles. | ETL/ELT Architecture Designer |\n| 5 | Gather pipeline requirements and plan lifecycle, reliability, scalability, fault tolerance, governance, security and operations. | Pipeline Requirements Document |\n\n**Phase completion checklist**\n\n- [x] Day 1 class notes and interview guide rebuilt and verified.\n- [x] Day 2 class notes and interview guide rebuilt and verified.\n- [x] Day 3 class notes and interview guide rebuilt and verified.\n- [x] Day 4 class notes and interview guide rebuilt and verified.\n- [x] Day 5 class notes and interview guide rebuilt and verified.\n- [x] Day-wise mini-project names checked against the approved syllabus.\n- [x] Phase tracker updated after file verification.\n\n**Phase 1 is complete.** Students are ready to begin Python for Data Engineering.\n\n## Phase 2 — Python for Data Engineering (Days 6–18)
 
 | Day | Syllabus topic | Mini-project | Class notes | Interview |
 |---|---|---|---|---|
