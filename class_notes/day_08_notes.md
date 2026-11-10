@@ -672,3 +672,211 @@ The path display may use different separators on Windows. The important checks a
 - `shutil.copy2()` copies a file; `Path.rename()` renames it; `shutil.move()` moves it.
 - Verify a processed output before archiving the source.
 - Day 9 builds on this lesson by reading structured CSV, JSON, XML and Parquet data.
+
+
+---
+
+# Beginner Teaching Extension — Day 8
+
+## A. Understand a file path before writing code
+
+A file is stored at a location. A path tells the operating system where to find it. A folder is also called a directory.
+
+Example project layout:
+
+```text
+file_project/
+    input/
+        orders.txt
+    output/
+    archive/
+    process_files.py
+```
+
+A relative path such as `input/orders.txt` is interpreted from the current working directory. An absolute path identifies a location from the filesystem root. Do not assume the current working directory is always the folder containing your script.
+
+## B. Create folders and inspect paths with pathlib
+
+```python
+from pathlib import Path
+
+project_folder = Path("file_project")
+input_folder = project_folder / "input"
+output_folder = project_folder / "output"
+
+input_folder.mkdir(parents=True, exist_ok=True)
+output_folder.mkdir(parents=True, exist_ok=True)
+
+print(input_folder)
+print(input_folder.exists())
+print(output_folder.is_dir())
+```
+
+Expected output:
+
+```text
+file_project/input
+True
+True
+```
+
+- `Path()` creates a path object.
+- The `/` operator joins path parts safely.
+- `mkdir()` creates a directory.
+- `parents=True` creates missing parent directories.
+- `exist_ok=True` avoids an error if the directory already exists.
+- `exists()` checks whether the path exists; `is_dir()` checks whether it is a directory.
+
+## C. Write a text file
+
+```python
+from pathlib import Path
+
+file_path = Path("orders.txt")
+file_path.write_text("1001,Asha,500\\n1002,Ravi,800\\n", encoding="utf-8")
+print(file_path.exists())
+```
+
+Expected output: `True`.
+
+`write_text()` writes text and replaces existing file content. The `\\n` character starts a new line. UTF-8 is an explicit text encoding and is a sensible default for many data files.
+
+## D. Read the file back
+
+```python
+from pathlib import Path
+
+file_path = Path("orders.txt")
+content = file_path.read_text(encoding="utf-8")
+print(content)
+```
+
+Expected output:
+
+```text
+1001,Asha,500
+1002,Ravi,800
+```
+
+Reading the file back verifies what was actually stored. Do not rely only on the fact that a write statement ran without an exception.
+
+## E. Append without replacing earlier records
+
+```python
+from pathlib import Path
+
+file_path = Path("orders.txt")
+with file_path.open("a", encoding="utf-8") as file:
+    file.write("1003,Meena,450\\n")
+
+print(file_path.read_text(encoding="utf-8"))
+```
+
+Expected output:
+
+```text
+1001,Asha,500
+1002,Ravi,800
+1003,Meena,450
+```
+
+Mode `a` means append. Mode `w` means write/replace. Mode `r` means read. The `with` statement closes the file correctly when the block ends, including when an error occurs.
+
+## F. Read one line at a time
+
+```python
+with open("orders.txt", "r", encoding="utf-8") as file:
+    for line in file:
+        print(line.strip())
+```
+
+Expected output:
+
+```text
+1001,Asha,500
+1002,Ravi,800
+1003,Meena,450
+```
+
+The file object can be iterated line by line. `strip()` removes surrounding whitespace, including the newline at the end. This is often more memory-friendly than reading a very large file into one string.
+
+## G. Copy, rename and move files
+
+```python
+from pathlib import Path
+import shutil
+
+source = Path("orders.txt")
+copy_path = Path("orders_backup.txt")
+shutil.copy2(source, copy_path)
+print(copy_path.exists())
+```
+
+Expected output: `True`.
+
+`copy2()` copies the file and attempts to preserve metadata. Before renaming or moving, check that the source exists and that the destination behavior is understood. A move can overwrite or fail depending on the operation and platform; never move the only source copy before validating the output.
+
+## H. List files in a folder
+
+```python
+from pathlib import Path
+
+input_folder = Path("input")
+for file_path in input_folder.glob("*.csv"):
+    print(file_path.name)
+```
+
+The output depends on the CSV files actually present in the folder. `glob("*.csv")` selects names matching that pattern; it does not guarantee any file exists.
+
+## I. Mini-project: File Processing Manager
+
+Business task: accept a daily order file, verify it exists, count its lines, write a processed copy, and keep the source safe.
+
+Create folders named `incoming`, `processed` and `archive`. Place a small `orders.txt` file inside incoming with three sample lines.
+
+```python
+from pathlib import Path
+
+input_file = Path("incoming/orders.txt")
+processed_folder = Path("processed")
+processed_folder.mkdir(exist_ok=True)
+
+if input_file.exists():
+    lines = input_file.read_text(encoding="utf-8").splitlines()
+    output_file = processed_folder / "orders_cleaned.txt"
+    output_file.write_text("\\n".join(lines) + "\\n", encoding="utf-8")
+    print("Input rows:", len(lines))
+    print("Output exists:", output_file.exists())
+else:
+    print("Input file is missing")
+```
+
+If the input has three non-empty lines, expected output is:
+
+```text
+Input rows: 3
+Output exists: True
+```
+
+This is a teaching example. A production processor should validate the file format, schema, duplicate delivery, empty lines, encoding, output naming and recovery behavior before archiving the source.
+
+## J. Common file-operation mistakes
+
+| Mistake | Why it happens | Correction |
+|---|---|---|
+| FileNotFoundError | Wrong path or current directory | Print/check the path and working directory |
+| Accidentally erase data | Opened with `w` instead of `a` | Choose the mode deliberately and keep backups |
+| File remains locked/open | File not closed | Use `with open(...)` |
+| Garbled characters | Encoding mismatch | Specify and agree on encoding, commonly UTF-8 |
+| Wrong files selected | Pattern too broad | Inspect the matched filenames before processing |
+| Archive moved too early | Output not verified | Validate output before moving source |
+
+## K. Readiness checklist
+
+- [ ] Explain relative and absolute paths.
+- [ ] Create folders with pathlib.
+- [ ] Write, read and append text safely.
+- [ ] Explain `r`, `w` and `a` modes.
+- [ ] Use `with` to manage file handles.
+- [ ] Check that a processed output exists and contains expected rows.
+- [ ] Explain why a source should not be archived before successful validation.
