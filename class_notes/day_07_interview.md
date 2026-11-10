@@ -156,3 +156,66 @@ Output: `600 3`.
 - Validate assumptions at function boundaries.
 - Modules organize reusable code.
 - Virtual environments and dependency files support reproducible execution.
+
+
+---
+
+## 7. Follow-up interview questions
+
+16. **What happens when a function is defined?** Python creates the function object, but its body runs only when the function is called.
+17. **What is a parameter?** A named input in a function definition.
+18. **What is an argument?** The actual value supplied when calling a function.
+19. **Why use return?** It gives a result back to the caller so later steps can use it.
+20. **Can a function return more than one value?** It can return a tuple containing multiple values, which can be unpacked by the caller.
+21. **What is a default parameter?** A parameter with a value used when the caller omits that argument.
+22. **What is a keyword argument?** An argument supplied by naming its parameter, such as `rate=0.10`.
+23. **What is local scope?** Names created inside a function are normally available only inside that function.
+24. **What is a module?** A Python file that groups reusable code.
+25. **What is a package?** A way to organize related modules into a namespace/package structure.
+26. **Why avoid copying the same transformation?** One implementation is easier to test, review and update consistently.
+27. **What is a pure function?** A function whose result depends on its inputs and that has no observable side effects. It is often easier to test.
+28. **What is a side effect?** A change outside the function's returned result, such as writing a file or changing a global variable.
+29. **What causes ModuleNotFoundError?** Python cannot locate the requested module in the active import search path.
+30. **How would you test a transformation function?** Supply known inputs, compare the returned result with an expected result, and include boundary and invalid cases.
+
+## 8. Output-tracing drill
+
+```python
+def add_tax(amount, rate=0.05):
+    return amount + (amount * rate)
+
+first = add_tax(100)
+second = add_tax(100, 0.10)
+print(first)
+print(second)
+```
+
+Expected output:
+
+```text
+105.0
+110.0
+```
+
+The first call uses the default rate of 5%. The second call overrides it with 10%.
+
+## 9. Mini-project defense
+
+- Why did you put transformations in a separate module?
+- Which function returns a value and why?
+- How would you handle a missing quantity?
+- What test inputs would you use for a quantity validation function?
+- How does a reusable function help when a business rule changes?
+
+**Strong explanation:** "I separated small order transformations into a module so the main script can import and reuse them. Each function has one clear responsibility and returns a result that can be tested independently."
+
+## 10. Readiness rubric
+
+| Skill | Ready when the student can… |
+|---|---|
+| Define and call | Write and execute a simple function |
+| Inputs | Explain parameters and arguments |
+| Results | Explain print versus return |
+| Defaults | Use default and keyword arguments |
+| Modules | Import a function from a second file |
+| Reuse | Explain how reuse reduces inconsistent business logic |
