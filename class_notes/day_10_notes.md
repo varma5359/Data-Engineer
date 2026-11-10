@@ -1,256 +1,573 @@
 # Day 10: Exception Handling and Debugging
 
 **Phase:** 2 — Python for Data Engineering  
-**Mini-project:** Resilient File Processor
+**Mini-project:** Resilient File Processor  
+**Learning time:** 2–3 hours
 
 ## 1. Learning outcomes
-- Explain exceptions and tracebacks.
-- Use try/except/else/finally correctly.
-- Raise meaningful errors for invalid data.
-- Create custom exceptions when they improve clarity.
-- Use Python logging levels and structured context.
-- Debug a failing file-processing workflow.
+
+- Explain the difference between syntax errors and runtime exceptions.
+- Read a traceback and locate the failing statement.
+- Use `try`, `except`, `else` and `finally`.
+- Catch specific exception types instead of hiding every failure.
+- Raise meaningful errors when input data violates a rule.
+- Use Python logging to record pipeline activity.
+- Build a file processor that reports success and failure clearly.
 
 ## 2. Why error handling matters
-A pipeline interacts with files, APIs, databases and external services. Failures are normal: a file may be missing, an API may time out, a field may contain invalid text, or a destination may be unavailable.
 
-Good error handling makes failures visible and recoverable. It must not hide data loss by pretending that a failed step succeeded.
+A data pipeline depends on files, APIs, databases and external services. Any of them can fail.
+
+Examples:
+- The expected source file was not delivered.
+- A CSV contains a quantity such as `"many"`.
+- A JSON file is incomplete.
+- The process does not have permission to read a folder.
+- A destination database is temporarily unavailable.
+
+A reliable pipeline does not pretend a failed step succeeded. It explains what failed, preserves useful evidence and allows an operator to decide whether to retry, skip or stop.
 
 ## 3. Errors and exceptions
-A syntax error prevents code from being parsed. An exception occurs while code executes.
 
-Common exceptions:
-- `FileNotFoundError`: requested file does not exist.
-- `PermissionError`: process lacks access.
-- `ValueError`: value is not valid for an operation.
-- `TypeError`: operation receives an unsupported type.
-- `KeyError`: dictionary key is absent.
-- `ZeroDivisionError`: division by zero.
-- `JSONDecodeError`: JSON text is invalid.
-- `TimeoutError`: operation exceeded a time limit.
+A syntax error prevents Python from understanding the program. An exception happens while a syntactically valid program is running.
+
+| Exception | Typical cause |
+|---|---|
+| `FileNotFoundError` | File path does not exist |
+| `PermissionError` | Process cannot access a file |
+| `ValueError` | Value is not valid for the requested conversion |
+| `TypeError` | An operation receives an incompatible type |
+| `KeyError` | Dictionary key is absent |
+| `IndexError` | List index is outside its valid range |
+| `ZeroDivisionError` | Divisor is zero |
+| `JSONDecodeError` | Text is not valid JSON |
 
 ## 4. Read a traceback
-A traceback shows the call path and the location where an exception occurred. Read from the bottom upward:
-1. Identify the exception type and message.
-2. Find the line that raised it.
-3. Inspect the variables used on that line.
-4. Trace where those values were created.
-5. Reproduce with the smallest input.
 
-Do not fix an error by suppressing it before understanding its cause.
+Run this deliberately failing example:
 
-## 5. Basic try and except
 ```python
-raw_amount = "1250.50"
-
-try:
-    amount = float(raw_amount)
-    print(amount)
-except ValueError:
-    print("Amount is not a valid number")
+quantity = int("three")
+print(quantity)
 ```
 
-The code in `try` may fail. The matching `except` handles the specified exception.
+Expected result: Python displays a traceback ending with a `ValueError` similar to:
 
-Prefer specific exceptions. A broad `except Exception` can be appropriate at a pipeline boundary for logging and controlled failure, but should not silently continue.
+```text
+ValueError: invalid literal for int() with base 10: 'three'
+```
+
+How to investigate:
+
+1. Read the final exception type and message.
+2. Find the line number where the error occurred.
+3. Inspect the value passed to the operation.
+4. Trace where that value came from.
+5. Reproduce the issue with the smallest possible input.
+
+Do not start by changing unrelated code. The message tells us the conversion to integer failed because the text was not numeric.
+
+## 5. Handle one known exception
+
+```python
+quantity_text = "three"
+
+try:
+    quantity = int(quantity_text)
+    print(quantity)
+except ValueError:
+    print("Quantity is not a valid whole number")
+```
+
+Expected output:
+
+```text
+Quantity is not a valid whole number
+```
+
+- The `try` block contains code that may fail.
+- The `except ValueError` block handles this specific conversion problem.
+- The program continues after the handler.
+
+Use a specific exception whenever possible. Catching every exception can hide programming defects.
 
 ## 6. Multiple exception types
+
 ```python
-raw_record = {"order_id": "501", "amount": "bad"}
+source_path = "missing_orders.csv"
 
 try:
-    order_id = int(raw_record["order_id"])
-    amount = float(raw_record["amount"])
-except KeyError as error:
-    print("Required field missing:", error)
-except ValueError as error:
-    print("Invalid field value:", error)
+    file = open(source_path, "r", encoding="utf-8")
+    print(file.read())
+    file.close()
+except FileNotFoundError:
+    print("Source file was not found")
+except PermissionError:
+    print("Permission denied while reading the source")
 ```
 
-Different errors may require different actions: missing schema field may stop the batch; an invalid individual record may be quarantined if policy permits.
+If the file does not exist, expected output:
 
-## 7. else and finally
+```text
+Source file was not found
+```
+
+The first matching handler runs. These two problems have different operational causes, so separate messages help troubleshooting.
+
+## 7. The else block
+
+The `else` block runs only when the `try` block completes without an exception.
+
 ```python
+quantity_text = "5"
+
 try:
-    amount = float("120.50")
+    quantity = int(quantity_text)
 except ValueError:
-    print("Conversion failed")
+    print("Invalid quantity")
 else:
-    print("Conversion succeeded:", amount)
+    print("Valid quantity:", quantity)
+```
+
+Expected output:
+
+```text
+Valid quantity: 5
+```
+
+Keep success-only logic in `else` when that makes the control flow easier to understand.
+
+## 8. The finally block
+
+The `finally` block runs whether an exception occurred or not. It is often used for cleanup.
+
+```python
+try:
+    print("Starting file operation")
+    result = 10 / 2
+    print(result)
+except ZeroDivisionError:
+    print("Cannot divide by zero")
 finally:
-    print("Conversion step finished")
+    print("File operation finished")
 ```
 
-- `else` runs only when no exception occurred.
-- `finally` runs whether the operation succeeds or fails.
-Use `finally` for cleanup, not for pretending a failed operation succeeded.
+Expected output:
 
-## 8. Raise an exception
-```python
-def validate_quantity(quantity):
-    if quantity <= 0:
-        raise ValueError("Quantity must be greater than zero")
-
-    return quantity
-
-print(validate_quantity(2))
+```text
+Starting file operation
+5.0
+File operation finished
 ```
 
-Raise errors when a function cannot fulfill its contract. Include enough context to diagnose the issue without exposing sensitive values.
+For file handling, prefer a `with open(...)` context manager because it closes the file automatically, including when an exception occurs.
 
-## 9. Custom exceptions
+## 9. Use a context manager for files
+
 ```python
-class InvalidOrderError(Exception):
-    """Raised when an order violates required business rules."""
+with open("sample.txt", "w", encoding="utf-8") as file:
+    file.write("pipeline started")
+
+print("Write completed")
+```
+
+Expected output:
+
+```text
+Write completed
+```
+
+The `with` statement manages the file resource. Once the indented block ends, the file is closed automatically.
+
+## 10. Raise an exception for invalid business data
+
+A conversion can succeed while a business value is still invalid. For example, quantity `-3` is an integer but may be disallowed for a normal sales order.
+
+```python
+quantity = -3
+
+if quantity <= 0:
+    raise ValueError("quantity must be greater than zero")
+```
+
+Expected result:
+
+```text
+ValueError: quantity must be greater than zero
+```
+
+Use `raise` when the current operation cannot safely continue with the supplied value.
+
+## 11. Validate and convert one record
+
+```python
+order = {
+    "order_id": "501",
+    "quantity": "2",
+    "unit_price": "250.00"
+}
 
 try:
-    raise InvalidOrderError("Order 501 has an invalid quantity")
-except InvalidOrderError as error:
-    print(error)
+    order_id = int(order["order_id"])
+    quantity = int(order["quantity"])
+    unit_price = float(order["unit_price"])
+
+    if quantity <= 0:
+        raise ValueError("quantity must be positive")
+
+    if unit_price < 0:
+        raise ValueError("unit_price cannot be negative")
+
+    order_amount = quantity * unit_price
+    print(order_id, order_amount)
+
+except (ValueError, KeyError) as error:
+    print("Order rejected:", error)
 ```
 
-Custom exception classes are useful when callers need to distinguish domain failures from ordinary Python errors. Do not create a large hierarchy without a real need.
+Expected output:
 
-## 10. Logging vs print
-Print is useful for quick exploration. Logging provides levels, timestamps, logger names and configurable destinations.
+```text
+501 500.0
+```
+
+This example handles conversion and missing-field failures. In production, record-level rejection should also preserve the order identifier and the reason so the source can be corrected.
+
+## 12. Why broad exception handling is risky
+
+Avoid this pattern:
+
+```python
+try:
+    total = 100 / 0
+except:
+    print("Something happened")
+```
+
+It catches exceptions too broadly and hides their type. It may also intercept exceptions that should stop the program.
+
+Prefer:
+
+```python
+try:
+    total = 100 / 0
+except ZeroDivisionError as error:
+    print("Calculation failed:", error)
+```
+
+Expected output:
+
+```text
+Calculation failed: division by zero
+```
+
+## 13. Logging fundamentals
+
+Logging records events while a program runs. It is more useful than scattered print statements for repeatable applications.
+
+Common levels:
+
+| Level | Purpose |
+|---|---|
+| DEBUG | Detailed diagnostic information |
+| INFO | Normal progress |
+| WARNING | Unexpected situation; process may continue |
+| ERROR | An operation failed |
+| CRITICAL | Serious failure that may stop the application |
+
+## 14. First logging example
 
 ```python
 import logging
 
 logging.basicConfig(
     level=logging.INFO,
-    format="%(asctime)s %(levelname)s %(name)s %(message)s"
+    format="%(levelname)s:%(message)s"
 )
 
-logger = logging.getLogger("order_pipeline")
-
-logger.debug("Detailed diagnostic")
-logger.info("Batch processing started")
-logger.warning("Optional field is missing")
-logger.error("Record validation failed")
+logging.info("Pipeline started")
+logging.warning("One optional field is missing")
+logging.error("Could not load source file")
 ```
 
-Levels:
-- DEBUG: detailed diagnostic information.
-- INFO: normal milestones.
-- WARNING: unexpected but recoverable condition.
-- ERROR: operation failed.
-- CRITICAL: severe failure requiring immediate attention.
+Expected output:
 
-In larger applications, configure logging once at the application entry point. Avoid repeatedly calling basicConfig in imported modules.
-
-## 11. Add useful context
-```python
-run_id = "run_2026_001"
-file_name = "orders.csv"
-rows_read = 1200
-
-logger.info(
-    "File processed run_id=%s file=%s rows_read=%s",
-    run_id,
-    file_name,
-    rows_read
-)
+```text
+INFO:Pipeline started
+WARNING:One optional field is missing
+ERROR:Could not load source file
 ```
 
-Useful fields include run ID, source, file/batch ID, stage, row counts, duration and error category. Do not log passwords, tokens, payment details or unnecessary personal information.
+- `level=logging.INFO` displays INFO and more severe messages.
+- `format` controls the displayed message structure.
+- Logging levels help separate normal progress from failures.
 
-## 12. Debugging workflow
-1. Reproduce the failure.
-2. Read the complete traceback.
-3. Inspect the input and types.
-4. Check assumptions and boundary conditions.
-5. Add temporary or structured diagnostics.
-6. Fix the root cause.
-7. Rerun the failing case.
-8. Run regression tests.
-9. Remove unsafe temporary prints and secrets.
-
-A debugger can pause execution, inspect variables and step through lines. Breakpoints are useful when a failure depends on state.
-
-## 13. Mini-project: Resilient File Processor
-Create a sample CSV:
+## 15. Log useful context
 
 ```python
-from pathlib import Path
+import logging
 
-Path("orders.csv").write_text(
-    "order_id,amount\n501,1200.50\n502,invalid\n503,800\n",
-    encoding="utf-8"
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(levelname)s:%(message)s"
 )
+
+source_file = "orders_2026_11_10.csv"
+row_count = 250
+
+logging.info("Reading source file: %s", source_file)
+logging.info("Rows received: %s", row_count)
 ```
 
-Read and validate rows:
+Expected output:
+
+```text
+INFO:Reading source file: orders_2026_11_10.csv
+INFO:Rows received: 250
+```
+
+Context such as file name, batch identifier and record count helps an engineer investigate a failed run. Never log passwords, access tokens or sensitive personal data.
+
+## 16. Log an exception with its traceback
+
+```python
+import logging
+
+logging.basicConfig(level=logging.ERROR)
+
+try:
+    amount = int("unknown")
+except ValueError:
+    logging.exception("Could not convert order amount")
+```
+
+Expected result: an ERROR log message and traceback ending in `ValueError`. The exact timestamp, file path and line number depend on the environment.
+
+`logging.exception()` should be called inside an exception handler. It includes traceback information.
+
+## 17. Debugging with small checks
+
+When a transformation returns an unexpected result, inspect assumptions in order.
+
+```python
+raw_quantity = " 4 "
+
+print("Raw value:", repr(raw_quantity))
+print("Raw type:", type(raw_quantity))
+
+clean_quantity = raw_quantity.strip()
+print("Clean value:", repr(clean_quantity))
+
+quantity = int(clean_quantity)
+print("Converted:", quantity)
+```
+
+Expected output:
+
+```text
+Raw value: ' 4 '
+Raw type: <class 'str'>
+Clean value: '4'
+Converted: 4
+```
+
+The `repr()` display makes leading and trailing spaces visible. Debugging often means inspecting intermediate values, not guessing.
+
+## 18. Mini-project: Resilient File Processor
+
+**Scenario:** A retail team receives a CSV file of orders. The processor should read the file, convert numeric fields, reject invalid rows with reasons, and report a summary.
+
+### Step 1 — Create the project folder and sample file
+
+Create `day10_resilient_processor` with a file named `orders.csv`.
+
+Contents of `orders.csv`:
+
+```csv
+order_id,quantity,unit_price
+1001,2,250
+1002,1,800
+1003,three,150
+1004,-1,200
+1005,3,100
+```
+
+The file intentionally includes one non-numeric quantity and one negative quantity.
+
+### Step 2 — Read the file
 
 ```python
 import csv
-import logging
 
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("file_processor")
+with open("orders.csv", "r", newline="", encoding="utf-8") as file:
+    reader = csv.DictReader(file)
+    rows = list(reader)
 
-valid_rows = []
-rejected_rows = []
-
-try:
-    with open("orders.csv", "r", newline="", encoding="utf-8") as file:
-        reader = csv.DictReader(file)
-
-        for line_number, row in enumerate(reader, start=2):
-            try:
-                order_id = int(row["order_id"])
-                amount = float(row["amount"])
-
-                if amount < 0:
-                    raise ValueError("Amount cannot be negative")
-
-                valid_rows.append({
-                    "order_id": order_id,
-                    "amount": amount
-                })
-
-            except (ValueError, KeyError) as error:
-                rejected_rows.append({
-                    "line_number": line_number,
-                    "reason": str(error)
-                })
-                logger.warning(
-                    "Rejected row line=%s reason=%s",
-                    line_number,
-                    error
-                )
-
-except FileNotFoundError:
-    logger.exception("Input file was not found")
-    raise
-
-logger.info(
-    "Processing complete valid=%s rejected=%s",
-    len(valid_rows),
-    len(rejected_rows)
-)
-
-print(valid_rows)
-print(rejected_rows)
+print(len(rows))
+print(rows[0])
 ```
 
-Expected behavior: two valid records and one rejected row. In a production pipeline, define whether a rejection threshold permits the batch to continue and where rejected data is stored.
+Expected output:
 
-## 14. Common mistakes
-| Mistake | Better approach |
-|---|---|
-| Catching every error and continuing | Catch expected errors; fail visibly on unexpected ones |
-| Empty except block | Log and handle or re-raise |
-| Logging secrets | Mask or omit sensitive data |
-| Using print everywhere | Use configured logging for applications |
-| Retrying invalid input | Fix or quarantine permanent data errors |
-| Losing traceback | Use logger.exception inside exception handling |
-| Reporting success after partial failure | Track rejected counts and batch status |
+```text
+5
+{'order_id': '1001', 'quantity': '2', 'unit_price': '250'}
+```
 
-## 15. Day 10 revision
-- Exceptions represent runtime failures.
-- Catch specific expected exceptions.
-- Use `raise` to enforce function contracts.
-- Logging records operational evidence.
-- Tracebacks help locate root causes.
-- Distinguish recoverable record errors from pipeline-level failures.
+CSV fields are initially text. Conversion and validation are separate steps.
+
+### Step 3 — Prepare accepted and rejected collections
+
+```python
+accepted_orders = []
+rejected_orders = []
+
+print(type(accepted_orders))
+print(type(rejected_orders))
+```
+
+Expected output:
+
+```text
+<class 'list'>
+<class 'list'>
+```
+
+We keep valid rows separate from rejected rows so invalid input does not silently enter the output dataset.
+
+### Step 4 — Process and validate each row
+
+```python
+for row in rows:
+    try:
+        order_id = int(row["order_id"])
+        quantity = int(row["quantity"])
+        unit_price = float(row["unit_price"])
+
+        if quantity <= 0:
+            raise ValueError("quantity must be greater than zero")
+
+        if unit_price < 0:
+            raise ValueError("unit_price cannot be negative")
+
+        order_amount = quantity * unit_price
+
+        accepted_orders.append({
+            "order_id": order_id,
+            "quantity": quantity,
+            "unit_price": unit_price,
+            "order_amount": order_amount
+        })
+
+    except (ValueError, KeyError) as error:
+        rejected_orders.append({
+            "order_id": row.get("order_id", "UNKNOWN"),
+            "reason": str(error)
+        })
+
+print("Accepted:", len(accepted_orders))
+print("Rejected:", len(rejected_orders))
+```
+
+Expected output:
+
+```text
+Accepted: 3
+Rejected: 2
+```
+
+Each row is processed independently. One bad row does not stop the remaining rows. This is a deliberate record-level error policy; some pipelines should fail the entire batch instead.
+
+### Step 5 — Inspect rejected records
+
+```python
+for rejected in rejected_orders:
+    print(rejected)
+```
+
+Expected output:
+
+```text
+{'order_id': '1003', 'reason': "invalid literal for int() with base 10: 'three'"}
+{'order_id': '1004', 'reason': 'quantity must be greater than zero'}
+```
+
+A rejection reason allows a source owner to correct the data. Avoid storing only a generic message such as "bad row".
+
+### Step 6 — Calculate a summary
+
+```python
+total_sales = 0
+
+for order in accepted_orders:
+    total_sales += order["order_amount"]
+
+print("Accepted rows:", len(accepted_orders))
+print("Rejected rows:", len(rejected_orders))
+print("Accepted sales:", total_sales)
+```
+
+Expected output:
+
+```text
+Accepted rows: 3
+Rejected rows: 2
+Accepted sales: 1550.0
+```
+
+The total is 500 + 800 + 300. Rejected records are excluded from the accepted sales total.
+
+### Step 7 — Write accepted records to a new CSV
+
+```python
+import csv
+
+with open("accepted_orders.csv", "w", newline="", encoding="utf-8") as file:
+    fieldnames = ["order_id", "quantity", "unit_price", "order_amount"]
+    writer = csv.DictWriter(file, fieldnames=fieldnames)
+    writer.writeheader()
+    writer.writerows(accepted_orders)
+
+print("Accepted output file created")
+```
+
+Expected output:
+
+```text
+Accepted output file created
+```
+
+The new file contains only validated rows. In a production workflow, also write rejected rows to a separate quarantine file and include a batch ID and processing timestamp.
+
+## 19. Common mistakes and troubleshooting
+
+| Symptom | Likely cause | Action |
+|---|---|---|
+| FileNotFoundError | Wrong working directory or filename | Print/check current directory and path |
+| ValueError | Invalid conversion or business value | Inspect raw value and validate before conversion |
+| KeyError | Column missing or misspelled | Inspect CSV headers and schema |
+| Empty output | Filter rejected every row | Check conditions and source values |
+| Duplicate logs | Logging configured repeatedly | Configure logging once near application startup |
+| Error hidden | Broad empty `except` | Catch specific exceptions and log context |
+
+## 20. Practical exercises
+
+1. Handle a missing input file without crashing silently.
+2. Convert a text price into a float and handle invalid values.
+3. Add a rule that rejects zero or negative unit prices.
+4. Log the number of rows read and accepted.
+5. Write rejected rows to `rejected_orders.csv`.
+6. Explain when a pipeline should stop the batch instead of rejecting one row.
+
+## 21. Interview revision
+
+- An exception is a runtime event that interrupts normal execution.
+- A traceback shows the call path and failing location.
+- `try/except` handles known failures; `else` runs on success; `finally` runs during cleanup.
+- Catch specific exceptions so programming errors are not hidden.
+- `raise` communicates that an operation cannot safely continue.
+- Logging provides durable, level-based operational evidence.
+- A rejected-record strategy must preserve the record identifier and reason.
+- A pipeline must define whether errors fail the whole batch or quarantine individual records.
+
+**Day 10 checkpoint:** You should be able to diagnose a traceback, handle expected file and data errors, log useful context and build a processor that separates accepted and rejected records.
