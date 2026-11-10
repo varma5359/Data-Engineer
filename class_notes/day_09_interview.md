@@ -147,3 +147,50 @@
 - Parquet is a typed columnar analytics format.
 - A parser can succeed even when business values are wrong.
 - Validate schema, types, required fields and business rules after parsing.
+
+
+---
+
+## 7. Follow-up interview questions
+
+16. What is serialization? Converting an in-memory object into a representation that can be stored or transmitted.
+17. What is deserialization? Reconstructing an in-memory representation from stored or transmitted data.
+18. Why do CSV values often need conversion? CSV is text and parsers commonly return field values as strings.
+19. What does DictReader do? It maps each row to a dictionary using header names as keys.
+20. load() versus loads()? load reads JSON from a file-like object; loads parses a JSON string.
+21. How does a JSON array map into Python? Usually to a list; JSON objects map to dictionaries.
+22. How is XML different from JSON? XML uses elements and attributes; JSON uses objects, arrays and primitive values.
+23. What is columnar storage? Values are organized by column, useful when analytical queries read selected columns.
+24. Why is Parquet useful in data lakes? It supports typed columnar storage, compression and efficient column projection.
+25. Is Parquet always faster than CSV? No. It depends on data size, query pattern, engine and conversion overhead.
+26. What is schema drift? An unexpected change in fields, types or structure from a source.
+27. How do you validate a parsed file? Check required fields, types, allowed values, row counts and business rules.
+28. Why retain raw source files? They support replay, auditing and debugging, subject to retention and privacy rules.
+29. Can an extension guarantee file format? No. Validate content and parser behavior.
+30. How compare CSV and Parquet records? Normalize types and schema, compare counts and keys, then reconcile business totals.
+
+## 8. Scenario questions
+
+An API sends nested JSON but the warehouse expects flat columns. Parse it, inspect nested fields, flatten only required attributes, convert types, validate, then load.
+
+A CSV amount contains the text unknown. Preserve the raw value, attempt controlled conversion, and route invalid rows to a rejected-record path with a reason. Do not silently replace it with zero.
+
+An analytics job reads only three columns from a wide dataset. Parquet may reduce unnecessary I/O because an engine can project selected columns.
+
+## 9. Mini-project defense
+
+- Which format was easiest for a human to inspect?
+- Which format supports nested records naturally?
+- Why did CSV require numeric conversion?
+- What dependency enabled Parquet support?
+- How did you verify conversion preserved records and totals?
+
+## 10. Readiness rubric
+
+| Skill | Ready when the student can… |
+|---|---|
+| CSV | Read header-based rows and explain string conversion |
+| JSON | Parse objects and arrays into Python structures |
+| XML | Read attributes and child element text |
+| Parquet | Explain columnar storage and dependency requirements |
+| Validation | Compare schema, types, counts and totals |
