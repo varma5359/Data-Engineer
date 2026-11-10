@@ -123,3 +123,46 @@ Output: `60`.
 - Lazy evaluation is beneficial only when the downstream pipeline also avoids full materialization.
 - Batch size affects memory, throughput and destination load.
 - Validate malformed rows and preserve rejection details.
+
+
+---
+
+## 7. Follow-up interview questions
+
+16. What is an iterable? An object that can provide its elements one at a time to an iteration process.
+17. What is an iterator? An object that remembers iteration state and returns the next value.
+18. What does iter() do? Obtains an iterator from an iterable.
+19. What does next() do? Requests the next item from an iterator.
+20. What is StopIteration? The signal that an iterator has no more values.
+21. What is a generator? An iterator commonly created by a function using yield.
+22. yield versus return? yield produces a value and pauses generator execution; return ends a function or generator.
+23. What is lazy evaluation? Producing a value only when it is requested.
+24. Why use a generator for a large file? It can process records gradually without storing all records in memory at once.
+25. Does a generator guarantee low memory? No. Downstream code may still accumulate all generated values.
+26. What is batching? Processing a bounded group of records at a time.
+27. Why is line-by-line reading useful? It limits the amount of file content held in memory at one time.
+
+## 8. Scenario questions
+
+A 20 GB text file cannot fit in memory. Iterate through the file or use a streaming parser and write results incrementally.
+
+A generator is converted to list() before processing. This materializes all values and can remove the memory advantage.
+
+A batch has fewer records than the configured batch size at the end. This is normal; the final partial batch must still be processed.
+
+## 9. Mini-project defense
+
+- What state does an iterator maintain?
+- Why does a generator pause at yield?
+- How did you control batch size?
+- Where could memory still grow in your implementation?
+
+## 10. Readiness rubric
+
+| Skill | Ready when the student can… |
+|---|---|
+| Iteration | Explain iterable, iterator and next |
+| Generator | Write and consume a yield-based generator |
+| Lazy behavior | Explain when generator code executes |
+| Memory | Explain streaming versus full materialization |
+| Batching | Produce and process bounded groups |
