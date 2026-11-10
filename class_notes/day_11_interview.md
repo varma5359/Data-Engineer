@@ -4,50 +4,122 @@
 
 ## 1. Core questions
 
-1. **What is an iterable?** An object whose elements can be visited, such as a list or file.
-2. **What is an iterator?** An object that provides values one at a time and tracks its position.
-3. **What is a generator?** A lazy iterator commonly created by a function using `yield`.
-4. **Why use generators in data engineering?** They allow large inputs to be consumed incrementally, reducing memory requirements.
-5. **What is StopIteration?** The signal that an iterator has no further values.
+1. **What is an iterable?**  
+   An object that can provide its elements one at a time, such as a list or file.
 
-## 2. Difference-based questions
+2. **What is an iterator?**  
+   An object that tracks its current position and returns the next value.
 
-| Compare | Answer |
+3. **What does iter() do?**  
+   It obtains an iterator from an iterable.
+
+4. **What does next() do?**  
+   It requests the next value from an iterator.
+
+5. **What is StopIteration?**  
+   The signal that an iterator has no more values.
+
+6. **What is a generator?**  
+   An iterator produced by a generator function or expression.
+
+7. **What does yield do?**  
+   It produces a value and pauses the generator while preserving its state.
+
+8. **What is lazy evaluation?**  
+   Values are calculated or produced only when requested.
+
+9. **Why use generators in data engineering?**  
+   They can process large input incrementally and avoid storing every generated value at once.
+
+10. **Does a generator always guarantee low memory usage?**  
+    No. Downstream code may still collect all generated values into a list or dataframe.
+
+11. **What is batching?**  
+    Processing a bounded group of records at a time.
+
+12. **What happens when a generator is exhausted?**  
+    It cannot produce more values; create a new generator to iterate again.
+
+## 2. Difference questions
+
+| Concept | Difference |
 |---|---|
-| Iterable vs iterator | Can provide iterator vs produces next values |
-| List vs generator | Materialized collection vs lazy value production |
-| return vs yield | Finish function vs pause and resume generator |
-| List comprehension vs generator expression | Builds list now vs yields values lazily |
+| Iterable / iterator | Can provide an iterator / provides next values and tracks position |
+| Iterator / generator | General next-value object / a convenient iterator created with yield |
+| return / yield | Ends function and returns / produces a value and pauses |
+| read() / file iteration | Loads content / reads incrementally by line |
+| list / generator | Stores all items / produces items on demand |
+| Row / batch processing | One record at a time / bounded group of records |
 
-## 3. Practical questions
+## 3. Practical coding questions
 
-6. **How do you read a large file?** Iterate over the file handle or yield bounded batches.
-7. **Why use batches?** They limit memory while allowing efficient bulk operations.
-8. **Can you iterate over a generator twice?** Not after it is exhausted; create a new generator to start again.
+**Q1. Create an iterator.**
 
-## 4. Scenario questions
+```python
+values = [10, 20]
+items = iter(values)
+print(next(items))
+print(next(items))
+```
 
-### Scenario A: 15 GB file causes memory error
-Avoid `read()` and `list(file)`. Stream rows, validate incrementally and write outputs in batches.
+Output: `10`, then `20`.
 
-### Scenario B: Final batch is missing
-Check that the generator yields the remaining non-empty batch after the main loop.
+**Q2. Create a generator.**
 
-### Scenario C: Second pass returns no rows
-The iterator was already exhausted. Recreate it or reopen the source.
+```python
+def ids():
+    yield 101
+    yield 102
 
-## 5. Troubleshooting
-- StopIteration: iterator is exhausted.
-- Generator unexpectedly empty: check whether it was consumed earlier.
-- Memory remains high: inspect whether batches or results are accumulated elsewhere.
-- Slow pipeline: measure parsing, I/O and destination writes separately.
+print(list(ids()))
+```
 
-## 6. Follow-up questions
-- What is lazy evaluation?
-- How do generators help backpressure?
-- What happens if a generator is closed?
+Output: `[101, 102]`.
+
+**Q3. Sum values without storing a new list.**
+
+```python
+total = 0
+for value in (x for x in [10, 20, 30]):
+    total += value
+print(total)
+```
+
+Output: `60`.
+
+**Q4. Why process in batches?**  
+   A bounded batch controls memory and often matches bulk database or file-writing operations.
+
+## 4. Scenario-based questions
+
+1. **A 20 GB text file cannot fit into memory. What would you do?**  
+   Iterate over the file line by line or use a streaming/chunked reader. Transform and write each record or batch rather than calling `read()`.
+
+2. **A generator produces no output the second time. Why?**  
+   Generators are single-pass. The first loop exhausted it; create a new generator.
+
+3. **The final batch contains fewer rows than the configured size. Is it an error?**  
+   No. Emit the remaining partial batch at end-of-file unless the destination requires a different policy.
+
+4. **A generator is used but memory still grows. What do you inspect?**  
+   Look for lists or dataframes accumulating all results downstream, cached objects and unbounded queues.
+
+5. **A file contains a header row. What must the reader do?**  
+   Parse or skip the header before converting data rows.
+
+## 5. Follow-up questions
+
+- How does a for loop use an iterator?
+- Can a generator be restarted?
+- What is a generator expression?
+- Why does a file object support iteration?
 - How do you choose a batch size?
-- Why can a generator still use substantial memory?
+- What trade-off exists between small and large batches?
+- What should happen if one row in a batch is malformed?
 
-## 7. Mini-project defence
-Explain how the Large File Reader reads incrementally, handles the final partial batch, and avoids retaining all records. Discuss how you would add parsing, rejection handling, checkpointing and safe output writes.
+## 6. Strong revision points
+
+- Generators are useful for incremental processing.
+- Lazy evaluation is beneficial only when the downstream pipeline also avoids full materialization.
+- Batch size affects memory, throughput and destination load.
+- Validate malformed rows and preserve rejection details.
