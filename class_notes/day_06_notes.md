@@ -658,3 +658,335 @@ The repeating decimal is normal floating-point display. For currency presentatio
 - Python is dynamically typed; values have types, while variable names can be reassigned to values of different types.
 
 **Day 6 checkpoint:** You should be able to run a Python script, explain common data types, work with lists and dictionaries, and calculate a simple order summary without copying a complete solution blindly.
+
+
+---
+
+# Beginner Teaching Extension — Day 6
+
+This extension gives students additional guided practice before they move to functions and modules. Complete the steps in order. Do not skip to the final mini-project until each small task is understood.
+
+## A. Understand what happens when Python runs a file
+
+When you type `python first_program.py`, the following happens:
+
+1. The terminal receives the command.
+2. The operating system locates the Python executable.
+3. Python opens the file named `first_program.py`.
+4. Python reads and executes the statements in order.
+5. Output from `print()` appears in the terminal.
+6. If Python encounters an error, it displays an error message and stops that run unless the program handles the error.
+
+**Important distinction:** the terminal is not Python itself. The terminal starts Python; Python executes the Python statements.
+
+### Guided experiment
+
+Create `execution_order.py`:
+
+```python
+print("Step 1: Read source")
+print("Step 2: Validate data")
+print("Step 3: Prepare output")
+```
+
+Run:
+
+```bash
+python execution_order.py
+```
+
+Expected output:
+
+```text
+Step 1: Read source
+Step 2: Validate data
+Step 3: Prepare output
+```
+
+Change the order of the three print statements and run again. Python follows the order in the file. This is called sequential execution.
+
+## B. Variables are labels, not boxes with permanent types
+
+Consider:
+
+```python
+record_count = 10
+print(record_count)
+print(type(record_count))
+
+record_count = "ten"
+print(record_count)
+print(type(record_count))
+```
+
+Expected output:
+
+```text
+10
+<class 'int'>
+ten
+<class 'str'>
+```
+
+The name `record_count` first refers to an integer and later refers to text. Python allows this because it is dynamically typed. In a real data pipeline, changing a variable from a number to text unexpectedly can cause a calculation or database load to fail. Use clear names and validate incoming values.
+
+## C. Distinguish a value from its printed representation
+
+```python
+city = "Hyderabad"
+order_count = 3
+
+print(city)
+print("city")
+print(order_count)
+print("order_count")
+```
+
+Expected output:
+
+```text
+Hyderabad
+city
+3
+order_count
+```
+
+- `city` without quotes means the variable.
+- `"city"` with quotes means the literal text city.
+- The same rule applies to `order_count`.
+
+This is one of the most common beginner mistakes.
+
+## D. Read and predict expressions before running them
+
+```python
+quantity = 3
+unit_price = 120
+discount = 20
+
+subtotal = quantity * unit_price
+final_amount = subtotal - discount
+
+print(subtotal)
+print(final_amount)
+```
+
+Expected output:
+
+```text
+360
+340
+```
+
+Read the expression from left to right:
+- `quantity * unit_price` means 3 multiplied by 120.
+- The result is stored in `subtotal`.
+- `subtotal - discount` subtracts 20 from 360.
+- The result is stored in `final_amount`.
+
+Python evaluates the right side of an assignment first, then stores the result under the name on the left.
+
+## E. Understand list indexing and slicing
+
+```python
+daily_sales = [120, 250, 180, 300, 150]
+
+print(daily_sales[0])
+print(daily_sales[2])
+print(daily_sales[-1])
+print(daily_sales[1:4])
+```
+
+Expected output:
+
+```text
+120
+180
+150
+[250, 180, 300]
+```
+
+For the slice `[1:4]`, Python starts at index 1 and stops before index 4. The stop position is excluded. This is why the values at positions 1, 2 and 3 are returned.
+
+## F. Understand dictionary keys and values
+
+```python
+customer = {
+    "customer_id": 201,
+    "name": "Asha",
+    "city": "Hyderabad"
+}
+
+print(customer.keys())
+print(customer.values())
+print(customer.items())
+```
+
+Expected output:
+
+```text
+dict_keys(['customer_id', 'name', 'city'])
+dict_values([201, 'Asha', 'Hyderabad'])
+dict_items([('customer_id', 201), ('name', 'Asha'), ('city', 'Hyderabad')])
+```
+
+- `keys()` provides the field names.
+- `values()` provides the stored values.
+- `items()` provides key-value pairs.
+
+These are useful when inspecting an unfamiliar record structure. In production code, confirm that the expected keys exist before relying on them.
+
+## G. Build a small data-quality check using only beginner Python
+
+A data engineer should not calculate a business total before checking whether the inputs are usable.
+
+```python
+orders = [
+    {"order_id": 1, "quantity": 2, "price": 100},
+    {"order_id": 2, "quantity": 0, "price": 250},
+    {"order_id": 3, "quantity": 3, "price": 50}
+]
+
+for order in orders:
+    if order["quantity"] <= 0:
+        print("Invalid quantity for order:", order["order_id"])
+    else:
+        amount = order["quantity"] * order["price"]
+        print("Valid order:", order["order_id"], "Amount:", amount)
+```
+
+Expected output:
+
+```text
+Valid order: 1 Amount: 200
+Invalid quantity for order: 2
+Valid order: 3 Amount: 150
+```
+
+Explanation:
+- The list contains three order dictionaries.
+- The loop takes one dictionary at a time.
+- The condition checks whether quantity is zero or negative.
+- Invalid data is identified instead of included in the total.
+- The `else` block runs only when the condition is false.
+
+This is a first introduction to validation. Day 16 will teach a more systematic validation design.
+
+## H. Common errors — what the message is telling you
+
+| Error | Beginner example | Meaning | First thing to check |
+|---|---|---|---|
+| `NameError` | `print(order_total)` before creating it | The name is not defined | Spelling and execution order |
+| `TypeError` | `"10" + 5` | Operation is not supported for these types | Inspect types and convert intentionally |
+| `ValueError` | `int("ten")` | Type is suitable but the value cannot be converted | Validate the raw value |
+| `IndexError` | `items[5]` when only 2 items exist | Position is outside the list | Check list length |
+| `KeyError` | `order["amount"]` when key is absent | Dictionary does not contain the key | Inspect record keys |
+| `SyntaxError` | Missing closing bracket | Python cannot parse the statement | Check quotes, brackets and colons |
+
+### Error-reading practice
+
+Code:
+
+```python
+amount_text = "one hundred"
+amount = int(amount_text)
+print(amount)
+```
+
+Expected behavior: Python raises `ValueError` on the conversion line. It does not reach the print statement.
+
+A good engineer reads the last lines of the traceback first, identifies the exception type and failing line, then inspects the input that caused it.
+
+## I. Mini-project acceptance checklist
+
+Before calling the Data Processing Utility complete, verify:
+
+- [ ] The script or notebook runs from the first cell without relying on hidden variables.
+- [ ] Every order has an order ID, quantity and unit price.
+- [ ] Each line amount is quantity multiplied by unit price.
+- [ ] Invalid quantities are identified and not silently included.
+- [ ] Total sales equals the sum of valid order amounts.
+- [ ] The student can explain each collection used.
+- [ ] The student can explain why a source value may need type conversion.
+- [ ] The student can reproduce the expected output from a clean run.
+
+## J. Independent practice with expected answers
+
+**Task 1:** What is printed?
+
+```python
+value = "25"
+print(type(value))
+print(int(value) + 5)
+```
+
+Answer:
+
+```text
+<class 'str'>
+30
+```
+
+The original value is text. `int(value)` creates an integer for the addition.
+
+**Task 2:** What is printed?
+
+```python
+codes = ["IN", "US", "UK"]
+print(codes[1])
+print(len(codes))
+```
+
+Answer:
+
+```text
+US
+3
+```
+
+**Task 3:** What is printed?
+
+```python
+item = {"name": "Keyboard", "price": 750}
+print(item.get("quantity", 0))
+```
+
+Answer:
+
+```text
+0
+```
+
+The key is absent, so `get()` returns the supplied default value.
+
+**Task 4:** Calculate the total.
+
+```python
+amounts = [100, 200, 50]
+total = 0
+
+for amount in amounts:
+    total += amount
+
+print(total)
+```
+
+Answer:
+
+```text
+350
+```
+
+## K. Instructor guidance — how to know the student is ready
+
+Ask the student to explain, without reading the notes:
+
+1. How does a Python file get executed?
+2. Why does `"5"` behave differently from `5`?
+3. When would you use a list rather than a dictionary?
+4. Why does list indexing start at zero?
+5. What happens if a dictionary key does not exist?
+6. Why should invalid source values be identified instead of silently changed?
+7. How did the student calculate the order total?
+
+If the student cannot explain these in their own words, repeat the relevant small experiment. Do not move forward just because the code ran once.
