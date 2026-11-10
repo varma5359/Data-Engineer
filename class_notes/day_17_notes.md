@@ -466,3 +466,104 @@ Your directory may also contain a `__pycache__` folder created by Python. It is 
 - A passing test suite proves the tested cases passed, not that all possible inputs are safe.
 
 **Day 17 checkpoint:** You should be able to create a transformation module, write tests using unittest, run them from CMD, interpret failures and explain the difference between unit and integration testing.
+
+
+---
+
+# Beginner Teaching Extension — Day 17
+
+## A. Why tests are needed
+
+A transformation that works for one sample may fail for empty input, boundary values, invalid data or a changed business rule. A test runs a known input and compares actual behavior with an expected result.
+
+## B. Start with a tiny function
+
+Create transform.py:
+
+```python
+def calculate_amount(quantity, unit_price):
+    return quantity * unit_price
+```
+
+This function has one responsibility and is easy to test without a file, database or API.
+
+## C. Write the first unit test
+
+Create test_transform.py:
+
+```python
+import unittest
+from transform import calculate_amount
+
+class TestCalculateAmount(unittest.TestCase):
+    def test_normal_order(self):
+        self.assertEqual(calculate_amount(2, 100), 200)
+
+if __name__ == "__main__":
+    unittest.main()
+```
+
+Run from the folder containing both files:
+
+```bash
+python -m unittest -v
+```
+
+Expected result includes one test marked ok and a summary showing Ran 1 test and OK. The exact elapsed time varies.
+
+- unittest is Python's built-in testing framework.
+- TestCase groups test methods.
+- Test methods begin with test_.
+- assertEqual compares actual and expected values.
+
+## D. Add boundary and invalid-input tests
+
+```python
+import unittest
+from transform import calculate_amount
+
+class TestCalculateAmount(unittest.TestCase):
+    def test_normal_order(self):
+        self.assertEqual(calculate_amount(2, 100), 200)
+
+    def test_zero_quantity(self):
+        self.assertEqual(calculate_amount(0, 100), 0)
+
+    def test_decimal_price(self):
+        self.assertEqual(calculate_amount(2, 12.5), 25.0)
+```
+
+These tests define the current function behavior. If the business rule says zero quantity is invalid, the function and test should be changed to enforce that rule rather than asserting zero is acceptable.
+
+## E. Understand test discovery
+
+Python's unittest discovery convention finds files named test*.py. Run all tests with python -m unittest. Keep tests separate from production code and use predictable names.
+
+## F. Unit, integration and end-to-end tests
+
+- Unit test: checks one small function or component in isolation.
+- Integration test: checks whether components work together, such as Python code writing to a temporary SQLite database.
+- End-to-end test: checks the complete workflow from source input to expected destination output.
+
+A passing unit test does not prove that a real API, database permissions or deployment configuration work.
+
+## G. Test a data transformation systematically
+
+For each rule, include a normal case, boundary case, empty input where meaningful, invalid input and duplicate case if relevant. Keep expected values small enough to calculate manually. A test should fail when behavior is wrong; do not write an assertion that merely repeats the implementation without checking the business expectation.
+
+## H. Mini-project: Transformation Test Suite
+
+Create a small transformation module and tests for amount calculation, status normalization and positive-quantity validation. Include normal and boundary cases. Run the suite from CMD and record the test count and result. Add one intentionally incorrect expected value and observe the test fail; then correct it. This demonstrates that tests provide evidence rather than just displaying a green status.
+
+## I. Common mistakes
+
+- Naming test functions without the test_ prefix.
+- Running tests from the wrong project folder.
+- Testing only the happy path.
+- Depending on a live database for a unit test.
+- Writing tests that merely duplicate the code's assumptions.
+- Ignoring failing tests or weakening assertions to make them pass.
+
+## J. Readiness check
+
+The student can write a unit test, run unittest discovery, interpret pass/fail output, design boundary cases and explain the difference between unit and integration tests.
