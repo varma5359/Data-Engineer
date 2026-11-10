@@ -591,3 +591,115 @@ The extractor collected records from two pages, checked the expected keys, saved
 - Pagination is required when the API splits results.
 - Protect credentials and respect rate limits.
 - Day 13 applies Python integration patterns to relational databases.
+
+
+---
+
+# Beginner Teaching Extension — Day 12
+
+## A. Understand the request and response
+
+An API is a contract that lets one application request information or an action from another. A client sends an HTTP request to an endpoint. The server returns a response containing a status code, headers and usually a body.
+
+## B. Learn the pieces of a GET request
+
+- Method: GET asks the server to retrieve information.
+- Endpoint: the URL identifying the resource.
+- Query parameters: values that filter or paginate a request.
+- Headers: metadata such as accepted response format or authorization.
+- Response body: returned content, often JSON.
+
+## C. Practice parsing a local response before using the internet
+
+```python
+import json
+
+response_text = '{"orders": [{"order_id": 101, "amount": 500}, {"order_id": 102, "amount": 800}]}'
+response_data = json.loads(response_text)
+
+print(response_data["orders"][0]["order_id"])
+print(len(response_data["orders"]))
+```
+
+Expected output:
+
+```text
+101
+2
+```
+
+loads() parses JSON text into Python objects. This local example lets students understand the response shape without network, authentication or rate-limit issues.
+
+## D. Make a real GET request
+
+Install requests:
+
+```bash
+python -m pip install requests
+```
+
+A public test endpoint can be used for practice when internet access is available:
+
+```python
+import requests
+
+url = "https://jsonplaceholder.typicode.com/posts/1"
+response = requests.get(url, timeout=10)
+print(response.status_code)
+print(response.json()["id"])
+```
+
+Expected response for this public test service is status 200 and ID 1, provided the service is reachable. Network availability can change, so this is not a guaranteed offline exercise.
+
+- requests.get() sends a GET request.
+- timeout=10 limits how long the client waits.
+- status_code is the HTTP response status.
+- json() parses a JSON response body; it can fail if the body is not valid JSON.
+
+## E. Check for HTTP errors
+
+```python
+import requests
+
+response = requests.get("https://jsonplaceholder.typicode.com/posts/1", timeout=10)
+response.raise_for_status()
+post = response.json()
+print(post["title"])
+```
+
+raise_for_status() raises an HTTPError for unsuccessful HTTP status codes. A network request may also raise a connection or timeout exception. Handle these deliberately in a complete extractor.
+
+## F. Understand pagination
+
+An API may return only a limited number of records per request. Pagination asks for successive pages or uses a cursor supplied by the service. Do not assume every API uses the same parameter names or pagination scheme; follow its documentation.
+
+A simple page loop is only valid when the API documents page and limit parameters:
+
+```python
+for page in range(1, 4):
+    print("Request page:", page)
+```
+
+Expected output:
+
+```text
+Request page: 1
+Request page: 2
+Request page: 3
+```
+
+This demonstrates iteration only; actual extraction must send the documented parameters and stop according to the API's next-page signal.
+
+## G. Safe API integration practices
+
+- Set a timeout on requests.
+- Check HTTP status before trusting the body.
+- Validate the response schema and required fields.
+- Respect rate limits and retry guidance.
+- Keep API keys out of source code and logs.
+- Use bounded retries for transient errors, not every failure.
+- Track page or cursor progress to avoid missing or duplicating records.
+
+## H. Readiness check
+
+The student should explain endpoint, method, headers, query parameters, status code, response body, JSON parsing, timeout and pagination. They should be able to explain why a local mock is useful before a live integration test.
