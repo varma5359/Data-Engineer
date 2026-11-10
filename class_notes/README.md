@@ -30,6 +30,12 @@
 | 17 | Testing Data Processing Code | Transformation Test Suite | [Notes](day_17_notes.md) | [Interview](day_17_interview.md) |
 | 18 | Git and Code Organization | Version-Controlled ETL Project | [Notes](day_18_notes.md) | [Interview](day_18_interview.md) |
 
+## Phase 3 — SQL and Database Engineering (Days 19–29)
+
+| Day | Syllabus topic | Mini-project | Class notes | Interview |
+|---|---|---|---|---|
+| 19 | Database Fundamentals | Operational Database Design | [Notes](day_19_notes.md) | [Interview](day_19_interview.md) |
+
 ## Future phases
 - Phase 3: SQL and Database Engineering (Days 19–29)
 - Phase 4: Data Processing and Pipelines (Days 30–39)
