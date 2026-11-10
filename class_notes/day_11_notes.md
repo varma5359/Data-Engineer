@@ -268,6 +268,8 @@ def read_batches(file_path, batch_size):
     batch = []
 
     with open(file_path, "r", encoding="utf-8") as file:
+        next(file)  # Skip the CSV header
+
         for line in file:
             batch.append(line.strip())
 
@@ -411,9 +413,9 @@ for batch in read_batches("large_orders.csv", 3):
     print(batch)
 ```
 
-Use the batch reader from Section 13. For a CSV with a header, adapt it to skip the header before building batches.
+The batch reader in Section 13 skips the CSV header before grouping data rows.
 
-Expected batch sizes for seven records and a batch size of three:
+Expected batch sizes for seven data records and a batch size of three:
 
 ```text
 3
@@ -439,7 +441,7 @@ for batch in read_batches("large_orders.csv", 3):
     print("Batch", batch_number, "total:", batch_total)
 ```
 
-Expected output (using the raw-line batch reader that skips no header):
+Expected output:
 
 ```text
 Batch 1 total: 900.0
@@ -447,7 +449,7 @@ Batch 2 total: 1450.0
 Batch 3 total: 900.0
 ```
 
-For the CSV mini-project, use a header-aware batch reader before this calculation; do not attempt to convert the header string to a number. This distinction is an important reason to inspect the source format before processing.
+The reader skips the header, so every batch contains only data records. This distinction is an important reason to inspect the source format before processing.
 
 ## 16. Common mistakes
 
