@@ -148,3 +148,108 @@ Output: `350`.
 - Keep project dependencies isolated with a virtual environment.
 - Use readable names and small, testable steps.
 - For a data engineering task, always think about input format, data types, invalid records and output destination.
+
+
+---
+
+## 7. Deeper follow-up questions and model answers
+
+16. **What is the difference between a variable and a value?**  
+    A value is the data itself, such as the integer `10`. A variable is a name that refers to that value. In `quantity = 10`, `10` is the value and `quantity` is the name.
+
+17. **Does Python require a variable type declaration?**  
+    No. Python determines the type at runtime. However, data engineers should still understand and validate types because source data may be inconsistent.
+
+18. **What is the difference between mutable and immutable objects?**  
+    Mutable objects can be changed after creation, such as lists and dictionaries. Immutable objects cannot be changed in place, such as strings, integers and tuples.
+
+19. **Why might a list of dictionaries be useful?**  
+    It represents a small collection of records. Each dictionary contains named fields, and the list contains multiple records. It is convenient for learning and small in-memory tasks, but not a substitute for scalable storage.
+
+20. **What is zero-based indexing?**  
+    The first element has index 0, the second has index 1, and so on.
+
+21. **What does slicing do?**  
+    It selects a portion of a sequence. In `values[start:stop]`, the start is included and the stop is excluded.
+
+22. **What is the difference between `append()` and `extend()`?**  
+    `append()` adds its argument as one item. `extend()` adds each element from an iterable.
+
+23. **Why use `dict.get()`?**  
+    It safely reads an optional key and can return a default value when the key is absent. It does not replace schema validation when a field is mandatory.
+
+24. **What does `None` mean?**  
+    It represents the absence of a value. It is different from zero, an empty string and False.
+
+25. **Why is `bool("False")` True?**  
+    A non-empty string is truthy in Python. The text "False" is not the Boolean value False. Parse source flags according to an explicit accepted-value rule.
+
+26. **Why can floating-point calculations be surprising?**  
+    Many decimal fractions cannot be represented exactly in binary floating point. For financial values, use an appropriate decimal strategy and agreed rounding rules.
+
+27. **What does `+=` mean?**  
+    It updates a variable using addition, such as `total += amount`, which is equivalent to `total = total + amount` for this example.
+
+28. **What is the difference between a syntax error and a runtime exception?**  
+    A syntax error prevents Python from parsing the code. A runtime exception occurs while validly parsed code is executing.
+
+29. **How would you investigate a wrong total?**  
+    Inspect each input's type and value, verify the calculation rule, print or inspect intermediate results, check whether invalid or duplicate records were included, and compare the result with a small manually calculated sample.
+
+30. **Why should a pipeline not convert every invalid amount to zero?**  
+    Zero may be a valid business amount. Replacing invalid input with zero hides data-quality problems and can make financial totals incorrect. Preserve the raw value and record a rejection reason or apply an approved business rule.
+
+## 8. Output-tracing interview drill
+
+**Question:** Predict the output before running the code.
+
+```python
+prices = [100, 200, 50]
+prices.append(150)
+
+total = 0
+for price in prices:
+    total += price
+
+print(len(prices))
+print(total)
+print(prices[1:3])
+```
+
+**Answer:**
+
+```text
+4
+500
+[200, 50]
+```
+
+Reasoning:
+- `append(150)` adds one element, so the list has four values.
+- The total is 100 + 200 + 50 + 150 = 500.
+- Slice `[1:3]` includes indexes 1 and 2, not index 3.
+
+## 9. Mini-project defense questions
+
+1. Why did you represent the orders as a list of dictionaries?
+2. Which fields are required for the amount calculation?
+3. What happens if quantity is stored as text?
+4. How would you handle a missing order ID?
+5. How did you verify the total sales figure?
+6. Why is the in-memory list suitable for this small exercise but not necessarily for millions of records?
+7. What would you change before loading the records into a database?
+
+**A strong project explanation:**  
+"I created a small in-memory order dataset using a list of dictionaries. Each dictionary represents one order. I calculated line amounts from quantity and unit price, checked for invalid quantities, and aggregated valid amounts. I used this small example to understand Python values and collections. For larger data, I would read from a file or database, validate records systematically, process in manageable batches and write results to a durable destination."
+
+## 10. Day 6 readiness rubric
+
+| Skill | Ready when the student can… |
+|---|---|
+| Environment | Check Python version and run a saved script |
+| Variables and types | Explain a value's type and convert compatible values |
+| Collections | Choose a list or dictionary for a simple record task |
+| Control flow | Read a loop and predict its output |
+| Data reasoning | Calculate line amounts and totals correctly |
+| Debugging | Recognize common beginner exceptions |
+| Communication | Explain the mini-project without memorizing a script |
