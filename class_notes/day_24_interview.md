@@ -1,178 +1,220 @@
 # Day 24 Interview Preparation: Transactions and ACID Principles
 
-**Pathway:** TechPhile.ai — Data Engineer Career Pathway  
 **Phase:** 3 — SQL and Database Engineering  
 **Level:** Beginner to junior Data Engineer  
 **Mini-project:** Transaction Simulation  
-**Coverage:** Transactions, COMMIT, ROLLBACK, ACID, isolation levels, concurrency, transaction consistency
+**Database:** PostgreSQL
 
 ---
 
-## 1. How to answer
+## 1. How to answer transaction questions
 
-For every question, define the concept, explain why a Data Engineer uses it, give a TechStore example, describe the result and mention a limitation or common mistake. Avoid memorizing only one-line definitions.
+Use a business operation such as a bank transfer or order placement. Explain what can go wrong if only part of the operation succeeds, then connect the answer to the transaction command or ACID property.
 
-## 2. Core interview questions
+---
+
+## 2. Core questions with complete answers
 
 ### 1. What is a transaction?
 
-**Answer guidance:** Explain in plain English, show the smallest relevant SQL/Python example from the class notes, describe the expected behavior and mention one edge case or trade-off.
-
-**Follow-up:** How would you verify this on the TechStore training database?
+A transaction is a group of database operations treated as one logical unit. It should complete successfully as a whole or have its uncommitted changes cancelled. A bank transfer is a classic example because both the debit and credit must be handled together.
 
 ### 2. What does BEGIN do?
 
-**Answer guidance:** Explain in plain English, show the smallest relevant SQL/Python example from the class notes, describe the expected behavior and mention one edge case or trade-off.
-
-**Follow-up:** How would you verify this on the TechStore training database?
+BEGIN starts an explicit transaction in PostgreSQL. Statements after BEGIN belong to that transaction until COMMIT or ROLLBACK.
 
 ### 3. What does COMMIT do?
 
-**Answer guidance:** Explain in plain English, show the smallest relevant SQL/Python example from the class notes, describe the expected behavior and mention one edge case or trade-off.
-
-**Follow-up:** How would you verify this on the TechStore training database?
+COMMIT completes the current transaction and makes its changes permanent according to the database's durability guarantees. Other sessions can then see the committed changes according to their isolation and snapshot rules.
 
 ### 4. What does ROLLBACK do?
 
-**Answer guidance:** Explain in plain English, show the smallest relevant SQL/Python example from the class notes, describe the expected behavior and mention one edge case or trade-off.
+ROLLBACK cancels the uncommitted changes in the current transaction and returns the database to the state before that transaction began.
 
-**Follow-up:** How would you verify this on the TechStore training database?
+### 5. Can ROLLBACK undo a committed transaction?
 
-### 5. Can rollback undo a committed transaction?
-
-**Answer guidance:** Explain in plain English, show the smallest relevant SQL/Python example from the class notes, describe the expected behavior and mention one edge case or trade-off.
-
-**Follow-up:** How would you verify this on the TechStore training database?
+No. Once committed, the transaction is complete. To correct a committed business mistake, use a compensating transaction or an appropriate recovery procedure. A normal ROLLBACK cannot reverse a completed commit.
 
 ### 6. What is SAVEPOINT?
 
-**Answer guidance:** Explain in plain English, show the smallest relevant SQL/Python example from the class notes, describe the expected behavior and mention one edge case or trade-off.
+SAVEPOINT creates a named point inside a transaction. ROLLBACK TO SAVEPOINT cancels changes made after that point while keeping earlier transaction work.
 
-**Follow-up:** How would you verify this on the TechStore training database?
+### 7. What is ACID?
 
-### 7. Explain atomicity.
+ACID stands for Atomicity, Consistency, Isolation and Durability. These properties describe important guarantees of reliable transaction processing.
 
-**Answer guidance:** Explain in plain English, show the smallest relevant SQL/Python example from the class notes, describe the expected behavior and mention one edge case or trade-off.
+### 8. Explain atomicity.
 
-**Follow-up:** How would you verify this on the TechStore training database?
+Atomicity means all required operations in a transaction succeed together or are rolled back together. In a transfer, the debit and credit should not be left half-complete.
 
-### 8. Explain consistency.
+### 9. Explain consistency.
 
-**Answer guidance:** Explain in plain English, show the smallest relevant SQL/Python example from the class notes, describe the expected behavior and mention one edge case or trade-off.
+Consistency means a transaction respects database constraints and required business rules, moving the database from one valid state to another. A CHECK constraint that prevents negative account balances is one example.
 
-**Follow-up:** How would you verify this on the TechStore training database?
+### 10. Explain isolation.
 
-### 9. Explain isolation.
+Isolation controls how concurrent transactions interact. It prevents transactions from seeing or producing certain inconsistent intermediate results. The exact guarantees depend on the selected isolation level and database engine.
 
-**Answer guidance:** Explain in plain English, show the smallest relevant SQL/Python example from the class notes, describe the expected behavior and mention one edge case or trade-off.
+### 11. Explain durability.
 
-**Follow-up:** How would you verify this on the TechStore training database?
+Durability means committed changes are preserved according to the database's durability configuration, even after a crash. Write-ahead logging and recovery mechanisms support this. Backups remain necessary for disaster recovery.
 
-### 10. Explain durability.
+### 12. What is autocommit?
 
-**Answer guidance:** Explain in plain English, show the smallest relevant SQL/Python example from the class notes, describe the expected behavior and mention one edge case or trade-off.
+Autocommit means a successful statement outside an explicit transaction is committed automatically. Applications can also explicitly begin a transaction to group multiple statements.
 
-**Follow-up:** How would you verify this on the TechStore training database?
+### 13. What is a dirty read?
 
-### 11. What is a dirty read?
+A dirty read occurs when one transaction reads another transaction's uncommitted change. If the writer rolls back, the reader has used data that never became committed. PostgreSQL does not allow dirty reads; READ UNCOMMITTED behaves like READ COMMITTED.
 
-**Answer guidance:** Explain in plain English, show the smallest relevant SQL/Python example from the class notes, describe the expected behavior and mention one edge case or trade-off.
+### 14. What is a non-repeatable read?
 
-**Follow-up:** How would you verify this on the TechStore training database?
+A transaction reads the same row twice and gets different committed values because another transaction updated and committed that row between the reads.
 
-### 12. What is a non-repeatable read?
+### 15. What is a phantom read?
 
-**Answer guidance:** Explain in plain English, show the smallest relevant SQL/Python example from the class notes, describe the expected behavior and mention one edge case or trade-off.
+A transaction repeats a query for a set of rows and sees a different set because another transaction inserted or deleted rows that match the query predicate.
 
-**Follow-up:** How would you verify this on the TechStore training database?
+### 16. What is a lost update?
 
-### 13. What is a phantom read?
+A lost update happens when concurrent operations overwrite one another's changes because they use stale values or an unsafe read-modify-write pattern. Use atomic updates, locking or suitable isolation and retry logic.
 
-**Answer guidance:** Explain in plain English, show the smallest relevant SQL/Python example from the class notes, describe the expected behavior and mention one edge case or trade-off.
+### 17. What are transaction isolation levels?
 
-**Follow-up:** How would you verify this on the TechStore training database?
+Common SQL isolation levels are READ UNCOMMITTED, READ COMMITTED, REPEATABLE READ and SERIALIZABLE. They offer progressively stronger rules for what concurrent transactions can observe, although exact behavior varies across database systems.
 
-### 14. What is a lost update?
+### 18. Which isolation levels does PostgreSQL support?
 
-**Answer guidance:** Explain in plain English, show the smallest relevant SQL/Python example from the class notes, describe the expected behavior and mention one edge case or trade-off.
+PostgreSQL supports READ COMMITTED, REPEATABLE READ and SERIALIZABLE. It treats READ UNCOMMITTED as READ COMMITTED. PostgreSQL uses MVCC for concurrency control.
 
-**Follow-up:** How would you verify this on the TechStore training database?
+### 19. What is MVCC?
 
-### 15. What is concurrency?
+Multi-Version Concurrency Control stores or manages multiple row versions so transactions can read a consistent snapshot while writes occur. It reduces reader-writer blocking for many ordinary operations. It does not eliminate all locking or conflicts.
 
-**Answer guidance:** Explain in plain English, show the smallest relevant SQL/Python example from the class notes, describe the expected behavior and mention one edge case or trade-off.
+### 20. What is SELECT FOR UPDATE?
 
-**Follow-up:** How would you verify this on the TechStore training database?
+In PostgreSQL, SELECT ... FOR UPDATE locks selected rows against conflicting updates and locking reads until the transaction ends. It is useful when an application must read a row and then safely update it.
 
-### 16. Name common SQL isolation levels.
+### 21. What is a deadlock?
 
-**Answer guidance:** Explain in plain English, show the smallest relevant SQL/Python example from the class notes, describe the expected behavior and mention one edge case or trade-off.
+A deadlock occurs when transactions wait for locks held by one another in a cycle. The database detects the cycle and aborts one transaction so the other can proceed.
 
-**Follow-up:** How would you verify this on the TechStore training database?
+### 22. How can you reduce deadlocks?
 
-### 17. How does PostgreSQL treat READ UNCOMMITTED?
+Keep transactions short, access rows in a consistent order, avoid unnecessary locks and retry transactions safely when a deadlock occurs.
 
-**Answer guidance:** Explain in plain English, show the smallest relevant SQL/Python example from the class notes, describe the expected behavior and mention one edge case or trade-off.
+### 23. Why should transactions be short?
 
-**Follow-up:** How would you verify this on the TechStore training database?
+Long transactions hold locks and snapshots for longer, increasing contention and resource use. They can delay other operations and increase the impact of failures.
 
-### 18. What does SELECT FOR UPDATE do?
+### 24. What happens if a statement fails in a PostgreSQL transaction?
 
-**Answer guidance:** Explain in plain English, show the smallest relevant SQL/Python example from the class notes, describe the expected behavior and mention one edge case or trade-off.
+The transaction enters an aborted state. Normal statements cannot continue until the transaction is rolled back or rolled back to a suitable savepoint. A Python application must explicitly handle this state.
 
-**Follow-up:** How would you verify this on the TechStore training database?
+### 25. What is the difference between ROLLBACK and ROLLBACK TO SAVEPOINT?
 
-### 19. Why keep transactions short?
+ROLLBACK cancels the entire current transaction. ROLLBACK TO SAVEPOINT cancels only work after the named savepoint and keeps earlier work in the transaction.
 
-**Answer guidance:** Explain in plain English, show the smallest relevant SQL/Python example from the class notes, describe the expected behavior and mention one edge case or trade-off.
+### 26. Does a transaction automatically enforce every business rule?
 
-**Follow-up:** How would you verify this on the TechStore training database?
+No. Database constraints enforce rules declared in the database, but some business rules require application logic, conditional updates, locks or additional validation. A transaction provides the boundary for coordinating the work.
 
-### 20. How should a pipeline handle a failed batch?
+### 27. How would you implement a bank transfer?
 
-**Answer guidance:** Explain in plain English, show the smallest relevant SQL/Python example from the class notes, describe the expected behavior and mention one edge case or trade-off.
+Start a transaction, debit the source account only if it has sufficient funds, verify that exactly one row was updated, credit the destination account, verify the result and commit. If any step fails, roll back. A production design must also consider concurrent transfers, idempotency and audit records.
 
-**Follow-up:** How would you verify this on the TechStore training database?
+### 28. Why use a conditional UPDATE for a debit?
 
-## 3. Scenario-based discussion
+A condition such as balance >= transfer_amount prevents the update from reducing the account below the allowed balance. The application must still check the affected row count to know whether the debit actually happened.
 
-1. **A transfer debits an account but fails before credit. What should happen?**
+### 29. What is a transaction boundary?
 
-   Discuss business impact, inspect source and target state, choose the correct SQL/Python behavior, and explain verification and failure handling.
+A transaction boundary defines which operations must succeed or fail together. A loader might treat one validated batch as a transaction, while a multi-step order operation might treat order and inventory changes as one transaction.
 
-2. **Two sessions update the same balance. What concurrency risks exist?**
+### 30. Should a very large data load be one transaction?
 
-   Discuss business impact, inspect source and target state, choose the correct SQL/Python behavior, and explain verification and failure handling.
+Not always. One huge transaction can hold locks, use resources and increase recovery cost. Batch transactions and staging tables may be more appropriate. The correct batch size depends on atomicity requirements, volume, database capacity and recovery design.
 
-3. **A client times out after COMMIT. How do you make retry safe?**
+### 31. What is the difference between a database transaction and a backup?
 
-   Discuss business impact, inspect source and target state, choose the correct SQL/Python behavior, and explain verification and failure handling.
+A transaction controls a unit of database work. A backup is a copy or recovery artifact used to restore data after loss or corruption. Transactions do not replace backups.
 
-## 4. Mini-project defence — Transaction Simulation
+### 32. What is a compensating transaction?
 
-Prepare a 2–3 minute explanation:
-- What business problem did it solve?
-- Which tables or components did you use?
-- Why did you choose this approach?
-- What output did you verify?
-- Which edge case or failure did you test?
-- What would you improve before production?
+It is a new business operation that reverses or offsets a previously committed operation. For example, a refund may compensate for a completed payment. It is not the same as rolling back the original committed transaction.
 
-## 5. Common interview mistakes
+---
 
-- Reciting syntax without explaining the result.
-- Ignoring NULL values, duplicate rows and one-to-many relationships.
-- Claiming performance improved without measuring it.
-- Ignoring transaction boundaries and error handling.
-- Using administrator privileges for routine jobs.
-- Exposing credentials in code or logs.
-- Failing to verify row counts and business totals.
+## 3. Scenario-based interview questions
+
+### Scenario 1: A transfer debits Asha but does not credit Ravi
+
+**Good answer:** The transfer was not treated as one atomic unit or the failure was not handled correctly. I would group both updates in one transaction, verify the debit affected exactly one row, perform the credit, and commit only if all required operations succeed. Otherwise I would roll back.
+
+### Scenario 2: A Python loader gets a constraint error and then every later statement fails
+
+**Good answer:** In PostgreSQL the transaction is in an aborted state after the error. The application must roll back before issuing new statements. I would also record the failed batch and decide whether to reject it or retry after correcting the data.
+
+### Scenario 3: Two users withdraw money at the same time
+
+**Good answer:** I would use a conditional update, row locking or suitable isolation to prevent both transactions from spending the same available balance. I would check affected rows, keep the transaction short and implement safe retry handling for retryable conflicts.
+
+### Scenario 4: A transaction waits for a long time
+
+**Good answer:** I would inspect blocking sessions and locks, identify the transaction holding the conflicting lock, and check whether it is idle or performing long work. I would avoid leaving transactions open and make sure application code commits or rolls back promptly.
+
+### Scenario 5: The database reports a deadlock
+
+**Good answer:** One transaction was aborted by deadlock detection. I would inspect the involved statements and lock order, standardize row access order and retry the entire transaction safely if the error is retryable.
+
+### Scenario 6: The business asks for SERIALIZABLE isolation everywhere
+
+**Good answer:** SERIALIZABLE offers strong guarantees but can cause transaction aborts that require retries. I would choose isolation based on business correctness, contention and performance, test the workload, and ensure the application handles serialization failures.
+
+### Scenario 7: A batch loader fails after inserting 70 percent of the records
+
+**Good answer:** I would define whether the batch must be all-or-nothing. If so, the batch should be in one transaction or staged and published atomically. If smaller batch commits are used, the pipeline needs checkpoints, idempotent keys and a recovery plan so reruns do not duplicate data.
+
+---
+
+## 4. Mini-project defence
+
+Be ready to explain:
+
+1. Why is a transfer a transaction?
+2. What would happen if the second update failed?
+3. How did you prove ROLLBACK restored the previous balance?
+4. What is the difference between COMMIT and SAVEPOINT?
+5. How does the CHECK constraint protect the balance?
+6. What happens when two sessions update the same row?
+7. What does SELECT FOR UPDATE protect?
+8. What is a deadlock?
+9. Why should the transaction be short?
+10. How would you make a data loader safe after a partial failure?
+
+---
+
+## 5. Common interview traps
+
+- Claiming rollback can undo committed data.
+- Saying ACID consistency means every business rule is automatically known to the database.
+- Claiming SERIALIZABLE can never fail.
+- Assuming PostgreSQL permits dirty reads.
+- Forgetting to roll back after a PostgreSQL transaction error.
+- Ignoring affected-row counts on conditional updates.
+- Holding locks while calling external services.
+- Retrying a transaction without protecting external side effects.
+- Treating backups and transactions as the same thing.
+
+---
 
 ## 6. Readiness checklist
 
-- [ ] I can explain every key concept in today's syllabus.
-- [ ] I can write or interpret the main SQL/Python pattern.
-- [ ] I can explain the expected output.
-- [ ] I can identify common mistakes and trade-offs.
-- [ ] I can defend the mini-project.
-- [ ] I can explain production validation and failure handling.
+- [ ] I can explain BEGIN, COMMIT and ROLLBACK.
+- [ ] I can use SAVEPOINT.
+- [ ] I can explain all ACID properties with examples.
+- [ ] I can describe dirty, non-repeatable and phantom reads.
+- [ ] I can explain PostgreSQL's isolation behavior at a high level.
+- [ ] I understand row locks and SELECT FOR UPDATE.
+- [ ] I can explain deadlocks and safe retries.
+- [ ] I can design a transaction boundary for a data load.
