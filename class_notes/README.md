@@ -25,9 +25,9 @@
 | 12 | API Integration | API Data Extractor | [Notes](day_12_notes.md) | [Interview](day_12_interview.md) |
 | 13 | Python Database Connectivity | Database Record Extractor | [Notes](day_13_notes.md) | [Interview](day_13_interview.md) |
 | 14 | Pandas for Data Engineering | Dataset Transformation Tool | [Notes](day_14_notes.md) | [Interview](day_14_interview.md) |
-| 15 | NumPy for Data Engineering | Numerical Transformation Lab | [Notes](day_15_notes.md) | [Interview](day_15_interview.md) |
+| 15 | NumPy and Numerical Processing | Numerical Transformation Lab | [Notes](day_15_notes.md) | [Interview](day_15_interview.md) |
 | 16 | Data Validation and Schema Checking | Data Validation Engine | [Notes](day_16_notes.md) | [Interview](day_16_interview.md) |
-| 17 | Unit Testing and Reusable Pipeline Functions | Transformation Test Suite | [Notes](day_17_notes.md) | [Interview](day_17_interview.md) |
+| 17 | Testing Data Processing Code | Transformation Test Suite | [Notes](day_17_notes.md) | [Interview](day_17_interview.md) |
 | 18 | Git and Code Organization | Version-Controlled ETL Project | [Notes](day_18_notes.md) | [Interview](day_18_interview.md) |
 
 ## Future phases
