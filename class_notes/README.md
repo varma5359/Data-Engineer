@@ -2,6 +2,22 @@
 
 > 75-day Data Engineer pathway. The approved syllabus in [career_path.md](../career_path.md) is authoritative. Each day has separate class notes and interview preparation.
 
+## Rebuild progress
+
+The course is being rebuilt phase by phase to one consistent beginner-first teaching standard. A phase is marked **Complete** only after every day's class notes and interview file in that phase have been rebuilt, committed, and verified in GitHub. A phase-level summary and completion checklist will be added here when that phase is finished.
+
+| Phase | Days | Status | Rebuild progress |
+|---|---:|---|---:|
+| Phase 1 — Data Engineering Foundations | 1–5 | In progress | 3/5 days verified |
+| Phase 2 — Python for Data Engineering | 6–18 | Pending | 0/13 days verified |
+| Phase 3 — SQL and Database Engineering | 19–29 | Pending | 0/11 days verified |
+| Phase 4 — Data Processing and Pipelines | 30–39 | Pending | 0/10 days verified |
+| Phase 5 — Data Warehousing and Modeling | 40–49 | Pending | 0/10 days verified |
+| Phase 6 — Cloud and Distributed Processing | 50–59 | Pending | 0/10 days verified |
+| Phase 7 — Orchestration, Quality and Monitoring | 60–67 | Pending | 0/8 days verified |
+| Phase 8 — Data Engineering Capstone | 68–75 | Pending | 0/8 days verified |
+
+
 ## Phase 1 — Data Engineering Foundations (Days 1–5)
 
 | Day | Syllabus topic | Mini-project | Class notes | Interview |
