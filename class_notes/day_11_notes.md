@@ -483,3 +483,122 @@ The reader skips the header, so every batch contains only data records. This dis
 - Generators are single-pass unless the source is recreated.
 
 **Day 11 checkpoint:** You should be able to explain lazy evaluation, create a generator, read a file incrementally and calculate totals without storing every record.
+
+
+---
+
+# Beginner Teaching Extension — Day 11
+
+## A. Iterable, iterator and generator
+
+An iterable is something a loop can read one item at a time, such as a list or file. An iterator remembers its current position and supplies the next item when asked. A generator is a convenient way to create an iterator, commonly using yield.
+
+## B. Observe iteration
+
+```python
+order_ids = [501, 502, 503]
+order_iterator = iter(order_ids)
+print(next(order_iterator))
+print(next(order_iterator))
+print(next(order_iterator))
+```
+
+Expected output:
+
+```text
+501
+502
+503
+```
+
+iter() obtains an iterator. next() requests one value. Asking for another value after the iterator is exhausted raises StopIteration; a for loop handles that ending automatically.
+
+## C. Build a generator
+
+```python
+def read_order_ids():
+    yield 501
+    yield 502
+    yield 503
+
+for order_id in read_order_ids():
+    print(order_id)
+```
+
+Expected output:
+
+```text
+501
+502
+503
+```
+
+The function pauses at each yield and resumes when the next value is requested. Unlike returning a completed list, a generator can produce values gradually.
+
+## D. Compare list and generator behavior
+
+```python
+def generate_numbers():
+    for number in range(1, 4):
+        print("Preparing:", number)
+        yield number
+
+numbers = generate_numbers()
+print("Generator created")
+print(next(numbers))
+print(next(numbers))
+```
+
+Expected output:
+
+```text
+Generator created
+Preparing: 1
+1
+Preparing: 2
+2
+```
+
+Creating the generator does not execute the body. Each next() call advances it. This is lazy evaluation.
+
+## E. Read a file line by line
+
+```python
+with open("orders.txt", "r", encoding="utf-8") as file:
+    for line in file:
+        clean_line = line.strip()
+        if clean_line:
+            print(clean_line)
+```
+
+The output is each non-empty line in the source file. The loop does not need to load the entire file into a list first. This reduces memory pressure for large files.
+
+## F. Process records in batches
+
+```python
+def read_batches(records, batch_size):
+    for start in range(0, len(records), batch_size):
+        yield records[start:start + batch_size]
+
+order_ids = [101, 102, 103, 104, 105]
+for batch in read_batches(order_ids, 2):
+    print(batch)
+```
+
+Expected output:
+
+```text
+[101, 102]
+[103, 104]
+[105]
+```
+
+The slice selects a manageable group. This example uses a list already in memory to teach batching; a production large-file reader should stream records from the source rather than first loading every record into a list.
+
+## G. Important limitation
+
+Generators reduce the need to hold all generated results at once, but they do not automatically make every pipeline memory-safe. If code converts the generator to list(), stores every result elsewhere, or accumulates an unbounded list, memory use can still grow.
+
+## H. Readiness check
+
+The student should explain iterable versus iterator, use iter() and next(), describe StopIteration, write a generator with yield, and explain why line-by-line reading is useful for large files.
