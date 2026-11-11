@@ -1656,3 +1656,16 @@ Try answering these questions without looking at the notes:
 If you cannot explain an answer, revisit the relevant part and run the SQL again. The goal is not to memorize query patterns; it is to understand what evidence each query provides and what decision that evidence supports.
 
 **Next lesson — Day 46: Data Reconciliation and Lineage.** We will trace source records to warehouse outputs, compare counts and totals, investigate mismatches and document where every important value came from.
+
+---
+
+## Visual Learning Diagrams
+
+### SCD Type 2 lifecycle
+![Day 45 - SCD Type 2 lifecycle](images/day_45_slowly_changing_type2.svg)
+
+### SCD effective date ranges
+![Day 45 - SCD effective date ranges](images/day_45_scd_effective_dates.svg)
+
+### Late arriving dimension
+![Day 45 - Late arriving dimension](images/day_45_late_dimension.svg)
