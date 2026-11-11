@@ -434,3 +434,16 @@ Airflow parses DAG files repeatedly. Expensive top-level work slows parsing and 
 - [ ] Explain why large data should not be returned through task metadata.
 
 **Next lesson — Day 62: Airflow Scheduling and Reliability.** You will understand logical dates, data intervals, retries, backfills, task failures and safe recovery.
+
+---
+
+## Visual Learning Diagrams
+
+### Airflow DAG and task structure
+![Day 61 - Airflow DAG and task structure](images/day_61_airflow_dag_tasks.svg)
+
+### TaskFlow API flow
+![Day 61 - TaskFlow API flow](images/day_61_airflow_taskflow.svg)
+
+### Task lifecycle states
+![Day 61 - Task lifecycle states](images/day_61_airflow_run_states.svg)
