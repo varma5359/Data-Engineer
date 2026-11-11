@@ -1,574 +1,441 @@
-# Day 33: Database Ingestion
+# Day 33: Database Ingestion — Beginner Notebook Class
 
 **Phase:** 4 — Data Processing and Pipelines  
-**Syllabus topic:** Database Ingestion  
-**Mini-project:** Database Extractor  
-**Learning time:** 2–3 hours  
-**Level:** Complete beginner to junior Data Engineer  
+**Time:** 2–3 hours  
+**Project:** TechStore Database Extractor  
+**Level:** Complete beginner / fresher  
+**Tools:** Python, Psycopg 3, PostgreSQL, Jupyter Notebook  
+**Prerequisites:** SQL basics, Python lists/loops, Day 30 extraction and Day 29 database connection
 
 ---
 
-# 1. What are we learning today?
+# 0. Today's business problem
 
-Copy operational data without overwhelming source DB; extract with stable progress and reconcile source/target.
+A company has customer/order data in an operational database. Analytics needs a controlled copy, but the source database is used by live applications. We must extract data efficiently and safely.
 
-## 1.1 Learning outcomes
+Today we build a small extractor that:
+1. connects with a read-only account;
+2. selects explicit columns;
+3. uses safe SQL parameters;
+4. fetches data in batches;
+5. writes a local extract;
+6. checks counts, keys and boundaries;
+7. explains incremental extraction limitations.
 
-By the end of this lesson, you should be able to:
+Flow:
+`Source DB -> Safe SQL -> Cursor -> Batches -> Output -> Reconciliation -> Checkpoint`
 
-1. Identify table, primary key, change column, volume and source limits.
-2. Use least-privilege read-only account.
-3. Select explicit columns and deterministic ORDER BY.
-4. Use driver placeholders, never concatenate values.
-5. Fetch in bounded batches for large tables.
-6. Choose full/incremental strategy and safe watermark.
-7. Write idempotently and checkpoint after target commit.
-8. Reconcile counts, keys, totals and boundaries.
+---
 
-## 1.2 Pipeline context
+# 1. Database extraction vocabulary
 
-```text
-Business source -> Database Ingestion -> Validate/process -> Staging/destination -> Reconcile -> Checkpoint + monitoring
-```
+| Term | Beginner meaning |
+|---|---|
+| Source database | Database where operational data lives |
+| Connection | Communication session with DB |
+| Cursor | Object used to execute SQL/read results |
+| Result set | Rows returned by query |
+| Fetch | Transfer result rows into Python |
+| Batch | A bounded group of rows |
+| Read-only account | Can read but cannot change source data |
+| Query timeout | Maximum allowed query duration |
+| Watermark | Saved progress boundary |
+| Snapshot | Consistent view of data at a point, depending on DB isolation |
+| CDC | Change Data Capture; captures inserts/updates/deletes from change stream |
+| Reconciliation | Evidence that extracted output matches expected source |
 
-A pipeline is not merely a script that reads data. It is repeatable work with defined input, rules, output, progress, error path and evidence of correctness.
+---
 
-# 2. Business scenario and vocabulary
+# 2. Why source safety matters
 
-Copy operational data without overwhelming source DB; extract with stable progress and reconcile source/target.
+Operational database supports customer actions—checkout, booking, payments, inventory. An expensive extraction can compete for CPU, I/O, memory or locks.
 
-| Term | Beginner meaning | Why it matters |
-|---|---|---|
-| **Source DB** |  system of record | Used to design and explain reliable pipelines. |
-| **connection** |  session | Used to design and explain reliable pipelines. |
-| **cursor** |  SQL execution/fetch object | Used to design and explain reliable pipelines. |
-| **watermark** |  extraction boundary | Used to design and explain reliable pipelines. |
-| **snapshot** |  consistent view | Used to design and explain reliable pipelines. |
-| **read replica** |  copy for reads | Used to design and explain reliable pipelines. |
-| **parameterized query** |  values separate from SQL. | Used to design and explain reliable pipelines. |
+Safer choices:
+- read only access;
+- explicit columns;
+- source-side filters;
+- indexed predicates where suitable;
+- bounded batches;
+- query timeout and cancellation;
+- schedule/backfill coordination;
+- approved replica if appropriate;
+- monitor source load.
 
-## Before coding, answer five questions
+**Important:** A read-only account prevents writes but does not prevent an expensive SELECT. Permission and performance safety are different controls.
 
-1. Where does data come from and who owns it?
-2. Which records/fields must be collected or changed?
-3. What can go wrong (missing values, duplicates, timeout, schema change, partial failure)?
-4. Where does the result go and what is its schema?
-5. How will correctness be proven (counts, keys, totals, status and run metadata)?
+---
 
-# 3. Understand the concept before coding
+# 3. Confirm connection and source table
 
-## 3.1 A small record example
-
-| ID | Value | Status |
-|---:|---:|---|
-| 1 | 100 | valid |
-| 2 | 200 | valid |
-| 3 | -5 | invalid |
-
-A reliable run accounts for all 3 input records: 2 accepted, 1 rejected with a reason, 2 output records. It must not silently discard record 3.
-
-## 3.2 Flow to remember
-
-```text
-Receive -> Inspect -> Validate -> Process -> Persist -> Verify -> Record progress
-                    |                  |
-                    v                  v
-                Reject path       Retry/recovery path
-```
-
-- Receive: obtain source data.
-- Inspect: understand shape, size and metadata.
-- Validate: check rules before trusting it.
-- Process: apply topic-specific operation.
-- Persist: write durably.
-- Verify: compare expected and actual results.
-- Record progress: checkpoint only when safe.
-
-# 4. First practical example
-
-## Task
-
-Demonstrate database extraction with one small operation before scaling it into a pipeline.
-
-## Code
+Use the TechStore DB from Day 19/20.
 
 ```python
+import os
 import psycopg
-with psycopg.connect("dbname=shop user=student password=student") as conn:
-    with conn.cursor() as cur:
-        cur.execute("SELECT order_id, amount FROM orders ORDER BY order_id")
-        rows = cur.fetchall()
-        print(rows)
+
+connection = psycopg.connect(
+    host=os.environ["PGHOST"],
+    port=os.environ["PGPORT"],
+    dbname=os.environ["PGDATABASE"],
+    user=os.environ["PGUSER"],
+    password=os.environ["PGPASSWORD"]
+)
+
+cursor = connection.cursor()
+cursor.execute("SELECT current_database(), current_user")
+print(cursor.fetchone())
 ```
 
-## Expected output
-
+Expected shape:
 ```text
-[(101, Decimal('1200.00')), (102, Decimal('850.00')), (103, Decimal('499.00'))]
+('techstore', 'your_database_user')
+```
+Actual user/database depend on your setup.
+
+Check table:
+```sql
+SELECT COUNT(*) FROM orders;
+```
+The count is your actual seed/source size. Record it; do not invent a number.
+
+---
+
+# 4. Explicit query and parameterized values
+
+## 4.1 Query selected fields
+
+```python
+cursor.execute("""
+SELECT order_id, customer_id, created_at, status, total_amount
+FROM orders
+ORDER BY order_id
+LIMIT 5
+""")
+
+sample_rows = cursor.fetchall()
+print("Sample rows:", len(sample_rows))
+for row in sample_rows:
+    print(row)
 ```
 
-> Sample output is for the stated sample values. API/database/file results may vary. Do not claim variable outputs are guaranteed or runtime-tested unless you executed them.
+Expected: up to five rows, ordered by order_id. Exact rows depend on TechStore seed data.
 
-## Line-by-line explanation
+## 4.2 Parameterized filter
 
-Connection/cursor context managers manage resources; execute runs SQL; fetchall materializes all rows and is suitable only for small examples, not huge extracts.
+```python
+customer_id = 501
 
-### After running, answer
+cursor.execute("""
+SELECT order_id, customer_id, status, total_amount
+FROM orders
+WHERE customer_id = %s
+ORDER BY order_id
+""", (customer_id,))
 
-- What input did I provide?
-- Which operation ran?
-- Which object holds the result?
-- What does output prove?
-- What does output not prove?
+customer_orders = cursor.fetchall()
+print("Orders for customer:", len(customer_orders))
+```
 
-A successful request/query/read does not automatically prove completeness, uniqueness, business validity or correctness.
+The placeholder is not quoted. The value is supplied separately. For a single parameter, `(customer_id,)` is a tuple; the comma is essential.
 
-# 5. Build the pipeline step by step
+**Never** build SQL by concatenating an untrusted customer ID or text. Parameters protect values and preserve type handling.
 
-## Step 1 — Define the input contract
+---
 
-Document source and owner, fields/types, required/optional values, unique identity, time/batch boundary, expected volume/frequency, permissions, and source limitations. If these are unknown, clarify before coding.
+# 5. Fetch one, many and all
 
-## Step 2 — Read a tiny sample
+```python
+cursor.execute("SELECT order_id FROM orders ORDER BY order_id")
 
-Start with 3–10 safe records. Inspect field names, types, nulls, duplicate keys, cursor/timestamp/version and whether the sample represents real edge cases. Never print credentials or sensitive data.
+one_row = cursor.fetchone()
+print("One:", one_row)
 
-## Step 3A — Validation is a decision
+next_rows = cursor.fetchmany(3)
+print("Next batch:", next_rows)
 
-| Rule | Example | Violation action |
-|---|---|---|
-| Required field | ID exists | Reject/quarantine |
-| Type | Amount numeric | Record conversion reason |
-| Range | Quantity positive | Reject or business review |
-| Identity | Key unique | Deduplicate or fail per contract |
-| Schema | Required columns exist | Stop batch and alert |
-| Completeness | All pages/partitions processed | Mark incomplete; don't checkpoint |
+remaining = cursor.fetchall()
+print("Remaining:", len(remaining))
+```
 
-## Step 4 — Process bounded units
+Each fetch consumes rows from the cursor. If you call fetchone, the next fetchmany begins after that row. If you need a fresh result, execute the query again.
 
-A unit can be a page, file, fetch batch, partition or record group. Bounded units control memory, reduce retry scope, provide progress points and isolate failures. Select the unit based on source/target capacity—not a tutorial's arbitrary number.
+**fetchall** is suitable for small data. Large datasets require bounded processing.
 
-## Step 5 — Persist safely
+---
 
-Ask: did destination commit finish? Can the batch replay without duplicate effects? Is there a unique key/idempotency token? Can I trace output to source? What if process crashes now?
+# 6. Bounded batch extraction
 
-## Step 6 — Verify
+## 6.1 Understand batch size
 
-Use at least two: input = accepted + rejected; key uniqueness; totals/ranges; boundary gap/overlap; schema; freshness; source/target reconciliation.
+Suppose 25 rows and batch size 10:
+- Batch 1: 10
+- Batch 2: 10
+- Batch 3: 5
 
-# 6. Mistakes and corrections
+The final batch can be smaller. Do not discard it.
 
-## Mistake 1: fetchall on millions
+## 6.2 Execute and fetch in batches
 
-**Why dangerous:** Memory grows with result.
+```python
+batch_size = 10
 
-**Correct approach:** fetchmany/server-side cursor/key batches.
+cursor.execute("""
+SELECT order_id, customer_id, created_at, status, total_amount
+FROM orders
+ORDER BY order_id
+""")
 
-## Mistake 2: ID-only incremental
+total_fetched = 0
+batch_number = 0
 
-**Why dangerous:** Misses updates to old IDs.
+while True:
+    batch = cursor.fetchmany(batch_size)
 
-**Correct approach:** Use updated_at, CDC or reconciliation.
+    if not batch:
+        break
 
-## Mistake 3: SQL concatenation
+    batch_number += 1
+    total_fetched += len(batch)
 
-**Why dangerous:** Injection and quoting risk.
+    print(
+        "Batch:", batch_number,
+        "Rows:", len(batch),
+        "Total fetched:", total_fetched
+    )
+```
 
-**Correct approach:** Parameterized SQL.
+The printed values depend on source row count. The loop stops when fetchmany returns an empty list.
 
-## Mistake 4: Long source transaction
+## 6.3 Why this is better than fetchall
 
-**Why dangerous:** Can affect locks/snapshots.
+Batching limits the number of result rows held at once. But note: driver/server cursor behavior matters. For very large PostgreSQL results, use a named/server-side cursor or documented streaming approach; ordinary client-side cursor may buffer more than expected. Learn the driver semantics before claiming memory is fully bounded.
 
-**Correct approach:** Bound extraction and coordinate with DBA.
+---
 
-## Mistake 5: No delete capture
+# 7. Write batches to CSV instead of collecting all rows
 
-**Why dangerous:** Deleted source rows remain target.
+## 7.1 Stream to a file
 
-**Correct approach:** CDC/tombstone or periodic reconciliation.
+```python
+import csv
 
+output_path = "../output/orders_full_extract.csv"
 
-## Debugging checklist
+cursor.execute("""
+SELECT order_id, customer_id, created_at, status, total_amount
+FROM orders
+ORDER BY order_id
+""")
 
-1. Confirm source exists and request/query is correct.
-2. Inspect exact raw input for a small failing case.
-3. Confirm schema and types.
-4. Check filters and boundaries (>, >=, dates, cursor).
-5. Check mapping/business rules.
-6. Check duplicate and unique-key behavior.
-7. Check destination write/transaction result.
-8. Inspect checkpoint and update timing.
-9. Reconcile input, accepted, rejected and output counts.
-10. Reproduce with controlled input before changing the full job.
+column_names = [column.name for column in cursor.description]
 
-# 7. Mini-project — Database Extractor
+with open(output_path, "w", newline="", encoding="utf-8") as file:
+    writer = csv.writer(file)
+    writer.writerow(column_names)
 
-## Objective
+    total_written = 0
 
-Build a beginner-readable pipeline demonstrating database ingestion with a happy path, invalid/failure path and verification step.
+    while True:
+        batch = cursor.fetchmany(500)
 
-## Requirements
+        if not batch:
+            break
 
-- Reproducible sample input and defined contract.
-- Predictable processing order and bounded units.
-- Required-field and identity validation.
-- Accepted/rejected outcomes separated.
-- Safe rerun without duplicate effects.
-- Run metadata: run ID, start/end, counts and status.
-- Progress/checkpoint behavior explained.
-- Output reconciled.
+        writer.writerows(batch)
+        total_written += len(batch)
 
-## Sample business data
+print("Rows written:", total_written)
+```
 
-| record_id | event_time | customer_id | amount | status |
-|---:|---|---:|---:|---|
-| 501 | 2026-11-10 09:00:00 | 11 | 1200.00 | PAID |
-| 502 | 2026-11-10 09:15:00 | 12 | 850.00 | PAID |
-| 503 | 2026-11-10 10:00:00 | 11 | 499.00 | PENDING |
-| 504 | 2026-11-10 10:30:00 | 13 | 0.00 | CANCELLED |
+This writes each batch as it is fetched instead of keeping every row in one Python list.
 
-These are teaching records. A zero amount or CANCELLED status is not automatically invalid; the business contract decides.
+For large production extracts, consider server-side cursors, query timeout, temporary output, file validation and atomic publication.
 
-## Part A — Design
+---
 
-1. Name source/destination.
-2. Define unique key and required fields/types.
-3. Decide batch boundary and accepted/rejected rules.
-4. Define checkpoint and output schema.
-5. Define reconciliation checks.
+# 8. Verify extraction
 
-## Part B — Happy path
+## 8.1 Compare source count and output count
 
-1. Read a small batch.
-2. Count received records.
-3. Validate required fields.
-4. Process accepted records.
-5. Persist/display output.
-6. Verify counts and values.
+```sql
+SELECT COUNT(*) FROM orders;
+```
 
-## Part C — Failure tests
+Compare with Python's total_written.
 
-Test missing field, duplicate key and one transient error/malformed payload. Record expected behavior, actual behavior and correction. A happy-path-only script is not reliable yet.
+If filters are used, source count must use the same WHERE condition.
 
-## Part D — Replay
+## 8.2 Key checks
 
-Run input twice; inspect duplicates; interrupt before checkpoint; restart from safe progress; reconcile final target.
+For a small dataset:
+- inspect first/last order ID;
+- verify IDs are unique;
+- compare key count;
+- compare amount totals if business rules permit;
+- check nulls and date range.
 
-## Acceptance checklist
+For large data, choose efficient checks (database constraints, aggregates, key ranges, sampled/full reconciliation) rather than loading all IDs into memory.
 
-- [ ] Input contract documented.
-- [ ] Small sample reproducible.
-- [ ] Code split into readable stages.
-- [ ] Outputs shown after important steps.
-- [ ] Invalid data has a reason.
-- [ ] Retry behavior bounded.
-- [ ] Rerun behavior safe.
-- [ ] Checkpoint order explained.
-- [ ] Counts and values reconciled.
-- [ ] Limitations and production improvements documented.
+---
 
-# 8. Production thinking
+# 9. Incremental extraction with ID watermark
 
-A classroom script runs on small data. Production additionally considers scale/memory, least-privilege security, secret management, concurrency, retries/checkpoints, source load, data contracts, monitoring/alerts/runbooks, schema changes, cost and auditability. A notebook is not production-ready merely because it executes successfully.
+## 9.1 Example for append-only records
 
-# 9. Practice exercises
+Suppose last successfully extracted ID = 1000.
 
-## Exercise 1 — Explain
+```python
+last_id = 1000
+cursor.execute("""
+SELECT order_id, customer_id, created_at, status, total_amount
+FROM orders
+WHERE order_id > %s
+ORDER BY order_id
+""", (last_id,))
+```
 
-Explain Source DB to a beginner; give a business example; name a failure; explain detection and recovery.
+This extracts IDs greater than 1000.
 
-## Exercise 2 — Trace one record
+**Limitation:** It only works for newly inserted higher IDs. If order 500 is updated or deleted, this query will not detect it.
 
-Trace record 502 from source through validation, processing, destination, checkpoint and verification.
+## 9.2 Bound the run with upper ID
 
-## Exercise 3 — Boundary test
+Capture a maximum ID at run start:
 
-Create records immediately before, exactly at and after the boundary. Explain which are processed and why.
+```sql
+SELECT MAX(order_id) FROM orders;
+```
 
-## Exercise 4 — Failure test
+Suppose upper_id=1500. Query:
+```sql
+SELECT order_id, customer_id, created_at, status, total_amount
+FROM orders
+WHERE order_id > 1000
+  AND order_id <= 1500
+ORDER BY order_id;
+```
 
-Interrupt after output persistence but before checkpoint. Restart and explain idempotency and duplicate checks.
+This bounds an append-only extraction window. It does not create a consistent snapshot across concurrent changes and does not capture updates/deletes.
 
-## Exercise 5 — Quality test
+---
 
-Make one field invalid, one key duplicated and one record late. Decide action from contract and justify.
+# 10. Timestamp watermark and tie handling
 
-## Exercise 6 — Interview practice
+If records have updated_at, a timestamp alone can have ties. Use timestamp plus unique key.
 
-Answer aloud: problem solved; end-to-end flow; failure behavior; completeness proof; production improvements.
+Concept:
+`updated_at > last_time OR (updated_at = last_time AND order_id > last_id)`
 
-# 10. Day 33 revision sheet
+Order by updated_at, order_id.
 
-**Flow:** Define contract -> Read bounded input -> Validate -> Process -> Persist -> Verify -> Checkpoint -> Observe
+A safe implementation also needs:
+- timezone and precision agreement;
+- late-update strategy;
+- overlap/replay;
+- destination idempotency;
+- checkpoint after durable write;
+- delete capture strategy.
 
-Never skip: unique record identity; what success guarantees; replay behavior; invalid versus transient error; evidence of destination correctness.
+Do not claim timestamp watermark guarantees every change unless source semantics support it.
 
-## One-minute project defence
+---
 
-“My Database Extractor receives data from a defined source. It validates the contract and identity, processes controlled units, handles invalid/transient cases explicitly, persists safely, records progress after durable success and reconciles counts/values. I can rerun it safely and diagnose failures from run metadata. Before production I would add automated tests, secret management, monitoring, access controls and scale testing.”
+# 11. Source consistency and replica lag
 
-## Self-assessment
+A query may run while source records are changing. A plain SELECT does not automatically guarantee that multiple batches represent one consistent point in time; transaction isolation matters.
 
-- [ ] I can define terms without memorizing.
-- [ ] I can explain code and output.
-- [ ] I can trace a record end-to-end.
-- [ ] I can reproduce/debug a failure.
-- [ ] I can explain checkpoint ordering and replay.
-- [ ] I can prove correctness with checks.
-- [ ] I can defend the project.
+If using a read replica:
+- replication lag may cause data to be behind primary;
+- a boundary from primary can exceed replica's applied changes;
+- monitor lag and choose safe overlap/position;
+- reconcile later.
 
-**Complete the day when you can explain, run, interpret, test failure and prove the result—not merely read the notes.**
+For exact change capture, use database-approved snapshot/CDC strategy.
 
+---
 
-# 11. Mentor-led deep dive — DB
+# 12. Failure and recovery
 
-This section expands the earlier example into decisions a junior Data Engineer should make. Read each scenario slowly: identify the input, risk, control and proof.
-
-## 11.1 Why source extraction needs care
-
-Operational systems serve customer transactions. Large scans, long snapshots or expensive joins can slow checkout/booking. Discuss extraction windows, read replicas, source-side filters and DBA approval.
-
-**Student checkpoint:** Explain this in your own words, then name one test that would prove it.
-
-## 11.2 Connection setup
-
-Install the matching driver, use connection settings from environment/config, open a connection, create cursor, execute a query, fetch rows and close resources. Explain each object before adding pipeline logic.
-
-**Student checkpoint:** Explain this in your own words, then name one test that would prove it.
-
-## 11.3 Parameterized SQL walkthrough
-
-SQL text contains placeholders; values are passed as a separate tuple/list. Placeholder syntax depends on driver. Parameters are values—not table/column names—so dynamic identifiers require safe allow-list handling.
-
-**Student checkpoint:** Explain this in your own words, then name one test that would prove it.
-
-## 11.4 Batch fetch
-
-Fetch 500 rows, process/write them, then fetch next batch. Do not accumulate every batch into one giant list. Track count and last key; test interruption between batches.
-
-**Student checkpoint:** Explain this in your own words, then name one test that would prove it.
-
-## 11.5 Keyset pagination
-
-For append-only ID: WHERE id > last_id AND id <= upper_id ORDER BY id LIMIT batch_size. Capture upper_id at start to bound the run. Explain why updates/deletes still need CDC or another method.
-
-**Student checkpoint:** Explain this in your own words, then name one test that would prove it.
-
-## 11.6 Timestamp compound cursor
-
-Use WHERE updated_at > last_time OR (updated_at = last_time AND id > last_id), ordered by updated_at,id. Explain how this resolves timestamp ties and why updates that move timestamps matter.
-
-**Student checkpoint:** Explain this in your own words, then name one test that would prove it.
-
-## 11.7 Source snapshot
-
-If records change while extraction runs, a query may observe different moments. Snapshot isolation/consistent snapshot/CDC strategies depend on database and operational constraints; don't claim a plain SELECT is always consistent.
-
-**Student checkpoint:** Explain this in your own words, then name one test that would prove it.
-
-## 11.8 Read replica lag
-
-Replica can be behind primary. A watermark taken from primary then queried on lagging replica can skip rows unless overlap/replication position is considered.
-
-**Student checkpoint:** Explain this in your own words, then name one test that would prove it.
-
-## 11.9 Data type mapping
-
-SQL DECIMAL may become Decimal in Python; timestamp may become datetime; NULL becomes None. Explain these conversions and avoid float for money.
-
-**Student checkpoint:** Explain this in your own words, then name one test that would prove it.
-
-## 11.10 Large-table extraction
-
-Select only required columns, filter in SQL, use bounded batches and index-friendly predicates. Monitor duration, rows, source load and query plan.
-
-**Student checkpoint:** Explain this in your own words, then name one test that would prove it.
-
-## 11.11 Connection failure
-
-If connection drops, identify last durable target batch. Reconnect and replay from checkpoint; target writes must be idempotent. Do not assume in-memory last row is durable progress.
-
-**Student checkpoint:** Explain this in your own words, then name one test that would prove it.
-
-## 11.12 Delete capture
-
-Hard-deleted rows vanish from SELECT. Use WAL/binlog CDC, soft-delete flag, tombstone table or periodic reconciliation.
-
-**Student checkpoint:** Explain this in your own words, then name one test that would prove it.
-
-## 11.13 Project test matrix
-
-Test empty table, one row, duplicate key, NULL timestamp, timestamp tie, update old ID, deleted source row, timeout and restart.
-
-**Student checkpoint:** Explain this in your own words, then name one test that would prove it.
-
-# 12. Guided lab checkpoints
-
-## Lab checkpoint 1
-
-- **Predict:** Before running anything, write what you expect to happen.
-- **Execute:** Run only this stage with a small input.
-- **Observe:** Record the actual output, row count and error (if any).
-- **Explain:** Why did the output occur? Which input or rule produced it?
-- **Verify:** Compare it with the expected result and contract.
-- **Recover:** If it failed, reproduce with the smallest input and correct the cause.
-
-## Lab checkpoint 2
-
-- **Predict:** Before running anything, write what you expect to happen.
-- **Execute:** Run only this stage with a small input.
-- **Observe:** Record the actual output, row count and error (if any).
-- **Explain:** Why did the output occur? Which input or rule produced it?
-- **Verify:** Compare it with the expected result and contract.
-- **Recover:** If it failed, reproduce with the smallest input and correct the cause.
-
-## Lab checkpoint 3
-
-- **Predict:** Before running anything, write what you expect to happen.
-- **Execute:** Run only this stage with a small input.
-- **Observe:** Record the actual output, row count and error (if any).
-- **Explain:** Why did the output occur? Which input or rule produced it?
-- **Verify:** Compare it with the expected result and contract.
-- **Recover:** If it failed, reproduce with the smallest input and correct the cause.
-
-## Lab checkpoint 4
-
-- **Predict:** Before running anything, write what you expect to happen.
-- **Execute:** Run only this stage with a small input.
-- **Observe:** Record the actual output, row count and error (if any).
-- **Explain:** Why did the output occur? Which input or rule produced it?
-- **Verify:** Compare it with the expected result and contract.
-- **Recover:** If it failed, reproduce with the smallest input and correct the cause.
-
-## Lab checkpoint 5
-
-- **Predict:** Before running anything, write what you expect to happen.
-- **Execute:** Run only this stage with a small input.
-- **Observe:** Record the actual output, row count and error (if any).
-- **Explain:** Why did the output occur? Which input or rule produced it?
-- **Verify:** Compare it with the expected result and contract.
-- **Recover:** If it failed, reproduce with the smallest input and correct the cause.
-
-## Lab checkpoint 6
-
-- **Predict:** Before running anything, write what you expect to happen.
-- **Execute:** Run only this stage with a small input.
-- **Observe:** Record the actual output, row count and error (if any).
-- **Explain:** Why did the output occur? Which input or rule produced it?
-- **Verify:** Compare it with the expected result and contract.
-- **Recover:** If it failed, reproduce with the smallest input and correct the cause.
-
-## Lab checkpoint 7
-
-- **Predict:** Before running anything, write what you expect to happen.
-- **Execute:** Run only this stage with a small input.
-- **Observe:** Record the actual output, row count and error (if any).
-- **Explain:** Why did the output occur? Which input or rule produced it?
-- **Verify:** Compare it with the expected result and contract.
-- **Recover:** If it failed, reproduce with the smallest input and correct the cause.
-
-## Lab checkpoint 8
-
-- **Predict:** Before running anything, write what you expect to happen.
-- **Execute:** Run only this stage with a small input.
-- **Observe:** Record the actual output, row count and error (if any).
-- **Explain:** Why did the output occur? Which input or rule produced it?
-- **Verify:** Compare it with the expected result and contract.
-- **Recover:** If it failed, reproduce with the smallest input and correct the cause.
-
-
-# 13. Instructor review rubric
-
-| Skill | Beginner evidence |
+| Failure | Safe response |
 |---|---|
-| Concept | Explains what/why in plain language |
-| Code | Can read and explain each line, not copy blindly |
-| Output | Can derive output from input and rule |
-| Quality | Identifies invalid, duplicate and boundary cases |
-| Reliability | Explains retry, replay and checkpoint |
-| Verification | Uses counts/keys/totals/quality checks |
-| Interview | Gives decision, reason, failure mode and proof |
+| Connection drops | Reconnect and replay from last durable batch |
+| Query timeout | Investigate plan/source load; don't retry forever |
+| Destination write fails | Do not advance checkpoint |
+| File write partial | Temp file, validate, publish safely |
+| Crash after write before checkpoint | Replay idempotently |
+| Checkpoint before write | Potential data loss; correct ordering |
+| Source schema changed | Stop, inspect contract, version mapping |
+| Duplicate source key | Investigate join/key/change semantics |
+| Replica behind | Wait/overlap/reconcile; don't advance unsafely |
 
+---
 
+# 13. Mini-project: TechStore Database Extractor
 
-# 11. Mentor-led deep dive — database ingestion
+## Requirement
+Extract all or a bounded subset of orders from PostgreSQL to CSV using batch fetching and verification.
 
-## 11.1 Parameters
+## Milestones
+1. Confirm database/table/schema.
+2. Use read-only credentials.
+3. Define explicit columns and filter.
+4. Record source count/upper boundary.
+5. Execute query and fetch batches.
+6. Write temp CSV batch by batch.
+7. Count output records and verify key/boundary.
+8. Publish only after checks.
+9. Save run summary and checkpoint.
+10. Test interruption/replay and explain watermark limitation.
 
-SQL result types,PostgreSQL NUMERIC may return Decimal; timestamp returns datetime; SQL NULL becomes Python None. Inspect types before conversion; don't stringify all rows prematurely.
+## Summary fields
+`run_id, source, query_window, upper_boundary, rows_read, rows_written, batch_count, duration, status, checkpoint`
 
-**Try it:** write a tiny input/output example or a test assertion proving this behavior.
+A successful run must prove that output is durable and reconciliation passes.
 
-## 11.2 Response metadata
+---
 
-Placeholder example,cur.execute("SELECT ... WHERE order_id = %s", (order_id,)). The second argument is a one-element tuple; comma matters. Placeholder syntax varies by driver.
+# 14. Exercises with answers
 
-**Try it:** write a tiny input/output example or a test assertion proving this behavior.
+1. Why use read-only account?
+2. Does read-only prevent expensive queries?
+3. Why use explicit columns?
+4. Why use parameter placeholders?
+5. What does fetchmany return when no rows remain?
+6. Why can fetchall exhaust memory?
+7. Why can ordinary cursor still buffer results?
+8. What can ID watermark miss?
+9. Why use timestamp+ID?
+10. Why checkpoint after destination commit?
+11. What is replica lag?
+12. What does reconciliation prove?
 
-## 11.3 Failure layers
+**Answer guide**
+1. Prevent accidental source changes.
+2. No; it still consumes resources.
+3. Stable contract and less data.
+4. Safe value binding and correct types.
+5. Empty list.
+6. All remaining rows materialize in memory.
+7. Driver/server cursor behavior may buffer; verify implementation.
+8. Updates/deletes to old IDs.
+9. Resolve timestamp ties deterministically.
+10. Avoid progress recorded before data is durable.
+11. Replica has not applied all primary changes yet.
+12. Evidence output matches defined source scope and rules.
 
-Fetch batches,Use fetchmany(batch_size) repeatedly until empty. Process and persist each batch; don't append every batch into one mega-list. Track batch count and last durable key.
+---
 
-**Try it:** write a tiny input/output example or a test assertion proving this behavior.
+# 15. Day 33 self-check
 
-## 11.4 Empty result
+- [ ] Connect and verify correct database/user.
+- [ ] Execute explicit SQL and parameterized filter.
+- [ ] Explain fetchone/fetchmany/fetchall.
+- [ ] Process output in batches.
+- [ ] Write CSV without collecting all rows.
+- [ ] Reconcile source/output count and keys.
+- [ ] Explain ID/timestamp watermark limitations.
+- [ ] Describe source safety and replica lag.
+- [ ] Demonstrate a crash/replay plan.
+- [ ] Defend the database extractor project.
 
-Keyset boundary,Capture upper_id at start; then read id > last_id AND id <= upper_id ORDER BY id LIMIT batch. This bounds append-only extraction; updates/deletes need separate change mechanism.
-
-**Try it:** write a tiny input/output example or a test assertion proving this behavior.
-
-## 11.5 Loop protection
-
-Compound timestamp,Use updated_at > last_time OR (updated_at=last_time AND id>last_id), ordered by both. Check timestamp precision and timezone; tie key must be unique.
-
-**Try it:** write a tiny input/output example or a test assertion proving this behavior.
-
-## 11.6 Consistency
-
-Index-friendly filter,Avoid wrapping indexed timestamp in a function in WHERE if it prevents index use. Inspect plan and ask DBA; query patterns and indexes depend on database.
-
-**Try it:** write a tiny input/output example or a test assertion proving this behavior.
-
-## 11.7 Retry budget
-
-Source consistency,Concurrent writes can happen during extraction. Choose snapshot, CDC or bounded reconciliation. State the consistency guarantee honestly.
-
-**Try it:** write a tiny input/output example or a test assertion proving this behavior.
-
-## 11.8 Checkpoint
-
-Replica lag,If reading replica, monitor lag and avoid checkpoint boundary beyond replica's applied changes; overlap/reconcile when exact position unavailable.
-
-**Try it:** write a tiny input/output example or a test assertion proving this behavior.
-
-## 11.9 Backfill
-
-Connection lifecycle,Use context managers/try-finally, close cursor/connection, handle transaction semantics. Do not share one cursor concurrently across threads.
-
-**Try it:** write a tiny input/output example or a test assertion proving this behavior.
-
-## 11.10 Security
-
-Operational safety,Read-only account, query timeout, source load monitoring, maintenance-window coordination, explicit columns, bounded batches and cancellation path.
-
-**Try it:** write a tiny input/output example or a test assertion proving this behavior.
-
-## 11.11 Mock testing
-
-Test matrix,Empty table; one record; timestamp tie; null update timestamp; old ID update; hard delete; connection interruption; restart; duplicate replay.
-
-**Try it:** write a tiny input/output example or a test assertion proving this behavior.
-
-# 12. Lab notebook record
-
-For every experiment, maintain this table:
-
-| Experiment | Input/boundary | Expected | Actual | Difference | Fix/test |
-|---|---|---|---|---|---|
-| Happy path | 3 records | 3 extracted | | | |
-| Empty result | 0 records | valid empty run | | | |
-| Duplicate/replay | same batch twice | no duplicate effects | | | |
-| Failure | timeout/connection loss | bounded retry/recovery | | | |
-| Boundary | equal timestamp/cursor | no gap | | | |
-
+**Remember:** Database ingestion is not just SELECT. It includes source protection, bounded reading, consistency, durable progress, replay and evidence.
