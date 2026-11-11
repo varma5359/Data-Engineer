@@ -1622,3 +1622,16 @@ Without looking at the notes, explain:
 If you can complete the local Python-to-PostgreSQL exercise and explain the cloud network path, you are ready for Day 54.
 
 **Next lesson — Day 54: Distributed Computing.** You will learn why one machine is sometimes not enough, how parallel work is divided, what partitions and workers mean, and what trade-offs distributed systems introduce.
+
+---
+
+## Visual Learning Diagrams
+
+### Managed database responsibility
+![Day 53 - Managed database responsibility](images/day_53_managed_database.svg)
+
+### RDS connection path
+![Day 53 - RDS connection path](images/day_53_rds_connection.svg)
+
+### Cloud DB backup and recovery
+![Day 53 - Cloud DB backup and recovery](images/day_53_cloud_db_backup.svg)
