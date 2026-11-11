@@ -779,3 +779,16 @@ A fact arrives before the customer record. What are two possible warehouse strat
 - [ ] Defend a warehouse key strategy.
 
 **Next lesson — Day 44: Data Marts and Subject-Oriented Modeling.** We will turn business requirements into a focused sales data mart, define its subject area and reusable dimensions, and design the model for actual reporting users.
+
+---
+
+## Visual Learning Diagrams
+
+### Dimensional modeling workflow
+![Day 43 - Dimensional modeling workflow](images/day_43_dimensional_modeling_steps.svg)
+
+### Conformed dimensions
+![Day 43 - Conformed dimensions](images/day_43_conformed_dimensions.svg)
+
+### Fact table types
+![Day 43 - Fact table types](images/day_43_fact_table_types.svg)
