@@ -147,6 +147,8 @@ For real tax processing, rates must come from the applicable business rules and 
 
 ## 8. Return versus print
 
+![Python return versus print](images/day_07_return_vs_print.svg)
+
 `print()` displays a value. `return` gives a value back to the caller so another step can use it.
 
 ```python
@@ -318,6 +320,8 @@ Expected output:
 The example uses an explicit date so the output is stable when students rerun the notebook.
 
 ## 14. Create your own module
+
+![Python modules and imports](images/day_07_python_modules_imports.svg)
 
 Create a project folder:
 
