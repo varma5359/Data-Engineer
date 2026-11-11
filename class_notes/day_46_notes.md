@@ -708,3 +708,623 @@ What is the difference between technical and business lineage?
 - [ ] Document a mismatch investigation.
 
 **Next lesson — Day 47: Metadata and Data Documentation.** We will build a data dictionary, business glossary and catalog entry, and learn how ownership, definitions, classifications and lineage make warehouse data discoverable and trustworthy.
+
+---
+
+# Part 15 — Build one reconciliation report
+
+Separate queries are useful for learning, but an engineer often needs one report that displays source and target differences together.
+
+## 15.1 Why FULL OUTER JOIN helps
+
+A FULL OUTER JOIN preserves:
+- rows found only in the source;
+- rows found only in the target;
+- rows found in both.
+
+Run this after the earlier training tables have been created and the target amount for order 1002 has been restored.
+
+~~~sql
+SELECT
+    COALESCE(s.order_id, t.order_id) AS order_id,
+    s.amount AS source_amount,
+    t.amount AS target_amount,
+    CASE
+        WHEN s.order_id IS NULL THEN 'EXTRA_IN_TARGET'
+        WHEN t.order_id IS NULL THEN 'MISSING_IN_TARGET'
+        WHEN s.amount <> t.amount THEN 'AMOUNT_MISMATCH'
+        ELSE 'MATCHED'
+    END AS reconciliation_status
+FROM (
+    SELECT order_id, amount
+    FROM source_orders
+    WHERE status = 'PAID'
+) AS s
+FULL OUTER JOIN target_orders AS t
+    ON s.order_id = t.order_id
+ORDER BY COALESCE(s.order_id, t.order_id);
+~~~
+
+Expected result:
+
+| order_id | source_amount | target_amount | reconciliation_status |
+|---:|---:|---:|---|
+| 1001 | 1000.00 | 1000.00 | MATCHED |
+| 1002 | 1500.00 | 1500.00 | MATCHED |
+| 1003 | 700.00 | 700.00 | MATCHED |
+
+The pending order 1004 is excluded from the source subquery because it is not eligible for this target.
+
+Understand the query:
+- The source subquery selects only eligible PAID rows.
+- The aliases s and t make the two inputs easier to reference.
+- FULL OUTER JOIN keeps unmatched rows from either side.
+- COALESCE returns the first non-NULL value, so the order ID is visible whichever side contains the row.
+- CASE labels the comparison result.
+- ORDER BY sorts the final report.
+
+## 15.2 Create a missing-target scenario
+
+Temporarily delete order 1002 from the target:
+
+~~~sql
+DELETE FROM target_orders
+WHERE order_id = 1002;
+~~~
+
+Expected output:
+
+~~~text
+DELETE 1
+~~~
+
+Run the FULL OUTER JOIN query again. The row for order 1002 should show source_amount 1500.00, target_amount NULL and status MISSING_IN_TARGET.
+
+Restore the row:
+
+~~~sql
+INSERT INTO target_orders (order_id, order_date, amount, status)
+SELECT order_id, order_date, amount, status
+FROM source_orders
+WHERE order_id = 1002
+  AND status = 'PAID';
+~~~
+
+Expected output:
+
+~~~text
+INSERT 0 1
+~~~
+
+## 15.3 Create an extra-target scenario
+
+~~~sql
+INSERT INTO target_orders VALUES
+(1099, DATE '2026-01-03', 450.00, 'PAID');
+~~~
+
+Expected output: INSERT 0 1.
+
+Run the reconciliation query. The extra row should show order_id 1099, source_amount NULL, target_amount 450.00 and status EXTRA_IN_TARGET.
+
+Remove the intentionally incorrect row:
+
+~~~sql
+DELETE FROM target_orders
+WHERE order_id = 1099;
+~~~
+
+Expected output: DELETE 1.
+
+## 15.4 Create an amount mismatch
+
+~~~sql
+UPDATE target_orders
+SET amount = 1550.00
+WHERE order_id = 1002;
+~~~
+
+Expected output: UPDATE 1.
+
+The reconciliation report should show order 1002 with source amount 1500.00, target amount 1550.00 and status AMOUNT_MISMATCH.
+
+Restore the training value:
+
+~~~sql
+UPDATE target_orders
+SET amount = 1500.00
+WHERE order_id = 1002;
+~~~
+
+Expected output: UPDATE 1.
+
+These are controlled learning changes. In production, investigate the root cause and use the approved reload or correction process. Do not casually edit production warehouse rows.
+
+---
+
+# Part 16 — Reconcile grouped totals with one query
+
+A grand total can match even when one date or region is wrong. Grouped comparison helps locate the difference.
+
+## 16.1 Compare daily totals
+
+~~~sql
+WITH source_daily AS (
+    SELECT
+        order_date,
+        SUM(amount) AS source_total
+    FROM source_orders
+    WHERE status = 'PAID'
+    GROUP BY order_date
+),
+target_daily AS (
+    SELECT
+        order_date,
+        SUM(amount) AS target_total
+    FROM target_orders
+    GROUP BY order_date
+)
+SELECT
+    COALESCE(s.order_date, t.order_date) AS order_date,
+    s.source_total,
+    t.target_total,
+    COALESCE(s.source_total, 0) - COALESCE(t.target_total, 0) AS difference
+FROM source_daily AS s
+FULL OUTER JOIN target_daily AS t
+    ON s.order_date = t.order_date
+ORDER BY COALESCE(s.order_date, t.order_date);
+~~~
+
+Expected result after restoring the target:
+
+| order_date | source_total | target_total | difference |
+|---|---:|---:|---:|
+| 2026-01-01 | 2500.00 | 2500.00 | 0.00 |
+| 2026-01-02 | 700.00 | 700.00 | 0.00 |
+
+A CTE is a named query result introduced with WITH:
+- source_daily calculates daily source totals;
+- target_daily calculates daily target totals;
+- the final query joins the two summaries;
+- difference is source total minus target total.
+
+A CTE does not permanently create a table. It makes a multi-step query easier to read.
+
+This example assumes order_date is the correct date role. If the business report uses payment date or shipment date, reconcile using that same date definition.
+
+## 16.2 Understand a missing group
+
+FULL OUTER JOIN preserves a date found on either side. COALESCE displays the date that exists.
+
+For arithmetic, COALESCE(total, 0) treats an absent group as zero. This is appropriate for this comparison, but an absent group is not the same as a source value explicitly recorded as zero.
+
+---
+
+# Part 17 — Use a checksum carefully
+
+A checksum is a compact value calculated from data. It can help detect whether row contents changed. It is supporting evidence, not a replacement for key-level reconciliation.
+
+## 17.1 Create a row fingerprint
+
+PostgreSQL provides MD5 for a text input. Run:
+
+~~~sql
+SELECT
+    order_id,
+    MD5(
+        CONCAT_WS(
+            '|',
+            order_id::TEXT,
+            order_date::TEXT,
+            amount::TEXT,
+            status
+        )
+    ) AS row_fingerprint
+FROM source_orders
+WHERE status = 'PAID'
+ORDER BY order_id;
+~~~
+
+The exact fingerprint strings are generated by PostgreSQL. Inspect them in your SQL client rather than memorizing a fixed hash.
+
+CONCAT_WS joins values using the supplied separator. Casting values to text gives MD5 a text input. MD5 returns a hexadecimal digest.
+
+## 17.2 Checksum design warnings
+
+A production fingerprint needs careful canonicalization:
+- define column order;
+- define date and timestamp formatting;
+- define decimal formatting;
+- define NULL representation;
+- define text encoding and whitespace handling;
+- avoid ambiguous separators inside values;
+- include the fields whose changes matter.
+
+A text value can itself contain the separator. Naive concatenation can then become ambiguous. A robust design uses unambiguous serialization or length-prefixing.
+
+MD5 is not suitable for security or tamper-proof guarantees. For ordinary change detection, select a checksum approach appropriate to scale and risk. For security-sensitive integrity, use an appropriate cryptographic hash and trusted controls.
+
+---
+
+# Part 18 — Source snapshots, time windows and watermarks
+
+A reconciliation is meaningful only when both sides refer to the same business scope.
+
+## 18.1 What is a source snapshot?
+
+A snapshot is a defined view of source data at a particular point or boundary.
+
+Imagine:
+- source extract begins at 07:00;
+- a new order is inserted at 07:05;
+- the warehouse query reads the source at 07:10;
+- the target load was based on the 07:00 extract.
+
+The source and target may differ even if the pipeline worked correctly. They represent different snapshots.
+
+Record the extract boundary or batch ID and reconcile against that same source batch.
+
+## 18.2 What is a watermark?
+
+A watermark is a stored boundary used to track how far a pipeline has processed source data.
+
+For a timestamp-based incremental load, it may be the maximum successfully processed source update time.
+
+| Run | Previous watermark | New watermark |
+|---|---|---|
+| Run 1 | 2026-01-01 00:00 | 2026-01-02 00:00 |
+| Run 2 | 2026-01-02 00:00 | 2026-01-03 00:00 |
+
+A watermark is not automatically the latest business event time. It is a processing boundary defined by extraction logic.
+
+## 18.3 Boundary conditions to document
+
+When comparing source and target, document:
+- inclusive or exclusive start boundary;
+- inclusive or exclusive end boundary;
+- time zone;
+- timestamp precision;
+- late-arriving update policy;
+- deletion handling;
+- source snapshot or batch identifier.
+
+These filters are not equivalent:
+
+~~~sql
+WHERE updated_at > TIMESTAMP '2026-01-01 00:00:00'
+~~~
+
+~~~sql
+WHERE updated_at >= TIMESTAMP '2026-01-01 00:00:00'
+~~~
+
+The second includes records exactly at midnight. If one side uses > and the other uses >=, boundary records may differ.
+
+## 18.4 Why date-only comparisons can be dangerous
+
+A timestamp such as 2026-01-02 00:30:00+00 may belong to a different local calendar date in another time zone.
+
+For daily reconciliation:
+1. choose the business time zone;
+2. convert timestamps consistently;
+3. define the start and end of the business day;
+4. use the same interval for source and target;
+5. record the time zone in the evidence.
+
+---
+
+# Part 19 — Lineage as an impact-analysis tool
+
+Lineage is not only documentation. It helps engineers decide what to test when something changes.
+
+## 19.1 Example: a source column is renamed
+
+Suppose the source team renames order_total to gross_amount.
+
+A lineage chain could be:
+
+~~~text
+orders.order_total
+    -> raw_orders.order_total
+    -> stg_orders.order_amount
+    -> int_sales.sales_amount
+    -> fct_sales.sales_amount
+    -> sales_dashboard.total_sales
+~~~
+
+If the source field changes, inspect every dependent transformation and consumer.
+
+## 19.2 Build an impact table
+
+| Changed object | Direct dependent | Downstream consumer | Required action |
+|---|---|---|---|
+| orders.order_total | raw_orders | stg_orders | Update source mapping |
+| stg_orders.order_amount | int_sales | fct_sales | Run model tests |
+| fct_sales.sales_amount | sales_dashboard | Finance report | Reconcile business metric |
+
+This is illustrative. A real dependency list must come from your repository, orchestration metadata or catalog—not from guessing.
+
+## 19.3 Upstream and downstream
+
+- Upstream: objects that provide data to the current object.
+- Downstream: objects that depend on the current object.
+
+For fct_sales, stg_orders may be upstream and sales_dashboard may be downstream.
+
+When a source changes, trace downstream impact. When a report is wrong, trace upstream to find the source or transformation responsible.
+
+## 19.4 Change-impact workflow
+
+1. Identify the changed source table or column.
+2. Find direct dependents.
+3. Continue tracing downstream.
+4. Identify affected reports and teams.
+5. Review source-to-target mapping.
+6. Update transformations and documentation.
+7. Run relevant schema and data tests.
+8. Reconcile affected outputs.
+9. Communicate the change and evidence.
+
+---
+
+# Part 20 — Build a practical source-to-target mapping document
+
+A mapping document should be specific enough that another engineer can understand and implement the transformation.
+
+## 20.1 Example mapping for training orders
+
+| Source field | Target field | Type conversion | Transformation | NULL policy | Validation |
+|---|---|---|---|---|---|
+| order_id | order_id | text to integer if needed | Trim and cast | Reject missing | Required and unique |
+| order_dt | order_date | text to date | Parse using agreed format | Reject missing | Valid date |
+| total | amount | text to numeric | Trim and decimal cast | Reject missing for PAID | Positive for PAID |
+| state | status | text to varchar | Trim and uppercase | Reject missing | Approved values |
+
+This is a teaching example. Real source field names and formats must be inspected.
+
+## 20.2 Add ownership and change details
+
+A useful mapping record also includes:
+- source system and table;
+- source owner;
+- target model and column;
+- target owner;
+- business definition;
+- transformation version;
+- effective date;
+- last reviewed date;
+- sensitivity classification;
+- related quality rule IDs.
+
+## 20.3 Mapping versus lineage
+
+Mapping says how a field is transformed from source to target.
+
+Lineage shows the broader path and dependencies across systems and models.
+
+A mapping is often one detailed edge in a larger lineage graph.
+
+---
+
+# Part 21 — Understand dbt lineage concepts
+
+This course introduces dbt as a transformation and dependency tool. You do not need a production dbt project to understand the basic idea.
+
+## 21.1 Declare a source
+
+A dbt source can identify a raw database table.
+
+~~~yaml
+version: 2
+
+sources:
+  - name: raw
+    schema: raw
+    tables:
+      - name: raw_orders
+~~~
+
+The database and schema must match your project configuration.
+
+## 21.2 Create a staging model
+
+A model file such as models/staging/stg_orders.sql can select from the declared source:
+
+~~~sql
+SELECT
+    order_id,
+    customer_id,
+    order_date,
+    amount,
+    status
+FROM {{ source('raw', 'raw_orders') }}
+~~~
+
+The source() expression tells dbt that this model depends on the declared source table.
+
+## 21.3 Create a downstream model
+
+~~~sql
+SELECT
+    order_id,
+    customer_id,
+    order_date,
+    amount
+FROM {{ ref('stg_orders') }}
+WHERE status = 'PAID'
+~~~
+
+The ref() expression tells dbt that this model depends on stg_orders.
+
+## 21.4 What does the dependency graph show?
+
+~~~text
+raw.raw_orders
+      |
+      v
+stg_orders
+      |
+      v
+fct_paid_orders
+      |
+      v
+sales_dashboard
+~~~
+
+The dbt graph can show declared model dependencies. It cannot automatically discover every manual spreadsheet calculation, undocumented dashboard formula or business conversation. Keep those definitions documented too.
+
+## 21.5 Where to inspect the graph
+
+In a configured dbt project:
+1. Open a terminal in the dbt project folder.
+2. Run dbt docs generate after the project is configured and models are available.
+3. Run dbt docs serve to start the local documentation site.
+4. Open the local address printed by the command.
+5. Select the graph view and inspect model dependencies.
+
+These commands require a working dbt installation, project profile, database connection and valid configuration. If those are not ready, study the dependency examples first; do not interpret a setup error as a lineage error.
+
+---
+
+# Part 22 — Troubleshoot common reconciliation mismatches
+
+| Symptom | Possible cause | First investigation |
+|---|---|---|
+| Source count higher than target | Missing records or filter mismatch | Compare source keys missing from target |
+| Target count higher than source | Duplicate or extra records | Find target-only keys and duplicate keys |
+| Counts match, totals differ | Amount or mapping error | Compare values by business key |
+| Totals match, grouped totals differ | Errors offset across groups | Compare by date, region or category |
+| Only one date differs | Boundary or late-arriving data | Inspect time zone and watermark |
+| Many rows suddenly missing | Source schema/filter change | Check ingestion and transformation run |
+| One dimension key is missing | Lookup or referential issue | Find unmatched dimension references |
+| Reconciliation query errors | Schema or permission problem | Confirm object names, types and access |
+| dbt graph omits a dependency | Dependency not declared or model bypasses dbt | Inspect source/ref declarations |
+
+Do not assume the target is always wrong. A mismatch can originate from a source correction after extraction, target transformation defect, business filter difference, late-arriving event, timezone conversion, duplicate join, source deletion or rejection policy.
+
+## 22.1 Keep a mismatch investigation record
+
+| Field | Example |
+|---|---|
+| Incident ID | REC-2026-001 |
+| Dataset | fct_sales |
+| Run ID | run-2026-01-06-001 |
+| Mismatch | Source has order 1002; target does not |
+| Root cause | Load filter excluded an eligible status |
+| Resolution | Correct filter and replay batch |
+| Evidence | Key comparison returned zero missing keys after replay |
+| Owner | Data Engineering |
+| Closed at | Record actual resolution time |
+
+These values illustrate the format, not a real incident.
+
+---
+
+# Part 23 — Practice exercises with worked answers
+
+## Exercise 6 — Choose the right join
+
+The source has keys 1, 2 and 3. The target has keys 1, 3 and 4. Which keys are missing and extra?
+
+**Worked answer:**
+- Key 2 is missing from the target.
+- Key 4 is extra in the target.
+- Keys 1 and 3 are present in both.
+- A FULL OUTER JOIN or two anti-join queries can reveal these differences.
+
+## Exercise 7 — Why use COALESCE?
+
+A FULL OUTER JOIN returns a row that exists only in the target. The source key is NULL in that output row. How can one display the key?
+
+**Worked answer:** Use COALESCE(source_key, target_key). It returns the first non-NULL key.
+
+## Exercise 8 — Equal grand totals, different dates
+
+Source totals are 500 for Monday and 700 for Tuesday. Target totals are 600 for Monday and 600 for Tuesday. Grand totals are both 1,200. Is reconciliation successful?
+
+**Worked answer:** No. Daily totals differ. Grouped reconciliation reveals Monday is 100 too high and Tuesday is 100 too low.
+
+## Exercise 9 — Source changed after extraction
+
+The warehouse loaded a source snapshot at 07:00. At 07:10, the source corrected an order amount. At 07:15, you compare the live source with the target. Why might the comparison fail?
+
+**Worked answer:** The source and target represent different snapshots. Reconcile against the extracted batch or record the source version/watermark used by the load.
+
+## Exercise 10 — Hash values differ
+
+Two row fingerprints differ. Does this automatically mean the business values changed?
+
+**Worked answer:** Not necessarily. Date formatting, decimal formatting, NULL representation, whitespace or column ordering may differ. Canonicalize values before hashing, then compare actual fields for investigation.
+
+## Exercise 11 — Find the owner
+
+A dashboard total is incorrect because a source status mapping was changed without approval. Who should be involved?
+
+**Worked answer:** The source/business owner should confirm the status meaning; the warehouse/model owner should correct the mapping; the report owner should validate the business metric. Record the change and test downstream outputs.
+
+## Exercise 12 — Lineage direction
+
+You are investigating why sales_dashboard.total_sales is wrong. Should you trace upstream or downstream?
+
+**Worked answer:** Trace upstream from the dashboard metric to its model, transformations and source fields. If a source field changes, trace downstream to identify impacted reports.
+
+## Exercise 13 — Missing dimension row
+
+A fact row has product_key 900, but the product dimension has no matching key. What should you investigate?
+
+**Worked answer:** Check whether the product is genuinely new, the dimension load failed, the fact arrived before its dimension, or the key mapping is wrong. Apply the warehouse's approved unknown-member or late-arriving-dimension policy.
+
+---
+
+# Part 24 — Day 46 practical completion checklist
+
+### Reconciliation concepts
+- [ ] Explain why matching row counts are not enough.
+- [ ] Compare source and target using the same filters and time window.
+- [ ] Explain row-count, key, aggregate, grouped and field-level reconciliation.
+- [ ] Find missing source keys and extra target keys.
+- [ ] Use FULL OUTER JOIN to display both sides.
+- [ ] Explain why errors can cancel in grand totals.
+- [ ] Compare grouped totals by date.
+- [ ] Explain what a control total and run ID provide.
+- [ ] Explain source snapshots and watermarks.
+- [ ] Describe why timezone and boundary rules matter.
+
+### SQL practice
+- [ ] Create the source and target training tables.
+- [ ] Load only eligible PAID rows.
+- [ ] Compare counts and distinct keys.
+- [ ] Find missing and extra records.
+- [ ] Introduce and detect a changed amount.
+- [ ] Build a FULL OUTER JOIN reconciliation report.
+- [ ] Detect a missing-target record.
+- [ ] Detect an extra-target record.
+- [ ] Detect an amount mismatch.
+- [ ] Compare daily source and target totals.
+- [ ] Explain the purpose and limitations of a row fingerprint.
+
+### Lineage and engineering
+- [ ] Create a source-to-target mapping.
+- [ ] Explain technical and business lineage.
+- [ ] Distinguish upstream from downstream.
+- [ ] Trace a report metric to source fields.
+- [ ] Use source() and ref() to understand dbt dependencies.
+- [ ] Perform a basic impact analysis after a column change.
+- [ ] Record a mismatch, root cause, owner, resolution and evidence.
+
+## Final self-assessment
+
+Without looking at the notes, explain:
+
+1. Why can two tables have equal row counts but different records?
+2. Why can two tables have equal totals but incorrect individual values?
+3. When is FULL OUTER JOIN useful for reconciliation?
+4. Why must source and target use the same time boundary?
+5. What does a watermark represent?
+6. How is field mapping different from lineage?
+7. How would you investigate a missing sales dashboard value?
+8. What should you do before changing a source-to-target mapping?
+
+If you can answer these questions and reproduce the SQL checks, you are ready to move to Day 47.
+
+**Next lesson — Day 47: Metadata and Data Documentation.** We will build a data dictionary, business glossary and catalog entry, and learn how ownership, definitions, classifications and lineage make warehouse data discoverable and trustworthy.
