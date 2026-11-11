@@ -227,7 +227,7 @@ SELECT
     (value % 10000) + 1 AS customer_id,
     DATE '2026-01-01' + (value % 365) AS order_date,
     (value % 50000) + 100 AS amount
-FROM generate_series(1, 200000) AS value;
+FROM generate_series(1, 200000) AS gs(value);
 ```
 
 Expected output:
@@ -599,11 +599,22 @@ A materialized view stores the result of a query and can be refreshed.
 
 PostgreSQL example:
 
+This example uses permanent practice objects because a PostgreSQL materialized view is a persistent database object. Run it in an isolated training database. If you rerun the lesson, remove the previous practice objects first.
+
 ```sql
-CREATE TEMP TABLE daily_sales_source (
-    sale_id INTEGER,
-    sale_date DATE,
-    amount NUMERIC(10, 2)
+DROP MATERIALIZED VIEW IF EXISTS daily_sales_summary;
+DROP TABLE IF EXISTS daily_sales_source;
+```
+
+Expected output: PostgreSQL reports that the objects were dropped when they existed. Notices are normal when they did not exist.
+
+Create the source table:
+
+```sql
+CREATE TABLE daily_sales_source (
+    sale_id INTEGER PRIMARY KEY,
+    sale_date DATE NOT NULL,
+    amount NUMERIC(10, 2) NOT NULL
 );
 ```
 
@@ -613,7 +624,7 @@ Expected output:
 CREATE TABLE
 ```
 
-Insert:
+Insert the training rows:
 
 ```sql
 INSERT INTO daily_sales_source VALUES
@@ -660,15 +671,49 @@ Expected result:
 | 2026-01-01 | 1500.00 |
 | 2026-01-02 | 700.00 |
 
-If source rows change, the materialized view does not automatically refresh.
+Now insert a new source row:
 
-For a permanent materialized view, use:
+```sql
+INSERT INTO daily_sales_source VALUES
+(4, DATE '2026-01-02', 300.00);
+```
+
+Expected output:
+
+```text
+INSERT 0 1
+```
+
+Query the materialized view again before refreshing. It still shows the earlier result because a materialized view stores its previous query result.
+
+Refresh it:
 
 ```sql
 REFRESH MATERIALIZED VIEW daily_sales_summary;
 ```
 
-The example uses a materialized view created in the current database. PostgreSQL's TEMP table restrictions and dependency lifetime mean a temporary source table is not suitable as a long-lived production dependency. For a production materialized view, use permanent source tables and define refresh ownership and schedule.
+Expected output:
+
+```text
+REFRESH MATERIALIZED VIEW
+```
+
+Query again:
+
+```sql
+SELECT *
+FROM daily_sales_summary
+ORDER BY sale_date;
+```
+
+Expected result after refresh:
+
+| sale_date | total_sales |
+|---|---:|
+| 2026-01-01 | 1500.00 |
+| 2026-01-02 | 1000.00 |
+
+This demonstrates the freshness trade-off: the stored result does not change until it is refreshed. Production systems must define refresh ownership, schedule, locking/concurrency behavior and failure monitoring.
 
 ## 7.4 Materialization trade-off
 
