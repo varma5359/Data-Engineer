@@ -445,3 +445,16 @@ Because the run may execute later or be backfilled and must still process the in
 - [ ] Explain safe historical reprocessing.
 
 **Next lesson — Day 63: Automated Data Quality.** You will turn business rules into executable validation tasks and prevent invalid data from reaching the curated layer.
+
+---
+
+## Visual Learning Diagrams
+
+### Logical date and data interval
+![Day 62 - Logical date and data interval](images/day_62_airflow_data_interval.svg)
+
+### Airflow retry timeline
+![Day 62 - Airflow retry timeline](images/day_62_airflow_retry_timeline.svg)
+
+### Schedule and catchup
+![Day 62 - Schedule and catchup](images/day_62_airflow_schedule_catchup.svg)
