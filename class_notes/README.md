@@ -178,3 +178,11 @@ The course is being rebuilt phase by phase to one consistent beginner-first teac
 - [Day 31 Interview Guide](day_31_interview.md) — complete model answers and project defence.
 
 **Status:** Rebuilt under independent-learning standard. Execute cells and test against the student's environment before classroom verification.
+
+## Day 32 — API-Based Data Ingestion (rebuild artifacts)
+
+- [Day 32 Class Notebook](day_32_notes.md) — 643 lines; API fundamentals, request/response, status codes, JSON, parameters, pagination, retries, security and persistence.
+- [Day 32 Project Workbook](day_32_project_workbook.md) — guided execution, mock pagination, expected outputs, failure drills and acceptance criteria.
+- [Day 32 Interview Guide](day_32_interview.md) — full model answers, follow-up prompts and project defence.
+
+**Status:** Rebuilt under independent-learning standard. Live API tests depend on network and provider availability; mock exercises remain executable offline.
