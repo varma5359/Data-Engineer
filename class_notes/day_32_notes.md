@@ -1755,3 +1755,16 @@ If any item is unclear, rerun the corresponding example before proceeding.
 Day 33 moves from an HTTP API source to a database source. You will learn how to connect to a database, execute safe read queries, fetch records in batches, avoid loading too much data into memory, and verify the extracted result.
 
 **End of Day 32 class notes.**
+
+---
+
+## Visual Learning Diagrams
+
+### API request and response
+![Day 32 - API request and response](images/day_32_api_request_response.svg)
+
+### API pagination
+![Day 32 - API pagination](images/day_32_api_pagination.svg)
+
+### API rate-limit handling
+![Day 32 - API rate-limit handling](images/day_32_api_rate_retry.svg)
