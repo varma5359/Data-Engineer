@@ -1328,3 +1328,16 @@ Without looking at the notes, explain:
 If you can answer these questions and reproduce the SQL checks, you are ready to move to Day 47.
 
 **Next lesson — Day 47: Metadata and Data Documentation.** We will build a data dictionary, business glossary and catalog entry, and learn how ownership, definitions, classifications and lineage make warehouse data discoverable and trustworthy.
+
+---
+
+## Visual Learning Diagrams
+
+### Incremental warehouse refresh
+![Day 46 - Incremental warehouse refresh](images/day_46_warehouse_incremental.svg)
+
+### Dimension before fact loading
+![Day 46 - Dimension before fact loading](images/day_46_fact_load_order.svg)
+
+### Warehouse reconciliation
+![Day 46 - Warehouse reconciliation](images/day_46_reconciliation.svg)
