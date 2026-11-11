@@ -917,3 +917,16 @@ The source says a city change became effective on 1 March, but the warehouse rec
 - [ ] Explain how facts reference the correct Type 2 version.
 
 **Next lesson — Day 43: Keys and Data Relationships.** We will study natural, surrogate, composite, primary and foreign keys, and learn how a warehouse assigns and protects identifiers.
+
+---
+
+## Visual Learning Diagrams
+
+### Define fact table grain
+![Day 42 - Define fact table grain](images/day_42_grain_definition.svg)
+
+### Natural vs surrogate keys
+![Day 42 - Natural vs surrogate keys](images/day_42_surrogate_natural_keys.svg)
+
+### SCD Type 1 vs Type 2
+![Day 42 - SCD Type 1 vs Type 2](images/day_42_slowly_changing_dimension.svg)
