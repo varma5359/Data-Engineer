@@ -1106,3 +1106,16 @@ You should be able to explain:
 Day 37 teaches incremental loading and upserts. You will learn how to process only new or changed records, track progress with watermarks, update existing destination records and make reruns safe.
 
 **End of Day 36 class notes.**
+
+---
+
+## Visual Learning Diagrams
+
+### Batch vs streaming
+![Day 36 - Batch vs streaming](images/day_36_batch_stream_timeline.svg)
+
+### Chunk processing and memory
+![Day 36 - Chunk processing and memory](images/day_36_chunk_processing.svg)
+
+### Data partitioning
+![Day 36 - Data partitioning](images/day_36_partitioning.svg)
