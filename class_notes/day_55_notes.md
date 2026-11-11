@@ -1471,3 +1471,16 @@ Without looking at the notes, explain:
 If you can create the Spark session, read the training CSV, inspect its schema and explain the execution model, you are ready for Day 56.
 
 **Next lesson — Day 56: Spark Transformations and Actions.** We will use select, filter, withColumn, when, groupBy, agg, orderBy and distinct, inspect the results after each step, and understand how actions trigger execution.
+
+---
+
+## Visual Learning Diagrams
+
+### Spark architecture
+![Day 55 - Spark architecture](images/day_55_spark_architecture.svg)
+
+### Spark execution flow
+![Day 55 - Spark execution flow](images/day_55_spark_execution_flow.svg)
+
+### Spark DataFrame concept
+![Day 55 - Spark DataFrame concept](images/day_55_spark_dataframe.svg)
