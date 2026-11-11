@@ -830,3 +830,697 @@ Why should a student avoid creating a bucket or database without checking pricin
 - [ ] Identify common cost and security mistakes.
 
 **Next lesson — Day 53: Cloud Database Fundamentals.** You will learn managed databases, database connectivity, endpoints, ports, security groups, credentials and safe application connections.
+
+
+---
+
+# Part 14 — Use the AWS Console safely
+
+The CLI is useful for automation, but beginners should recognize the same concepts in the AWS Console.
+
+## 54. Sign in to an approved training account
+
+Use only an instructor-approved sandbox or organization account.
+
+1. Open the sign-in page supplied by your instructor.
+2. Confirm the account and role after signing in.
+3. Never use another person's credentials.
+4. Never share passwords, one-time codes or access keys.
+5. Do not use production resources for this exercise.
+
+The console is only an interface. It does not grant permissions that the signed-in identity does not already have.
+
+## 55. Open Amazon S3
+
+1. Use the AWS Console search bar and search for S3.
+2. Open Amazon S3.
+3. Review the bucket list.
+4. Confirm the account and region context.
+5. Open only a bucket assigned to you or one you are authorized to use.
+
+If no bucket appears, possible reasons include no buckets existing or insufficient list permissions. Do not assume the service is broken.
+
+## 56. Inspect a bucket
+
+Look for the Objects, Properties, Permissions and Management areas. The console layout can change, so focus on what each area represents.
+
+- Objects: keys and prefixes stored in the bucket.
+- Properties: bucket-level configuration such as versioning and encryption settings.
+- Permissions: public access settings and resource policies.
+- Management: lifecycle and other storage-management features.
+
+## 57. Upload a synthetic file
+
+Use a small CSV containing invented training data only.
+
+1. Open the approved development bucket.
+2. Open the assigned raw/orders prefix or create it through the console.
+3. Choose Upload and select the synthetic CSV.
+4. Review the destination and encryption settings.
+5. Start the upload.
+6. Wait for completion.
+7. Confirm the object name and size in the object list.
+
+A console-created folder may be represented by a zero-byte object ending in a slash. Ordinary object keys can also create the same folder-like view.
+
+## 58. Download and compare
+
+1. Select the training object.
+2. Download it to a dedicated practice folder.
+3. Compare the downloaded file with the original.
+4. Check byte size.
+5. Calculate a checksum if the exercise requires stronger evidence.
+
+Do not download sensitive production data to a personal device.
+
+## 59. Delete only the training object
+
+Delete is destructive. Do this only when the resource owner approves and only for the synthetic object you created.
+
+Confirm the account, bucket and complete key. Check versioning before deleting. In a versioned bucket, a normal delete may create a delete marker while previous versions remain.
+
+If no approved development bucket is available, skip the actual mutation. Complete the command-reading and design exercises instead.
+
+---
+
+# Part 15 — Safe AWS CLI practice on Windows
+
+The commands below are templates. Replace the placeholder bucket only with an approved development bucket. Never run them against an unknown or production bucket.
+
+## 60. Check the CLI installation
+
+Open Windows CMD or PowerShell:
+
+~~~bat
+aws --version
+~~~
+
+If Windows reports that aws is not recognized, confirm installation and PATH. Open a new terminal after installation.
+
+## 61. Confirm the active identity
+
+~~~bat
+aws sts get-caller-identity
+~~~
+
+Review the account and ARN. Confirm that they represent the approved training identity.
+
+If credentials are missing or expired, stop and use the approved sign-in flow. Do not paste keys into the command line or code.
+
+## 62. Set a temporary bucket variable in CMD
+
+~~~bat
+set BUCKET=your-approved-development-bucket
+echo %BUCKET%
+~~~
+
+The first command sets a variable for the current CMD session. The second prints it so you can check the value.
+
+PowerShell uses different variable syntax. Do not copy CMD syntax into PowerShell unchanged.
+
+## 63. List one prefix
+
+~~~bat
+aws s3 ls s3://%BUCKET%/raw/orders/
+~~~
+
+The command lists visible objects under the prefix. An empty result may simply mean that no objects are stored there.
+
+If access is denied, identify the missing action and resource. Do not attach administrator access as a shortcut.
+
+## 64. Create a synthetic local file
+
+Create `orders_training.csv` in your current folder:
+
+~~~csv
+order_id,order_date,amount,status
+501,2026-11-10,250.00,PAID
+502,2026-11-10,499.00,PAID
+503,2026-11-11,100.00,PENDING
+~~~
+
+Save and close the file before uploading it. Confirm it exists:
+
+~~~bat
+dir orders_training.csv
+~~~
+
+## 65. Upload to a date-specific key
+
+~~~bat
+aws s3 cp orders_training.csv s3://%BUCKET%/raw/orders/ingest_date=2026-11-11/orders_training.csv
+~~~
+
+The command reports success if the file, destination and permissions are valid.
+
+Use date/run-specific keys when each delivery must be preserved. Reusing a generic key can replace the current object.
+
+## 66. Confirm the destination
+
+~~~bat
+aws s3 ls s3://%BUCKET%/raw/orders/ingest_date=2026-11-11/
+~~~
+
+Confirm the object name and size. If it is missing, check the upload result, active identity, bucket, key and permissions.
+
+## 67. Download to a different local name
+
+~~~bat
+aws s3 cp s3://%BUCKET%/raw/orders/ingest_date=2026-11-11/orders_training.csv downloaded_orders_training.csv
+~~~
+
+Do not download over the original input file. Compare the files:
+
+~~~bat
+fc orders_training.csv downloaded_orders_training.csv
+~~~
+
+If the files match, CMD normally reports that no differences were found.
+
+## 68. Copy within S3
+
+~~~bat
+aws s3 cp s3://%BUCKET%/raw/orders/ingest_date=2026-11-11/orders_training.csv s3://%BUCKET%/processed/orders/ingest_date=2026-11-11/orders_training.csv
+~~~
+
+This copies bytes to a new key. It does not validate, clean, convert or transform the data. A copied raw file is not automatically a processed dataset.
+
+## 69. Understand sync
+
+~~~bat
+aws s3 sync ./training_exports s3://%BUCKET%/raw/training_exports/
+~~~
+
+Sync compares local and remote paths and transfers files as needed. Options that delete destination objects are dangerous. Test direction and behavior in a small development prefix before any production use.
+
+Never copy a recursive delete or sync-with-delete command without understanding its exact target and impact.
+
+---
+
+# Part 16 — Verify object integrity
+
+## 70. Inspect metadata with HeadObject
+
+~~~bash
+aws s3api head-object --bucket your-approved-development-bucket --key raw/orders/ingest_date=2026-11-11/orders_training.csv
+~~~
+
+This requests metadata for one object without downloading the full contents. The response can include content length, last-modified time, ETag and encryption-related details.
+
+Do not assume an ETag is always an MD5 checksum. Multipart upload and encryption configuration can change its meaning.
+
+## 71. Compare local file sizes
+
+~~~bat
+dir orders_training.csv
+dir downloaded_orders_training.csv
+~~~
+
+Equal byte size is useful evidence, but it does not prove the files are byte-for-byte identical.
+
+## 72. Calculate SHA-256 on Windows
+
+~~~bat
+certutil -hashfile orders_training.csv SHA256
+certutil -hashfile downloaded_orders_training.csv SHA256
+~~~
+
+If both files are identical, their SHA-256 digests should match. The actual digest must come from your machine; never copy an invented hash into a report.
+
+For production integrity checks, use a checksum feature supported and configured for the chosen S3 upload method. Record the algorithm and value consistently.
+
+## 73. Understand multipart upload
+
+Large objects can be uploaded in parts. Conceptually:
+1. initiate the multipart upload;
+2. transfer the parts;
+3. complete the upload;
+4. S3 assembles the object.
+
+If a transfer fails before completion, incomplete parts can remain and incur storage charges. Lifecycle configuration can abort incomplete multipart uploads after an approved period.
+
+Choose that period based on maximum expected transfer duration and recovery needs.
+
+---
+
+# Part 17 — Select storage classes using business requirements
+
+## 74. Active daily data
+
+Current order files are read by daily transformations and may need replay. A frequently accessible class such as S3 Standard may fit. Confirm actual usage and cost.
+
+## 75. Uncertain access pattern
+
+An audit dataset is sometimes read frequently and sometimes not read for months. Intelligent-Tiering may be worth evaluating. Check eligible object sizes, tier behavior, monitoring charges and retrieval characteristics.
+
+## 76. Infrequent but rapid access
+
+An old dataset is rarely read but must be available quickly when requested. An infrequent-access class may fit if retrieval charges and minimum storage duration are acceptable.
+
+## 77. Long-term archive
+
+A compliance archive is retained for years and rarely retrieved. Evaluate Glacier storage classes against:
+- required retrieval time;
+- retrieval mode and charges;
+- minimum storage duration;
+- restore workflow;
+- legal retention;
+- recovery testing.
+
+Do not archive data before confirming who will request a restore and how long the restore can take.
+
+## 78. Storage class decision table
+
+| Question | Why it matters |
+|---|---|
+| How often is the object read? | Helps choose an access tier |
+| How quickly must it be available? | Archive retrieval can take longer |
+| How long will it remain stored? | Minimum duration can affect cost |
+| Are retrieval requests charged? | Low storage price may not mean low total cost |
+| Is the object replaceable? | A single-AZ design may be unsuitable for irreplaceable data |
+| Is another copy available? | Recovery design affects storage decisions |
+| Is there a legal hold? | Expiration may be prohibited |
+
+Always check current AWS pricing and feature documentation before a production choice.
+
+---
+
+# Part 18 — Lifecycle rules and version recovery
+
+## 79. What can a lifecycle rule do?
+
+Depending on configuration, lifecycle rules can:
+- transition objects to another storage class;
+- expire objects after a retention period;
+- manage noncurrent versions;
+- abort incomplete multipart uploads.
+
+A lifecycle rule may apply to a bucket or selected prefixes/tags. The scope must be reviewed carefully.
+
+## 80. Example lifecycle planning
+
+| Dataset | Possible action | Approval needed |
+|---|---|---|
+| Temporary exports | Expire after an approved short period | Owner and retention policy |
+| Older raw data | Transition to an archive/infrequent tier | Recovery-time and cost review |
+| Noncurrent versions | Expire after approved retention | Recovery and audit review |
+| Incomplete multipart uploads | Abort after safe period | Transfer and retry requirements |
+
+This is a planning example, not a ready-to-deploy policy.
+
+## 81. Lifecycle review checklist
+
+Before enabling a rule, ask:
+1. Which prefix or tags does it match?
+2. Does it apply to current or noncurrent versions?
+3. Does it transition or expire objects?
+4. What happens to delete markers?
+5. What happens to incomplete multipart uploads?
+6. Does the rule conflict with retention or legal holds?
+7. How will the team test its effect?
+8. Who owns and approves the rule?
+
+Do not expire data merely because it is old or rarely queried.
+
+## 82. Versioning and overwrite
+
+Suppose `raw/orders/orders.csv` first contains 100 rows and is later uploaded again with 80 rows.
+
+Without versioning, the new object may replace the current object. With versioning enabled, S3 can retain the earlier version and make the new version current.
+
+Versioning supports recovery but increases storage when old versions are retained.
+
+## 83. Delete markers
+
+In a versioned bucket, a normal delete commonly adds a delete marker as the current version. Earlier versions may remain stored.
+
+Permanent deletion of a specific version is a separate operation requiring appropriate permission.
+
+Before recovery:
+1. confirm the bucket and exact key;
+2. identify the correct version;
+3. verify its time, size and business batch;
+4. confirm restore authority;
+5. promote/copy the version through the approved process;
+6. validate row counts and totals;
+7. record the recovery.
+
+Do not permanently delete versions just to make the bucket look tidy.
+
+---
+
+# Part 19 — Security and access review
+
+## 84. Encryption in transit and at rest
+
+- Encryption in transit protects data moving between systems, commonly through HTTPS/TLS.
+- Encryption at rest protects stored objects.
+- Server-side encryption is performed by the storage service according to the selected configuration.
+- Encryption does not replace access control.
+
+A principal authorized to retrieve an object may receive its decrypted contents through the service.
+
+## 85. KMS permission
+
+When a customer-managed KMS key is used, the role may need permission to use that key in addition to permission to read the S3 object.
+
+If an object request fails, check both object access and key access. Also review key policy and other applicable controls.
+
+## 86. Block Public Access
+
+S3 Block Public Access helps prevent public access to buckets and objects.
+
+For private company data, keep public access blocked unless a documented and reviewed use case requires otherwise.
+
+Never make a bucket public to fix an application AccessDenied error.
+
+## 87. IAM policy and bucket policy
+
+An IAM policy is attached to an identity such as a role. A bucket policy is attached to the bucket.
+
+Both may participate in authorization. Explicit denies, organization policies and other controls can also affect the result.
+
+Listing a prefix and reading a known object are different actions. A workload may be able to read a known key without permission to browse the bucket.
+
+## 88. Example role boundaries
+
+| Identity | Intended access |
+|---|---|
+| Ingestion role | Write to raw/orders |
+| Transformation role | Read raw/orders and write processed/orders |
+| Reporting role | Read curated/sales_daily |
+| General analyst | No raw customer data access by default |
+
+The actual policy must include the exact required actions, resource scopes, listing behavior, encryption access and service permissions.
+
+---
+
+# Part 20 — Use boto3 without hardcoding credentials
+
+## 89. What is boto3?
+
+boto3 is the AWS SDK for Python. It allows Python applications to call AWS services through supported APIs.
+
+The SDK uses the configured credential provider chain. It can use approved roles, SSO/profile configuration or other supported mechanisms.
+
+Never paste real access keys into a notebook or Python file.
+
+## 90. Install boto3
+
+Run in the terminal associated with the Python environment used by Jupyter:
+
+~~~bat
+python -m pip install boto3
+~~~
+
+Expected behavior: pip reports that boto3 and its dependencies were installed or are already installed. Exact output depends on package versions.
+
+If Jupyter cannot import boto3 after installation, the terminal and notebook may be using different Python environments. Check the notebook kernel's interpreter and install into that environment.
+
+## 91. Create an S3 client
+
+Run in a notebook cell:
+
+~~~python
+import boto3
+
+s3 = boto3.client("s3")
+
+print("S3 client created")
+~~~
+
+Expected output:
+
+~~~text
+S3 client created
+~~~
+
+This creates a client object. It does not prove that credentials are valid or that the identity can access a bucket.
+
+## 92. Upload a training file
+
+~~~python
+import boto3
+
+s3 = boto3.client("s3")
+
+s3.upload_file(
+    "orders_training.csv",
+    "your-approved-development-bucket",
+    "raw/orders/orders_training.csv"
+)
+
+print("Upload request completed")
+~~~
+
+Parameters:
+- first argument: local file path;
+- second argument: bucket name;
+- third argument: object key.
+
+The operation requires the local file, bucket, credentials, permissions, network path and encryption configuration to be correct.
+
+Do not run the template with an unknown bucket or production destination.
+
+## 93. Download a training file
+
+~~~python
+import boto3
+
+s3 = boto3.client("s3")
+
+s3.download_file(
+    "your-approved-development-bucket",
+    "raw/orders/orders_training.csv",
+    "downloaded_orders.csv"
+)
+
+print("Download request completed")
+~~~
+
+Parameters:
+- first argument: bucket;
+- second argument: object key;
+- third argument: local destination path.
+
+After download, validate size or checksum. A successful SDK call does not prove that the data is the correct business batch.
+
+## 94. Understand common SDK failures
+
+| Error category | Possible reason | Safe next check |
+|---|---|---|
+| No credentials | No identity configured | Follow approved SSO/role setup |
+| Expired token | Temporary credentials expired | Renew through approved login |
+| Access denied | Effective permissions insufficient | Inspect identity and bucket policies |
+| No such bucket | Wrong bucket/account | Verify bucket and active identity |
+| No such key | Incorrect key | Check exact spelling and case |
+| KMS denied | Key permission missing | Review key policy and role access |
+| Timeout | Network issue | Check DNS, route and endpoint |
+| Throttling | Request rate too high | Use bounded retry/backoff where safe |
+
+Permission failures generally need configuration correction, not endless retries. Log safe identifiers and error details, never secrets.
+
+---
+
+# Part 21 — Complete an upload verification workflow
+
+## 95. Requirements
+
+Upload one synthetic order file to a unique raw key and confirm that the downloaded bytes match the source.
+
+## 96. Step 1 — Prepare the source
+
+Confirm:
+- file writing is complete;
+- expected file name and format;
+- required columns;
+- expected row count;
+- nonzero size;
+- source batch ID.
+
+## 97. Step 2 — Select the destination key
+
+Example:
+
+~~~text
+raw/orders/ingest_date=2026-11-11/batch_id=orders_001/orders.csv
+~~~
+
+In a recurring pipeline, the date and batch ID must come from the actual run. Do not hardcode a stale date.
+
+## 98. Step 3 — Confirm identity and upload
+
+~~~bat
+aws sts get-caller-identity
+aws s3 cp orders_training.csv s3://your-approved-development-bucket/raw/orders/ingest_date=2026-11-11/batch_id=orders_001/orders.csv
+~~~
+
+Verify the identity before uploading.
+
+## 99. Step 4 — Inspect and download
+
+~~~bash
+aws s3api head-object --bucket your-approved-development-bucket --key raw/orders/ingest_date=2026-11-11/batch_id=orders_001/orders.csv
+~~~
+
+Then download to a new local file and compare its SHA-256 checksum with the source.
+
+## 100. Step 5 — Record actual evidence
+
+| Evidence | What to record |
+|---|---|
+| Source file | Actual file name |
+| Source row count | Count from validation |
+| Source size | Actual bytes |
+| Source checksum | Actual SHA-256 |
+| Destination bucket/key | Exact S3 location |
+| Active identity | Approved account and role |
+| Destination size | Actual object metadata |
+| Download checksum | Actual SHA-256 |
+| Result | Match or mismatch |
+| Run ID | Actual run identifier |
+
+Never fill evidence with invented values.
+
+## 101. Step 6 — Clean up safely
+
+Delete only the synthetic training object if the owner approves. If versioning is enabled, understand that a delete marker may be created and previous versions may remain.
+
+---
+
+# Part 22 — Troubleshooting scenarios
+
+| Symptom | Possible cause | First investigation |
+|---|---|---|
+| Unable to locate credentials | No supported identity configured | Approved SSO or role setup |
+| AccessDenied on upload | Missing object-write permission | Identity, bucket policy and explicit denies |
+| AccessDenied on download | Missing read or KMS permission | Object and key permissions |
+| NoSuchBucket | Wrong bucket or account | Verify bucket and caller identity |
+| NoSuchKey | Wrong key | Check exact key and capitalization |
+| Signature/region error | Wrong region/signing context | Confirm bucket region and CLI configuration |
+| Object in wrong prefix | Incorrect key | Inspect complete object key |
+| Download differs | Wrong key/version or incomplete process | Compare size and checksum |
+| Storage cost rises | Versions, requests or incomplete uploads | Inspect storage metrics and lifecycle |
+| Sync removes files | Destructive sync option or wrong direction | Stop, inspect command and recovery options |
+
+Do not grant broad access before identifying the actual failure layer.
+
+---
+
+# Part 23 — More practice exercises with worked answers
+
+## Exercise 9 — Same key upload
+
+A daily pipeline uploads every file to `raw/orders/orders.csv`. What is the risk?
+
+**Worked answer:** A later upload may replace the current object. Use a date/run-specific key or a deliberate versioning and overwrite strategy.
+
+## Exercise 10 — ETag
+
+A developer assumes every S3 ETag is the MD5 hash of the uploaded file. Is this safe?
+
+**Worked answer:** No. Multipart uploads and encryption configurations can change ETag behavior. Use a supported checksum mechanism for integrity verification.
+
+## Exercise 11 — Archive retrieval
+
+An archive must be retrievable within five minutes. Should the team choose a Glacier option based only on storage price?
+
+**Worked answer:** No. Confirm the exact retrieval option and expected restore time. Select a class that meets the recovery requirement.
+
+## Exercise 12 — Public access
+
+A pipeline receives AccessDenied on a private bucket. Should the engineer disable Block Public Access?
+
+**Worked answer:** No. Fix the workload identity, IAM policy, bucket policy, KMS permission or other actual access issue.
+
+## Exercise 13 — Version cost
+
+A 5 GB object is overwritten every day and every version is retained for a year. What should the team consider?
+
+**Worked answer:** Storage can grow because previous versions remain. Define noncurrent-version retention consistent with recovery and legal requirements.
+
+## Exercise 14 — Lifecycle conflict
+
+A lifecycle rule expires raw data after 30 days, but the business needs 90 days of replay history. What is wrong?
+
+**Worked answer:** The lifecycle rule conflicts with the replay requirement. Align retention with owners, recovery needs and legal policy before enabling expiration.
+
+## Exercise 15 — Multipart upload
+
+A large upload is interrupted. What should the team investigate?
+
+**Worked answer:** Determine whether the multipart upload completed, whether incomplete parts remain, and how retry or abort works. Configure safe cleanup for abandoned uploads.
+
+## Exercise 16 — Listing versus reading
+
+A role can read a known object but cannot list the prefix. Is object access necessarily broken?
+
+**Worked answer:** No. Listing and reading are distinct permissions. A workload may read a known key without browsing the prefix.
+
+## Exercise 17 — Upload success
+
+The CLI reports that upload succeeded. Can the pipeline mark the dataset as curated?
+
+**Worked answer:** No. Transfer success does not prove schema validity, business correctness or reconciliation. Processing and quality checks remain necessary.
+
+---
+
+# Part 24 — Day 52 practical completion checklist
+
+### S3 fundamentals
+- [ ] Explain buckets, objects, keys, prefixes and regions.
+- [ ] Explain why prefixes look like folders.
+- [ ] Distinguish upload, download, copy and sync.
+- [ ] Explain why object keys should include stable batch/date information.
+
+### Console and CLI
+- [ ] Locate S3 in the AWS Console.
+- [ ] Inspect an approved development bucket.
+- [ ] Upload and download a synthetic file safely.
+- [ ] Check the active identity with STS.
+- [ ] List a prefix with the CLI.
+- [ ] Upload and copy a training object.
+- [ ] Inspect object metadata.
+- [ ] Explain why recursive delete and sync-delete options are dangerous.
+
+### Storage management
+- [ ] Compare Standard, Intelligent-Tiering, infrequent-access and Glacier class families.
+- [ ] Explain retrieval time, retrieval charges and minimum duration.
+- [ ] Explain lifecycle transition and expiration.
+- [ ] Explain versioning and delete markers.
+- [ ] Explain incomplete multipart uploads and cleanup.
+
+### Security and reliability
+- [ ] Explain encryption in transit and at rest.
+- [ ] Explain KMS key permissions.
+- [ ] Explain Block Public Access.
+- [ ] Distinguish IAM and bucket policies.
+- [ ] Verify upload size and checksum.
+- [ ] Record object key, batch ID and run ID.
+- [ ] Explain safe recovery and deletion.
+
+### Python SDK
+- [ ] Explain what boto3 is.
+- [ ] Create an S3 client without hardcoding credentials.
+- [ ] Explain upload_file and download_file parameters.
+- [ ] Identify common SDK errors.
+- [ ] Explain why upload success is not data-quality success.
+
+## Final self-assessment
+
+Without looking at the notes, explain:
+
+1. What is the difference between an S3 bucket, object and key?
+2. Why should daily source files not all overwrite one object key?
+3. How do you verify that an upload reached the expected destination?
+4. Why is an ETag not always a file MD5 checksum?
+5. How do storage classes affect retrieval and cost?
+6. What can a lifecycle rule do?
+7. How does versioning help recovery, and why can it increase storage?
+8. Why should Block Public Access remain enabled for private data?
+9. What permissions may be required for an encrypted object?
+10. What evidence is needed before a pipeline marks an uploaded batch successful?
+
+If you can perform the safe upload/download exercise and explain the storage, security and recovery decisions, you are ready for Day 53.
+
+**Next lesson — Day 53: Cloud Database Fundamentals.** We will connect a data pipeline to a managed relational database and learn endpoints, ports, network access, credentials, TLS, connection testing and safe data movement.
