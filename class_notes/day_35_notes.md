@@ -1174,3 +1174,16 @@ You should be able to explain:
 Day 36 introduces batch processing and partitioning. You will learn how to process large datasets in manageable chunks, organize data into partitions, choose partition keys and understand the small-file and skew problems.
 
 **End of Day 35 class notes.**
+
+---
+
+## Visual Learning Diagrams
+
+### Data quality dimensions
+![Day 35 - Data quality dimensions](images/day_35_quality_dimensions.svg)
+
+### Profile → validate → clean
+![Day 35 - Profile → validate → clean](images/day_35_profile_validate_clean.svg)
+
+### Schema evolution compatibility
+![Day 35 - Schema evolution compatibility](images/day_35_schema_evolution.svg)
