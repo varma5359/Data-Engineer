@@ -123,6 +123,8 @@ If your trainer has already created the database, do not create it again. Just c
 
 ## 4. Understand SQL command categories
 
+![SQL command categories](images/day_20_sql_command_categories.svg)
+
 For this lesson, focus on two important categories.
 
 ### 4.1 DDL — Data Definition Language
@@ -281,6 +283,8 @@ Expected result: zero rows, because we created the table but have not inserted d
 ---
 
 ## 6. Add rules with constraints
+
+![How SQL constraints protect data](images/day_20_sql_constraints.svg)
 
 A table without constraints may accept records that do not make business sense.
 
@@ -572,6 +576,8 @@ DEFAULT is used when the column is omitted. Explicitly inserting NULL is differe
 ---
 
 ## 7. Insert data using INSERT
+
+![Create a table and work with its rows](images/day_20_create_insert_query_flow.svg)
 
 ### 7.1 Insert one row
 
