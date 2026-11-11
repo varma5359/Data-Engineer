@@ -439,3 +439,83 @@ A successful run must prove that output is durable and reconciliation passes.
 - [ ] Defend the database extractor project.
 
 **Remember:** Database ingestion is not just SELECT. It includes source protection, bounded reading, consistency, durable progress, replay and evidence.
+
+
+# 16. More guided execution cells (do not skip)
+
+## Cell A — Compare SQL count with Python count
+
+Run in SQL client:
+```sql
+SELECT COUNT(*) FROM orders;
+```
+Then run in Python:
+```python
+cursor.execute("SELECT COUNT(*) FROM orders")
+source_count = cursor.fetchone()[0]
+print("Source count:", source_count)
+```
+The two values must match when they use the same database/table and no filter. If they differ, verify database connection, permissions, transaction snapshot and query text.
+
+## Cell B — Explain a batch boundary
+
+For a table with 23 rows and batch_size=10, the loop returns 10,10,3,then 0. The empty batch is the stop signal; the final 3 rows are valid and must be written.
+
+| Fetch call | Returned rows | Running total |
+|---|---:|---:|
+| 1 | 10 | 10 |
+| 2 | 10 | 20 |
+| 3 | 3 | 23 |
+| 4 | 0 | 23 (stop) |
+
+## Cell C — Write batch progress safely
+
+For each batch, write rows to a temporary output and track batch number and row count. A checkpoint must represent only data that has been durably committed. If the file/database write is not durable, do not move the watermark.
+
+## Cell D — Demonstrate a duplicate replay
+
+Take a 3-row batch and write it twice to a plain append CSV. The file now has 6 rows: this demonstrates why append is not idempotent. For a daily full extract, write to a temporary file and replace only after validation. For database targets, use a stable key and a controlled upsert/merge.
+
+## Cell E — Explain a join multiplication risk
+
+Suppose one order has two order_items and three payment_attempts. Joining both child tables by order_id can create 2 × 3 = 6 rows for that order. Summing order amount after this join can multiply the amount. Inspect table grain, aggregate children first or query at the correct grain, and reconcile.
+
+## Cell F — Verify first/last key
+
+For a deterministic append-only extract, inspect MIN(order_id), MAX(order_id), count and distinct count. A range alone does not prove no gaps; compare expected key set or source/target reconciliation when required.
+
+## Cell G — Use query plan safely
+
+Ask the DBA or use EXPLAIN to understand scans/filters. EXPLAIN ANALYZE executes the query; do not casually run it on expensive production queries. Check index use and row estimates against actual workload.
+
+## Cell H — Empty table
+
+A source count of zero should produce a header-only output or an explicitly defined empty result. The pipeline must still record run date, source, zero rows and status. Do not treat empty fetch as a crash.
+
+# 17. Practical decision table
+
+| Situation | Junior engineer action | Evidence |
+|---|---|---|
+| Small source | fetchall may be acceptable | measured size/count |
+| Large source | bounded batches/server cursor | memory and batch metrics |
+| Append-only table | ID boundary may work | source guarantees append-only |
+| Mutable table | updated_at/CDC/change feed | update/delete test |
+| Tied timestamps | compound cursor | same-time test rows |
+| Replica source | monitor lag | applied position/lag metric |
+| Partial output | temp + validation | output count/hash |
+| Rerun | replay-safe write | duplicate test |
+| Query slow | plan/filters/index review | explain and duration |
+
+# 18. Additional student exercise
+
+Design extraction for 4 million orders updated throughout the day. Write a short plan that answers:
+- Which source change mechanism would you request and why?
+- How do you bound the initial load?
+- How do you avoid missing changes during initial snapshot handoff?
+- How do you fetch/write batches?
+- How do you capture deletes?
+- What is checkpoint order?
+- What reconciliation evidence is feasible?
+- How do you protect the source database?
+
+**Suggested reasoning:** Do not assume ID alone captures updates. Ask for snapshot/CDC handoff or documented updated timestamp/change feed. Use bounded reads, durable staging, idempotent merge, source-load controls, delete/tombstone policy and key/count/aggregate reconciliation. Exact architecture depends on DB and provider capabilities.
