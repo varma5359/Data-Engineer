@@ -1171,3 +1171,16 @@ Place the WHERE clause before GROUP BY.
 - [ ] I can validate foreign keys and measure calculations.
 
 **Next lesson — Day 42: Slowly Changing Dimensions.** We will learn how a warehouse handles customer and product attributes that change over time, using Type 1, Type 2 and Type 3 examples with effective dates and current-record indicators.
+
+---
+
+## Visual Learning Diagrams
+
+### Warehouse layers
+![Day 41 - Warehouse layers](images/day_41_warehouse_layers.svg)
+
+### Fact and dimension tables
+![Day 41 - Fact and dimension tables](images/day_41_fact_dimension.svg)
+
+### Star schema
+![Day 41 - Star schema](images/day_41_star_schema.svg)
