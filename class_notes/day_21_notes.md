@@ -170,6 +170,8 @@ SQL is declarative. You describe the result you want; the database engine choose
 
 ## 5. SELECT: choose the columns
 
+![How a SQL query retrieves data](images/day_21_sql_query_execution.svg)
+
 ### 5.1 Return one column
 
 Task: The manager wants only customer names.
@@ -592,6 +594,8 @@ ILIKE is PostgreSQL-specific. MySQL's default case behavior depends on the colla
 
 ## 12. NULL: understand missing or unknown values
 
+![SQL NULL filtering](images/day_21_sql_null_filtering.svg)
+
 NULL is not the number zero. NULL is not an empty string. NULL means the value is missing or unknown.
 
 SQL cannot test NULL using = NULL.
@@ -846,6 +850,8 @@ A JOIN combines rows based on a relationship condition.
 
 ## 17. INNER JOIN: return matching rows only
 
+![SQL JOIN types and which rows remain](images/day_21_sql_join_types.svg)
+
 Think of INNER JOIN as: "Show me records where the relationship exists in both tables."
 
 ### 17.1 First INNER JOIN
@@ -1061,6 +1067,8 @@ RIGHT JOIN is valid SQL, but a LEFT JOIN rewrite often makes query flow easier t
 ---
 
 ## 20. Understand JOIN row counts before writing reports
+
+![Understand JOIN cardinality](images/day_21_sql_join_cardinality.svg)
 
 A JOIN does not always return the same number of rows as either input table.
 
