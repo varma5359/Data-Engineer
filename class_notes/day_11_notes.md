@@ -44,6 +44,8 @@ A `for` loop obtains each value automatically.
 
 ## 4. What is an iterator?
 
+![Iterable, iterator and generator](images/day_11_iterable_iterator_generator.svg)
+
 An iterator remembers its current position and returns the next item when requested.
 
 ```python
@@ -112,6 +114,8 @@ Calling the generator function creates a generator object. Its body runs as valu
 
 ## 7. Compare return and yield
 
+![List versus generator](images/day_11_generator_vs_list.svg)
+
 `return` finishes a function and sends back its result. `yield` produces a value while preserving the generator's state so it can continue later.
 
 ```python
@@ -137,6 +141,8 @@ Expected output:
 The displayed values look the same after converting the generator to a list. The difference is how the values are produced and stored.
 
 ## 8. Lazy evaluation
+
+![Lazy batch processing of a large file](images/day_11_lazy_batch_processing.svg)
 
 Lazy evaluation means a value is produced only when it is requested.
 
