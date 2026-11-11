@@ -225,6 +225,8 @@ order_id,customer,amount,status
 
 ## 8. Understand file modes
 
+![File paths and file modes](images/day_08_file_paths_and_modes.svg)
+
 | Mode | Behavior | Important caution |
 |---|---|---|
 | `r` | Read existing file | Fails if file is missing |
@@ -391,6 +393,8 @@ The file paths created so far, including the output and archive files. The exact
 - `is_file()` excludes folders.
 
 ## 13. Process multiple text files
+
+![Read, process and write files](images/day_08_read_process_write.svg)
 
 Create two incoming files:
 
