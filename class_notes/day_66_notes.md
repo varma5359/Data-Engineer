@@ -364,3 +364,16 @@ Pinning improves repeatability. Images are built from layers; Docker can reuse u
 - [ ] Explain image security and dependency pinning.
 
 **Next lesson — Day 67: CI/CD and Automated Pipeline Testing.** You will create automated checks for pipeline code and learn how GitHub Actions validates changes before release.
+
+---
+
+## Visual Learning Diagrams
+
+### Docker image vs container
+![Day 66 - Docker image vs container](images/day_66_docker_image_container.svg)
+
+### Build and run workflow
+![Day 66 - Build and run workflow](images/day_66_docker_build_run.svg)
+
+### Container application layers
+![Day 66 - Container application layers](images/day_66_docker_container_layers.svg)
