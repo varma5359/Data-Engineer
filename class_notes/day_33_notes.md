@@ -1473,3 +1473,16 @@ You should be able to explain:
 Day 34 focuses on data transformation and business rules. After data is extracted, a Data Engineer must standardize values, derive useful fields, apply approved business logic and keep rejected data visible.
 
 **End of Day 33 class notes.**
+
+---
+
+## Visual Learning Diagrams
+
+### Read-only database extraction
+![Day 33 - Read-only database extraction](images/day_33_db_extract_readonly.svg)
+
+### Database connection parts
+![Day 33 - Database connection parts](images/day_33_db_connection_parts.svg)
+
+### Consistent extraction cutoff
+![Day 33 - Consistent extraction cutoff](images/day_33_db_snapshot_consistency.svg)
