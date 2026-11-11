@@ -1592,3 +1592,16 @@ Without looking at the notes, explain:
 If you can explain the distributed sales workflow and reproduce the local partition experiment, you are ready for Day 55.
 
 **Next lesson — Day 55: Apache Spark Fundamentals.** We will install or access a suitable Spark environment, understand the driver and executors, create a SparkSession, load a dataset into a DataFrame, inspect its schema and rows, and understand what happens when a Spark action runs.
+
+---
+
+## Visual Learning Diagrams
+
+### Sequential, parallel and distributed
+![Day 54 - Sequential, parallel and distributed](images/day_54_sequential_parallel_distributed.svg)
+
+### Distributed job components
+![Day 54 - Distributed job components](images/day_54_distributed_components.svg)
+
+### Distributed failure recovery
+![Day 54 - Distributed failure recovery](images/day_54_distributed_failure.svg)
