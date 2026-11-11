@@ -1,235 +1,74 @@
-# Day 35 Interview Preparation: Data Cleaning and Schema Evolution
+# Day 35 Interview Guide — Data Cleaning and Schema Evolution
 
-**Mini-project:** Data Cleaning Framework  
-**Target:** Fresher / Junior Data Engineer  
-**Method:** Answer aloud first; compare with the model answer; then connect it to your project.
+**Project:** TechStore Data Cleaning Framework  
+Practice each answer aloud, then point to project evidence.
 
----
+## 1. What is data cleaning?
+Data cleaning identifies quality problems and applies approved rules to correct, standardize, reject or quarantine records. It is not simply deleting rows or filling every null. In TechStore we normalize status, parse amounts, validate IDs and retain rejected records with reasons.
 
-# 1. Core concepts — complete model answers
+**Follow-up — prove no data disappeared:** Reconcile input count against accepted plus rejected, then inspect rule-level counts.
 
-## 1. What is schema drift?
+## 2. Profiling vs validation vs cleaning
+Profiling describes data before changes (shape, types, nulls, duplicates, ranges). Validation checks a rule and reports pass/fail. Cleaning applies the approved action. Profile first to preserve baseline evidence.
 
-**Model answer:** Unexpected incoming structure change, such as rename/removal/type change.
+## 3. What is schema?
+The agreed structure of a dataset: field names, types, requiredness and constraints, often including meaning and relationships. It is the interface between producer and consumer.
 
-**Follow-up:** Give a concrete example from Data Cleaning Framework; state what evidence proves your answer.
+## 4. Schema drift vs evolution
+Drift is an unexpected difference from the contract. Evolution is a planned, versioned change with compatibility and consumer impact assessed. A surprise rename is drift; an approved rename with migration and tests is evolution.
 
-## 2. What is schema evolution?
+## 5. How detect a renamed column?
+Compare received names/types with the contract. A rename appears as missing expected plus extra received field. Confirm semantics with source owner, document mapping and test downstream. Never infer equivalence from spelling alone.
 
-**Model answer:** Controlled, versioned schema change with compatibility and consumer impact assessed.
+## 6. Is adding a column always backward-compatible?
+No. Name-based consumers that ignore unknown optional fields may tolerate it; strict validators and positional readers may fail. Added required fields can break old producers. Test consumers.
 
-**Follow-up:** Give a concrete example from Data Cleaning Framework; state what evidence proves your answer.
+## 7. What is a data contract?
+An agreement on structure, field meaning, types, requiredness, quality, delivery, ownership and change process. It prevents surprise changes and clarifies response responsibilities.
 
-## 3. What is data contract?
+## 8. How handle nulls?
+Understand whether null means unknown, not applicable, not collected or source defect. Define field-specific policy: required IDs may be rejected; optional values may remain null; defaults need business meaning. Zero is not the same as unknown.
 
-**Model answer:** Agreement on fields, types, semantics, quality, delivery, ownership and change process.
+## 9. How identify duplicates?
+Define business/event identity and source semantics first. Same key may be retransmission, update or legitimate multiple event. Determine authoritative version/time using approved rules; preserve conflicts for investigation. Identical payload does not always mean duplicate.
 
-**Follow-up:** Give a concrete example from Data Cleaning Framework; state what evidence proves your answer.
+## 10. What is quarantine?
+A controlled location for records that cannot safely be accepted. Retain original values, reasons, source/run metadata and replay context. Apply access and retention controls.
 
-## 4. How detect schema drift?
+## 11. Why preserve raw data?
+It is evidence of what source sent; supports audit, debugging, replay and comparison after rule changes. Curated outputs must be separate.
 
-**Model answer:** Compare received columns/types/nullability/version with approved contract.
+## 12. How clean amount?
+Inspect source values and types; parse safely; count conversion failures; apply domain constraints. Negative amounts can be refunds/reversals, so consult business semantics. Preserve original value and rejection reason.
 
-**Follow-up:** Give a concrete example from Data Cleaning Framework; state what evidence proves your answer.
+## 13. Idempotency?
+Repeated processing of the same source should not create duplicate/inconsistent effects. Use stable source identity, run IDs, keys, deterministic outputs and safe overwrite/merge policy. It matters for retry/replay.
 
-## 5. What is additive change?
+## 14. Backward vs forward compatibility?
+Backward: newer producer/schema remains usable by existing consumers under rules. Forward: older consumer can handle newer producer data. Neither is automatic; unknown fields, required fields and type changes may break.
 
-**Model answer:** Adding a field; compatible only if consumers tolerate it and field is optional/defaulted.
+## 15. Handle breaking schema change in production
+Stop/quarantine affected batch if unsafe; capture schema diff and samples; notify owner/consumers; agree mapping or contract version; test old/new; deploy in controlled order; replay safely; reconcile and document approval.
 
-**Follow-up:** Give a concrete example from Data Cleaning Framework; state what evidence proves your answer.
+## 16. Prove project works
+Show raw input, profile, rules, accepted/rejected outputs, reason codes, assertions, schema-drift simulation and reconciliation. Explain each record. Notebook success alone is not correctness proof.
 
-## 6. Why rename is breaking?
+## 17. Improve for production
+Multiple reject reasons, versioned contracts, immutable raw storage, structured run metadata, secure quarantine, configurable rules, automated tests, alerts, bounded processing and safe replay. Separate business policy from implementation.
 
-**Model answer:** Consumers expect old name; rename appears as missing plus extra and breaks mapping.
+## 18. Scenario: supplier adds a field
+Compare schemas; confirm optionality, meaning and type; assess consumers. If approved, update contract/version and tests. Otherwise stop/quarantine according to severity and contact owner.
 
-**Follow-up:** Give a concrete example from Data Cleaning Framework; state what evidence proves your answer.
+## 19. Scenario: same ID, different amount
+Do not keep first automatically. Inspect event/version/update time and source semantics. It may be update/correction or defect. Preserve evidence, apply approved authoritative rule or quarantine conflict, and report.
 
-## 7. What is backward compatibility?
+## 20. Scenario: accepted records suddenly fall
+Compare input/accepted/rejected and group rejection reasons. Check schema, nulls, conversion, duplicate rules and recent changes. Identify source vs pipeline cause, communicate impact, correct and replay safely.
 
-**Model answer:** New version remains usable by older consumers under agreed rules.
+## 21. 90-second project explanation
+“I built a TechStore order cleaning pipeline. It preserves raw data, profiles row counts/types/nulls/duplicates, and applies explicit rules for required IDs, amount parsing, status normalization and duplicate identity. Rows are accepted or rejected with reasons. I reconcile input with accepted plus rejected, write separate outputs, reload them and run assertions. I also simulate a supplier rename to demonstrate drift detection. The key design choice is not to silently delete or guess values; every decision is traceable.”
 
-**Follow-up:** Give a concrete example from Data Cleaning Framework; state what evidence proves your answer.
+## Answer quality checklist
+Definition → why it matters → concrete example → risk/decision → proof/test → failure handling.
 
-## 8. How define duplicates?
-
-**Model answer:** Use business/event identity, not all columns; identical payloads can be legitimate separate events.
-
-**Follow-up:** Give a concrete example from Data Cleaning Framework; state what evidence proves your answer.
-
-## 9. How handle missing values?
-
-**Model answer:** Field-level policy: preserve NULL, meaningful default, reject required missing, or approved imputation.
-
-**Follow-up:** Give a concrete example from Data Cleaning Framework; state what evidence proves your answer.
-
-## 10. Why profile data?
-
-**Model answer:** Measure nulls, distinct values, ranges, duplicates and distributions before cleaning.
-
-**Follow-up:** Give a concrete example from Data Cleaning Framework; state what evidence proves your answer.
-
-## 11. What is quarantine?
-
-**Model answer:** Controlled holding area preserving evidence/reason for investigation and replay.
-
-**Follow-up:** Give a concrete example from Data Cleaning Framework; state what evidence proves your answer.
-
-## 12. What is schema registry?
-
-**Model answer:** Central schema/version and compatibility rules, often for event/message formats.
-
-**Follow-up:** Give a concrete example from Data Cleaning Framework; state what evidence proves your answer.
-
-## 13. How handle type change?
-
-**Model answer:** Assess semantics/consumers, define migration/cast, version contract and test both; no silent arbitrary cast.
-
-**Follow-up:** Give a concrete example from Data Cleaning Framework; state what evidence proves your answer.
-
-## 14. Should unknown columns reject?
-
-**Model answer:** Capture and alert; tolerate additive fields only when contract/consumer allow.
-
-**Follow-up:** Give a concrete example from Data Cleaning Framework; state what evidence proves your answer.
-
-## 15. What is idempotent dedup?
-
-**Model answer:** Repeated application yields same result; identity and winner rule deterministic.
-
-**Follow-up:** Give a concrete example from Data Cleaning Framework; state what evidence proves your answer.
-
-## 16. What is quality rule?
-
-**Model answer:** Not-null, uniqueness, range, referential integrity or accepted values.
-
-**Follow-up:** Give a concrete example from Data Cleaning Framework; state what evidence proves your answer.
-
-## 17. How clean phone numbers?
-
-**Model answer:** Normalize with country/context rules; retain original and avoid assumptions.
-
-**Follow-up:** Give a concrete example from Data Cleaning Framework; state what evidence proves your answer.
-
-## 18. What is schema version?
-
-**Model answer:** Identifier for structure/meaning version enabling controlled migration.
-
-**Follow-up:** Give a concrete example from Data Cleaning Framework; state what evidence proves your answer.
-
-## 19. How test evolution?
-
-**Model answer:** Test old/new fixtures, optional/additive fields and breaking changes downstream.
-
-**Follow-up:** Give a concrete example from Data Cleaning Framework; state what evidence proves your answer.
-
-## 20. Defend cleaning framework.
-
-**Model answer:** Explain contract checks, profiling, duplicate keys, null policy, quarantine, versions, metrics and replay.
-
-**Follow-up:** Give a concrete example from Data Cleaning Framework; state what evidence proves your answer.
-
-
----
-
-# 2. Scenario questions
-
-## 21. What if required field disappears?
-
-**Strong answer structure:** clarify requirement/source behavior; identify data-loss/duplicate/quality/security/performance risk; state exact control; explain failure/recovery; name verification metric. Do not say only “I will handle it”—describe the boundary, key, rule, retry/checkpoint and test.
-
-## 22. How roll out rename?
-
-**Strong answer structure:** clarify requirement/source behavior; identify data-loss/duplicate/quality/security/performance risk; state exact control; explain failure/recovery; name verification metric. Do not say only “I will handle it”—describe the boundary, key, rule, retry/checkpoint and test.
-
-## 23. What is breaking change?
-
-**Strong answer structure:** clarify requirement/source behavior; identify data-loss/duplicate/quality/security/performance risk; state exact control; explain failure/recovery; name verification metric. Do not say only “I will handle it”—describe the boundary, key, rule, retry/checkpoint and test.
-
-## 24. How preserve unknown columns?
-
-**Strong answer structure:** clarify requirement/source behavior; identify data-loss/duplicate/quality/security/performance risk; state exact control; explain failure/recovery; name verification metric. Do not say only “I will handle it”—describe the boundary, key, rule, retry/checkpoint and test.
-
-## 25. How replay after mapping fix?
-
-**Strong answer structure:** clarify requirement/source behavior; identify data-loss/duplicate/quality/security/performance risk; state exact control; explain failure/recovery; name verification metric. Do not say only “I will handle it”—describe the boundary, key, rule, retry/checkpoint and test.
-
-
----
-
-# 3. Project defence — Data Cleaning Framework
-
-## 90-second project answer
-
-“My project is Data Cleaning Framework. It solves this business problem: A supplier renames customer_id to customerId and adds a field. Detect and manage schema changes rather than silently misinterpreting them. I define the source contract and record identity, read data in controlled units, validate structure/business rules, process valid records, isolate invalid data, persist safely and verify counts/keys/values. I record run metadata and progress only after durable success. I test duplicates, boundary cases and failures so reruns are safe. For production I would add managed secrets, least-privilege access, automated tests, scheduling, monitoring/alerts, scale tests and a runbook.”
-
-## 1. Why choose this project?
-
-**Answer:** It models a recurring Data Engineering responsibility and demonstrates more than a happy-path script.
-
-## 2. What is the source contract?
-
-**Answer:** Documented fields, types, required values, identity, delivery behavior and change expectations; I validate before processing.
-
-## 3. How prove output correctness?
-
-**Answer:** Reconcile counts, accepted/rejected totals, unique keys, business totals and source boundary.
-
-## 4. What if job fails halfway?
-
-**Answer:** Inspect last durable safe point, replay uncertain input idempotently, reconcile, then advance progress.
-
-## 5. How prevent duplicates?
-
-**Answer:** Stable business/event key, unique constraint or idempotency token and deterministic deduplication.
-
-## 6. Largest limitation?
-
-**Answer:** Classroom version uses small data and simplified infrastructure; production needs scale tests, secret management, concurrency and monitoring.
-
-## 7. First improvement?
-
-**Answer:** Automated boundary/failure tests, structured run metadata, alerting and repeatable deployment/runbook.
-
----
-
-# 4. Practical interview exercise
-
-- Draw source, validation, processing, destination, rejected path, checkpoint and monitoring. Label when progress becomes safe.
-- Job processed 800 records, persisted 700, then crashed. Explain state inspection, retry, duplicate prevention and success checks.
-- Compare classroom and production: scale, security, concurrency, retries, contract, observability and cost.
-- Identify in your code: validation, error handling, persistence, progress and correctness verification. If absent, state limitation and next step.
-
-# 5. Interview traps
-
-- “HTTP 200 means correct data.”
-- “I retry every error.”
-- “I use timestamp” without ties/late records/deletes.
-- “I remove duplicates” without identity key.
-- “Job succeeded” without counts/reconciliation.
-- “Exactly once” without mechanism/failure window.
-- “I log everything” including secrets/PII.
-- “Production-ready” based only on a local happy-path run.
-
-# 6. Short revision answers
-
-- **What is schema drift?** Unexpected incoming structure change, such as rename/removal/type change.
-- **What is schema evolution?** Controlled, versioned schema change with compatibility and consumer impact assessed.
-- **What is data contract?** Agreement on fields, types, semantics, quality, delivery, ownership and change process.
-- **How detect schema drift?** Compare received columns/types/nullability/version with approved contract.
-- **What is additive change?** Adding a field; compatible only if consumers tolerate it and field is optional/defaulted.
-- **Why rename is breaking?** Consumers expect old name; rename appears as missing plus extra and breaks mapping.
-- **What is backward compatibility?** New version remains usable by older consumers under agreed rules.
-- **How define duplicates?** Use business/event identity, not all columns; identical payloads can be legitimate separate events.
-
-# 7. Readiness checklist
-
-- [ ] Core answers explained without reading.
-- [ ] One business example connected.
-- [ ] End-to-end flow drawn.
-- [ ] Failure and recovery explained.
-- [ ] Key/checkpoint choice defended.
-- [ ] Correctness checks named.
-- [ ] Limitations stated honestly.
-- [ ] Production improvements discussed.
-
-**Interview goal:** explain decision + reason + failure mode + verification, not just tool name.
+Avoid vague answers like “I remove nulls” or “I drop duplicates” without a business rule.
