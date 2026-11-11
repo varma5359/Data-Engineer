@@ -1,88 +1,162 @@
 # Day 44 Interview Guide — Data Marts and Subject-Oriented Modeling
 
+**Interview goal:** Turn business questions into a governed analytical product and defend its grain, metrics, relationships and quality.
+
 ## 1. What is a data mart?
 
-A data mart is a focused analytical area organized around a business subject such as sales, finance, marketing or inventory. It exposes trusted data for a specific group of users or decisions. It may be implemented as a schema, model set or logical area inside a larger warehouse.
+A data mart is a focused analytical area organized around a subject—sales, finance, inventory or marketing—and designed for a defined group of users or decisions. It can be a schema, a set of warehouse models or a logical presentation area; it does not necessarily require a separate server.
 
-## 2. What does subject-oriented modeling mean?
+**Example:** A sales mart exposes paid sales, order counts, product categories, customer regions and sales channels without requiring a sales manager to understand every source-system table.
 
-It means organizing analytical data around business topics and questions rather than copying the source application's table structure. For example, a sales mart combines the relevant order, product, customer, date and channel information for sales analysis.
+## 2. What is subject-oriented modeling?
 
-## 3. What is the difference between a warehouse and a mart?
+It organizes data around business questions rather than mirroring source application structures.
 
-A warehouse is the broader integrated analytical environment across business domains. A mart is a focused subject area that serves a team or use case. A mart often uses shared warehouse data and definitions.
+Source-oriented: customer application table, order application table, payment table.  
+Subject-oriented: sales performance, customer behavior, payment performance.
 
-## 4. What is a dependent data mart?
+The subject drives the metrics, grain and dimensions.
 
-A dependent mart is built from an integrated enterprise warehouse. It can reuse shared dimensions, keys and business definitions, making cross-domain consistency easier.
+## 3. Warehouse versus mart?
 
-## 5. What is an independent data mart?
+The warehouse is the broad integrated analytical environment across domains. A mart is a focused area serving a subject or use case, often built from warehouse data. A mart should reuse enterprise definitions rather than invent a conflicting revenue calculation.
 
-An independent mart is built directly from source systems rather than from a shared enterprise warehouse. It may deliver an isolated requirement quickly but can duplicate ingestion and business logic and create conflicting definitions.
+## 4. Dependent versus independent mart?
 
-## 6. What is a conformed dimension?
+A **dependent mart** is built from an integrated warehouse. It can reuse conformed dimensions, keys and governed metrics.
 
-A conformed dimension is shared consistently by multiple facts or marts. For example, sales and inventory models may use the same product dimension and category definitions. The business meaning and key mapping must truly be shared.
+An **independent mart** ingests directly from source systems. It may be quicker for a narrow request but risks duplicated pipelines, inconsistent definitions and isolated data silos.
 
-## 7. What is a semantic layer?
+I would generally prefer dependent marts when an enterprise warehouse and governed models exist.
 
-A semantic layer presents business-friendly concepts and governed metric definitions over underlying data models. It helps users reuse consistent calculations such as paid sales, active customers and refund rate rather than recreating them differently in each report.
+## 5. What is a conformed dimension?
 
-## 8. What is a metric contract?
+A dimension whose attributes and business meaning are consistent across facts/marts. Sales and inventory may both use a product dimension.
 
-A metric contract documents a metric's name, business definition, grain, formula, filters, date role, owner, refresh expectation and known limitations. It prevents different reports from using the same label for different calculations.
+Conformance is not merely having tables with the same column names. Product identity, category definitions, keys and change handling must be aligned.
 
-## 9. Why should business questions come before table design?
+## 6. What is a semantic layer?
 
-The questions reveal the required metrics, dimensions, time roles, users and decisions. Designing tables first can produce a model that is technically valid but cannot answer the real business question or uses the wrong grain.
+A semantic layer exposes business-friendly dimensions and governed metrics on top of data models. It can help BI users reuse definitions such as Paid Sales or Active Customer rather than independently recreating them.
 
-## 10. Why might sales and refunds use separate fact tables?
+It does not repair incorrect data, incorrect grain or bad metric definitions underneath.
 
-They represent different business processes and may have different grains. One order line can have multiple refund events. Joining them carelessly can multiply sales rows and overstate totals. Separate facts can share dimensions and be reconciled using clear business rules.
+## 7. What is a metric contract?
 
-## 11. Why is COUNT(*) not always the order count?
+A metric contract specifies:
+- metric name and business meaning;
+- formula and grain;
+- eligible records and exclusions;
+- date role;
+- currency/unit;
+- owner and approval;
+- refresh/freshness expectation;
+- known limitations and version history.
 
-A sales fact may have one row per order line. An order with three lines contributes three rows. To count orders, use a distinct order identifier or a model whose grain is one row per order.
+**Example:** Paid Sales = sum of eligible paid sales-line amounts, after the approved discount treatment, in the reporting currency. Refunds are reported separately unless the business explicitly defines net sales.
 
-## 12. How do you design a sales mart?
+## 8. Why define grain before writing SQL?
 
-I clarify the users and decisions, define sales and refund metrics, choose the reporting date, identify source systems, declare fact grain, select dimensions, reuse conformed dimensions, build presentation models, validate totals and document ownership and freshness.
+Grain is what one row represents. If sales fact is one row per order line, an order with three lines contributes three rows. COUNT(*) is line count, not order count.
 
-## 13. What is mart ownership?
+Grain determines:
+- which measures can be summed;
+- which keys identify a row;
+- how joins behave;
+- how counts are calculated;
+- how facts can be combined safely.
 
-Business ownership defines the meaning and acceptable use of the data. Technical ownership maintains the models, pipelines, tests, documentation and operational behavior. Both are important.
+A grain mismatch can inflate metrics even when SQL runs successfully.
 
-## 14. Scenario: two departments show different sales totals.
+## 9. Why keep sales and refund facts separate?
 
-I compare metric definitions, grain, date role, filters, refunds, cancellations and currency rules. I trace both reports to their underlying models and identify where the definitions diverge. I would agree one governed definition with the business owner and make reports reuse it.
+They represent different events and often have different grains and dates. One sales line can have multiple partial refund events, and refunds may occur after the sale.
 
-## 15. Scenario: adding refunds doubles sales.
+Joining raw refund events directly to sales lines can repeat the sales amount. Keep separate facts, share appropriate dimensions, aggregate at compatible grains and define whether refunds are analyzed by refund date or original order date.
 
-I would inspect the join cardinality and grain. A sales line may match multiple refund events, multiplying the sales amount. I would keep separate facts or aggregate refunds to a compatible grain before combining them, then reconcile totals.
+## 10. How do you count orders from an order-line fact?
 
-## 16. Scenario: the CEO needs sales by category and inventory by category.
+Use COUNT(DISTINCT order_id) for the eligible population, or use a separate order-grain model. COUNT(*) counts sales lines. Confirm whether partially paid, cancelled or split orders qualify.
 
-I would use a conformed product dimension if both processes share the same product identity and category definitions. I would keep sales and inventory as separate facts because their grains and measures differ.
+## 11. How do you design a sales mart from a request?
 
-## 17. Explain your Day 44 sales mart.
+I would:
+1. identify users and decisions;
+2. capture reporting questions;
+3. agree metric definitions and date roles;
+4. declare fact grain;
+5. identify fact processes and dimensions;
+6. reuse conformed dimensions;
+7. build a presentation model/view;
+8. validate keys, row counts and metric totals;
+9. document ownership, freshness, access and limitations.
 
-I translated sales reporting questions into metrics and dimensions, declared the sales fact grain, identified date, product, customer and channel dimensions, separated refund events, and documented the metric definitions, owners, refresh expectations and validation checks. I then built a reporting model and reconciled its totals.
+## 12. How do you validate a mart?
 
-## Interview traps
+- Reconcile eligible source and mart totals with identical filters.
+- Check fact grain and distinct business keys.
+- Check dimension key uniqueness and unmatched relationships.
+- Compare row counts before/after joins to detect fan-out.
+- Verify metric definitions and date roles.
+- Confirm source completeness and refresh freshness.
+- Test representative business questions against known examples.
 
-- Calling every subject-area schema a separate warehouse.
-- Building a mart by copying source tables without business definitions.
-- Duplicating dimensions that should be conformed.
-- Joining facts with incompatible grains.
-- Confusing line count with order count.
-- Assuming a semantic layer fixes incorrect underlying data.
-- Publishing a mart without owner or freshness expectation.
+Equal totals alone are not sufficient: two errors can cancel each other.
+
+## 13. Scenario: Finance and Sales report different revenue.
+
+I compare their definitions, grain, filters, date roles, discounts, cancellations, refunds, currency and source populations. I trace each report to its model, quantify the difference, and work with metric owners to agree one governed definition. Then I update reusable models/tests and communicate the change rather than silently changing one dashboard.
+
+## 14. Scenario: joining refunds doubled sales.
+
+A sale line probably matched multiple refund events, multiplying the sale amount. I inspect join cardinality and row counts, keep the facts separate or aggregate refund events to a compatible grain, and reconcile sales and refund totals independently.
+
+## 15. Scenario: CEO wants sales and inventory by category.
+
+Use a conformed product/category dimension if identity and category definitions are shared. Keep sales and inventory facts separate: sales may be order-line grain; inventory may be product-location-snapshot grain. Do not directly join raw facts at incompatible grains and sum both measures.
+
+## 16. Scenario: source is missing but mart refresh succeeded.
+
+A successful SQL job is not proof of complete data. I check expected source delivery, source row counts and freshness. If a critical source is absent, the quality gate should block or clearly mark the mart as incomplete according to the agreed SLA.
+
+## 17. Explain your Day 44 Sales Mart project.
+
+"I translated sales questions into a metric contract, defined sales-line and refund-event grains, selected relevant dimensions and reused warehouse keys. I built a reporting view, validated totals with identical eligibility filters, checked dimension uniqueness and join fan-out, and documented metric ownership, refresh and limitations."
+
+**Evidence:** metric contract, grain statements, mart diagram, SQL output, source-to-mart reconciliation, key checks and documented refund treatment.
+
+## 18. Interview traps
+
+- Building tables before understanding decisions.
+- Treating a mart as a copy of source tables.
+- Using COUNT(*) for orders on a line-grain fact.
+- Joining facts at incompatible grains.
+- Assuming a semantic layer guarantees correctness.
+- Comparing totals with different filters or date roles.
+- Publishing without freshness, owner or metric definition.
+
+## 19. Practice questions with answers
+
+**Q1.** An order has four sales lines. What does COUNT(*) return for that order's lines?  
+**Answer:** Four. Order count requires distinct order IDs or order-grain data.
+
+**Q2.** Can sales and refunds be summed after a raw join?  
+**Answer:** Not safely; multiple refunds can multiply sale rows. Aggregate separately at compatible grain.
+
+**Q3.** What makes a product dimension conformed?  
+**Answer:** Shared identity, meaning, keys and governed attributes—not just similar columns.
+
+**Q4.** Why can two reports show different sales?  
+**Answer:** Different definitions, populations, date roles, filters, currency or grain.
+
+**Q5.** What does equal source/mart total prove?  
+**Answer:** It is one reconciliation signal, not complete correctness; validate grain, keys, filters and representative records too.
 
 ## Readiness checklist
 
-- [ ] Explain warehouse versus mart.
-- [ ] Explain dependent versus independent marts.
+- [ ] Explain warehouse, mart and semantic layer.
+- [ ] Define a metric contract and grain.
+- [ ] Defend sales/refund fact separation.
 - [ ] Explain conformed dimensions.
-- [ ] Define a metric contract.
-- [ ] Defend separate facts for separate processes.
-- [ ] Explain the sales mart grain and validation.
+- [ ] Diagnose fan-out and order-count errors.
+- [ ] Present mart validation evidence and ownership.
