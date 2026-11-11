@@ -842,3 +842,16 @@ Small metadata such as identifiers, paths and counts. Large datasets should rema
 - [ ] Explain why Airflow does not replace Spark, Kafka, S3 or a warehouse.
 
 **Next lesson — Day 61: Airflow DAGs and Tasks.** You will create your first practical DAG, define tasks, use operators and dependencies, run a Python-based workflow and inspect task output.
+
+---
+
+## Visual Learning Diagrams
+
+### Workflow DAG
+![Day 60 - Workflow DAG](images/day_60_orchestration_dag.svg)
+
+### Orchestration retry behavior
+![Day 60 - Orchestration retry behavior](images/day_60_orchestration_retry.svg)
+
+### Schedule vs dependency
+![Day 60 - Schedule vs dependency](images/day_60_orchestration_schedule.svg)
