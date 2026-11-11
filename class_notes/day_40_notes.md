@@ -1668,3 +1668,16 @@ Before moving to Day 41, confirm that you can:
 - [ ] Identify at least five architecture risks and controls.
 
 **Next lesson — Day 41: Fact and Dimension Tables.** We will design a sales model from a business scenario, declare its grain, create fact and dimension tables, and compare Star Schema with Snowflake Schema using runnable SQL and expected outputs.
+
+---
+
+## Visual Learning Diagrams
+
+### Data warehouse architecture
+![Day 40 - Data warehouse architecture](images/day_40_warehouse_architecture.svg)
+
+### Operational database vs warehouse
+![Day 40 - Operational database vs warehouse](images/day_40_operational_vs_warehouse.svg)
+
+### Batch vs streaming
+![Day 40 - Batch vs streaming](images/day_40_batch_stream_timeline.svg)
