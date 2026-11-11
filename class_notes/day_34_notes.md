@@ -1148,3 +1148,16 @@ You should be able to explain:
 Day 35 focuses on data cleaning and schema evolution. You will learn how to profile dirty datasets, handle duplicates and missing values, detect changes in incoming columns, and manage schema changes without silently breaking the pipeline.
 
 **End of Day 34 class notes.**
+
+---
+
+## Visual Learning Diagrams
+
+### Raw to transformed data
+![Day 34 - Raw to transformed data](images/day_34_raw_transform_output.svg)
+
+### Business-rule decision flow
+![Day 34 - Business-rule decision flow](images/day_34_business_rule_decision.svg)
+
+### Transformation audit trail
+![Day 34 - Transformation audit trail](images/day_34_transform_audit_columns.svg)
