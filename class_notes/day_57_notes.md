@@ -796,3 +796,712 @@ Why should you validate totals after a join?
 - [ ] Validate row counts and totals after joins.
 
 **Next lesson — Day 58: Spark Performance Optimization.** You will inspect execution plans, understand shuffle and caching, learn partition pruning and data skew, and compare performance using a repeatable experiment.
+
+
+---
+
+# Part 17 — Build a complete orders, customers and products join lab
+
+The earlier examples used two small DataFrames. In a real warehouse pipeline, you often combine a fact-like dataset with multiple reference datasets.
+
+This lab creates three inputs and joins them one step at a time.
+
+## 40. Create the business input data
+
+Orders have one row per order line:
+
+~~~python
+orders_data = [
+    (1001, 1, "C001", "P01", 2, 100.00),
+    (1001, 2, "C001", "P02", 1, 250.00),
+    (1002, 1, "C002", "P01", 1, 100.00),
+    (1003, 1, "C003", "P03", 3, 50.00),
+    (1004, 1, "C005", "P02", 2, 250.00),
+    (1005, 1, "C002", "P04", 1, 500.00)
+]
+
+orders = spark.createDataFrame(
+    orders_data,
+    ["order_id", "line_number", "customer_id", "product_id", "quantity", "unit_price"]
+)
+
+orders.show()
+~~~
+
+Expected input: six order-line rows.
+
+Understand the grain: one row represents one product line in an order. order_id can repeat in a larger dataset. The combination order_id and line_number identifies the order line in this example.
+
+## 41. Create customer data
+
+~~~python
+customers_data = [
+    ("C001", "Ravi", "Hyderabad"),
+    ("C002", "Meena", "Chennai"),
+    ("C003", "Arjun", "Bengaluru"),
+    ("C004", "Sana", "Pune")
+]
+
+customers = spark.createDataFrame(
+    customers_data,
+    ["customer_id", "customer_name", "customer_city"]
+)
+
+customers.show()
+~~~
+
+There are four customer records. C005 is deliberately missing so we can detect an unmatched order.
+
+## 42. Create product data
+
+~~~python
+products_data = [
+    ("P01", "Keyboard", "Accessories"),
+    ("P02", "Monitor", "Electronics"),
+    ("P03", "Mouse", "Accessories")
+]
+
+products = spark.createDataFrame(
+    products_data,
+    ["product_id", "product_name", "category"]
+)
+
+products.show()
+~~~
+
+There are three product records. P04 is deliberately missing.
+
+## 43. Inspect the business keys
+
+~~~python
+orders.select("customer_id").distinct().orderBy("customer_id").show()
+customers.select("customer_id").distinct().orderBy("customer_id").show()
+
+orders.select("product_id").distinct().orderBy("product_id").show()
+products.select("product_id").distinct().orderBy("product_id").show()
+~~~
+
+Expected unmatched keys:
+- customer_id C005;
+- product_id P04.
+
+Before joining, understand the key coverage. This predicts which source rows will be unmatched.
+
+## 44. Join orders to customers
+
+~~~python
+order_customer = orders.join(
+    customers,
+    on="customer_id",
+    how="left"
+)
+
+order_customer.orderBy("order_id", "line_number").show()
+~~~
+
+Expected result has six rows because customer_id is unique in the customer DataFrame.
+
+The C005 order line remains, but customer_name and customer_city are null.
+
+Why use a left join? The order line is the main business record. We do not want to silently remove it just because a customer lookup is missing.
+
+## 45. Join the result to products
+
+~~~python
+order_customer_product = order_customer.join(
+    products,
+    on="product_id",
+    how="left"
+)
+
+order_customer_product.orderBy(
+    "order_id",
+    "line_number"
+).show()
+~~~
+
+Expected result still has six rows because product_id is unique in the product DataFrame.
+
+The P04 line remains, but product_name and category are null.
+
+## 46. Calculate line sales
+
+~~~python
+from pyspark.sql.functions import col
+
+joined_sales = order_customer_product.withColumn(
+    "line_sales",
+    col("quantity") * col("unit_price")
+)
+
+joined_sales.select(
+    "order_id",
+    "line_number",
+    "customer_name",
+    "product_name",
+    "category",
+    "quantity",
+    "unit_price",
+    "line_sales"
+).orderBy("order_id", "line_number").show()
+~~~
+
+Expected line sales:
+
+| order_id | line_number | customer | product | category | quantity | unit_price | line_sales |
+|---:|---:|---|---|---|---:|---:|---:|
+| 1001 | 1 | Ravi | Keyboard | Accessories | 2 | 100.00 | 200.00 |
+| 1001 | 2 | Ravi | Monitor | Electronics | 1 | 250.00 | 250.00 |
+| 1002 | 1 | Meena | Keyboard | Accessories | 1 | 100.00 | 100.00 |
+| 1003 | 1 | Arjun | Mouse | Accessories | 3 | 50.00 | 150.00 |
+| 1004 | 1 | null | Monitor | Electronics | 2 | 250.00 | 500.00 |
+| 1005 | 1 | Meena | null | null | 1 | 500.00 | 500.00 |
+
+Total line sales = 1,700.00.
+
+The total is calculated from all six order lines, including lines with missing reference details. Missing descriptive attributes do not make the order line disappear.
+
+## 47. Find orders with missing customer details
+
+~~~python
+missing_customers = order_customer.join(
+    customers,
+    on="customer_id",
+    how="left_anti"
+)
+
+missing_customers.select(
+    "order_id",
+    "line_number",
+    "customer_id"
+).show()
+~~~
+
+Expected result: order 1004, line 1, customer C005.
+
+Note: This uses the original orders DataFrame for the anti join. If you use a DataFrame that already contains customer columns, select the intended fields carefully.
+
+## 48. Find order lines with missing product details
+
+~~~python
+missing_products = orders.join(
+    products,
+    on="product_id",
+    how="left_anti"
+)
+
+missing_products.select(
+    "order_id",
+    "line_number",
+    "product_id"
+).show()
+~~~
+
+Expected result: order 1005, line 1, product P04.
+
+This is a useful quality check before publishing a curated sales dataset.
+
+## 49. Aggregate sales by category
+
+For this exercise, keep unmatched product rows visible in the joined data, but do not assign them an invented category.
+
+~~~python
+category_sales = (
+    joined_sales
+    .filter(col("category").isNotNull())
+    .groupBy("category")
+    .sum("line_sales")
+    .withColumnRenamed("sum(line_sales)", "category_sales")
+)
+
+category_sales.orderBy("category").show()
+~~~
+
+Expected values:
+
+| category | category_sales |
+|---|---:|
+| Accessories | 450.00 |
+| Electronics | 750.00 |
+
+The unmatched P04 line contributes 500.00 to the overall order-line total but is not included in a known product category. Report that unmatched amount separately rather than silently losing it.
+
+## 50. Reconcile the joined result
+
+~~~python
+from pyspark.sql.functions import sum, count
+
+joined_sales.select(
+    count("*").alias("joined_line_count"),
+    sum("line_sales").alias("joined_sales_total")
+).show()
+~~~
+
+Expected result:
+
+| joined_line_count | joined_sales_total |
+|---:|---:|
+| 6 | 1700.00 |
+
+Compare with the source order-line calculation:
+
+~~~python
+orders.withColumn(
+    "line_sales",
+    col("quantity") * col("unit_price")
+).select(
+    count("*").alias("source_line_count"),
+    sum("line_sales").alias("source_sales_total")
+).show()
+~~~
+
+Expected source result: six lines and 1,700.00.
+
+If the joined total is higher, investigate duplicate customer or product keys. If lower, investigate inner joins, filters or missing rows.
+
+---
+
+# Part 18 — Demonstrate join multiplication
+
+## 51. Create a duplicate product dimension
+
+~~~python
+duplicate_products_data = [
+    ("P01", "Keyboard", "Accessories"),
+    ("P01", "Keyboard - Old", "Accessories"),
+    ("P02", "Monitor", "Electronics"),
+    ("P03", "Mouse", "Accessories")
+]
+
+duplicate_products = spark.createDataFrame(
+    duplicate_products_data,
+    ["product_id", "product_name", "category"]
+)
+~~~
+
+P01 appears twice.
+
+## 52. Join without validating uniqueness
+
+~~~python
+duplicate_product_join = orders.join(
+    duplicate_products,
+    on="product_id",
+    how="left"
+)
+
+print("Original order lines:", orders.count())
+print("Joined rows:", duplicate_product_join.count())
+~~~
+
+Expected output:
+- original order lines: 6;
+- joined rows: 8.
+
+Why eight?
+- P01 appears in three order lines;
+- each P01 line matches two product records;
+- those three lines produce six joined rows;
+- the other three order lines produce one row each;
+- total = nine, not eight.
+
+The correct count is **9**. Use this arithmetic to check your output.
+
+This example demonstrates why row-count validation matters. A duplicate dimension key can multiply fact rows and inflate measures.
+
+## 53. Detect duplicate product keys
+
+~~~python
+duplicate_product_keys = (
+    duplicate_products
+    .groupBy("product_id")
+    .count()
+    .filter(col("count") > 1)
+)
+
+duplicate_product_keys.show()
+~~~
+
+Expected output identifies P01 with count 2.
+
+Resolve the duplicate using a documented rule:
+- choose the authoritative current record;
+- use effective dates for historical dimensions;
+- consult source priority or update sequence;
+- quarantine conflicting records if the correct version is unknown.
+
+Do not call dropDuplicates("product_id") and assume the retained row is correct.
+
+---
+
+# Part 19 — Handle null join keys deliberately
+
+## 54. Create a row with a missing customer key
+
+~~~python
+orders_with_null_key = spark.createDataFrame(
+    [
+        (2001, "C001", 100),
+        (2002, None, 200)
+    ],
+    ["order_id", "customer_id", "amount"]
+)
+
+orders_with_null_key.show()
+~~~
+
+## 55. Run a normal left join
+
+~~~python
+null_key_join = orders_with_null_key.join(
+    customers,
+    on="customer_id",
+    how="left"
+)
+
+null_key_join.show()
+~~~
+
+The row with a null customer_id does not match an ordinary customer key. Its customer descriptive columns remain null.
+
+## 56. Find missing keys before joining
+
+~~~python
+orders_with_null_key.filter(
+    col("customer_id").isNull()
+).show()
+~~~
+
+A missing key should be recorded as a data quality issue. Do not replace every missing key with a shared placeholder that might match an unrelated row.
+
+---
+
+# Part 20 — Partition experiments in Spark
+
+## 57. Inspect the original partition count
+
+~~~python
+print("Original partitions:", orders.rdd.getNumPartitions())
+~~~
+
+The value depends on how the DataFrame was created and the local Spark environment.
+
+Record your actual output.
+
+## 58. Repartition to four partitions
+
+~~~python
+orders_four_partitions = orders.repartition(4)
+
+print("After repartition:", orders_four_partitions.rdd.getNumPartitions())
+~~~
+
+Expected output:
+
+~~~text
+After repartition: 4
+~~~
+
+repartition(4) requests four execution partitions. It normally causes a shuffle to redistribute records.
+
+## 59. Inspect records per partition
+
+~~~python
+partition_sizes = (
+    orders_four_partitions
+    .groupBy(spark_partition_id())
+    .count()
+)
+~~~
+
+Before running this cell, import the function:
+
+~~~python
+from pyspark.sql.functions import spark_partition_id
+~~~
+
+Then run:
+
+~~~python
+partition_sizes = (
+    orders_four_partitions
+    .groupBy(spark_partition_id().alias("partition_id"))
+    .count()
+    .orderBy("partition_id")
+)
+
+partition_sizes.show()
+~~~
+
+The number of rows in each partition can vary. With only six training rows and four partitions, some partitions may contain one or more rows and some may be empty.
+
+The purpose is to inspect distribution, not to force equal row counts.
+
+## 60. Repartition by customer ID
+
+~~~python
+orders_by_customer = orders.repartition(
+    4,
+    "customer_id"
+)
+
+print("Partitions:", orders_by_customer.rdd.getNumPartitions())
+~~~
+
+Rows with the same customer_id are directed to the same hash partition for this operation. Different customers can share a partition.
+
+This can be useful for some later operations, but repartitioning has a shuffle cost.
+
+## 61. Reduce partitions with coalesce
+
+~~~python
+orders_two_partitions = orders_four_partitions.coalesce(2)
+
+print("After coalesce:", orders_two_partitions.rdd.getNumPartitions())
+~~~
+
+Expected output:
+
+~~~text
+After coalesce: 2
+~~~
+
+coalesce is commonly used to reduce partitions without a full shuffle. It may produce uneven partition sizes.
+
+## 62. Compare partition counts
+
+~~~python
+print("Original:", orders.rdd.getNumPartitions())
+print("Repartitioned:", orders_four_partitions.rdd.getNumPartitions())
+print("Coalesced:", orders_two_partitions.rdd.getNumPartitions())
+~~~
+
+Use your actual original partition count. The requested repartition and coalesce results should be four and two.
+
+---
+
+# Part 21 — Write and inspect storage partitions
+
+## 63. Write output partitioned by city
+
+~~~python
+orders.write.mode("overwrite").partitionBy(
+    "city"
+).parquet("spark_day57/output/orders_by_city")
+~~~
+
+Expected folder structure resembles:
+
+~~~text
+orders_by_city/
+    city=Bengaluru/
+    city=Chennai/
+    city=Hyderabad/
+~~~
+
+There may be multiple part files under a city directory. Exact file names depend on Spark execution.
+
+## 64. Read the partitioned output
+
+~~~python
+orders_by_city = spark.read.parquet(
+    "spark_day57/output/orders_by_city"
+)
+
+orders_by_city.printSchema()
+orders_by_city.orderBy("order_id").show()
+~~~
+
+Spark can restore the partition column from the folder layout when reading the dataset.
+
+## 65. Filter one partition value
+
+~~~python
+hyderabad_orders = orders_by_city.filter(
+    col("city") == "Hyderabad"
+)
+
+hyderabad_orders.show()
+~~~
+
+The query can benefit from partition pruning when the file source and plan support it. Inspect the execution plan rather than assuming that every read skips unrelated data.
+
+## 66. Inspect the plan
+
+~~~python
+hyderabad_orders.explain()
+~~~
+
+Look for partition filters and file scan details. The exact plan depends on Spark version and reader configuration.
+
+---
+
+# Part 22 — Join strategy awareness
+
+## 67. What is a broadcast join?
+
+If one DataFrame is small enough, Spark may distribute a copy of it to executors so the larger DataFrame can be joined without shuffling both sides in the usual way.
+
+This is called a broadcast join.
+
+For example, a small product lookup may be joined to a very large order dataset.
+
+## 68. Why broadcast can help
+
+It may reduce shuffle of the large dataset when:
+- one side is genuinely small;
+- the broadcast fits in executor memory;
+- the join type and plan support the strategy.
+
+## 69. Why broadcast can hurt
+
+Broadcasting a large dataset can:
+- consume executor memory;
+- increase network transfer;
+- cause memory pressure or failure.
+
+Do not force broadcast simply because one DataFrame is called a dimension. Inspect its actual size and Spark's plan.
+
+## 70. Inspect join plan
+
+~~~python
+orders.join(
+    customers,
+    on="customer_id",
+    how="left"
+).explain()
+~~~
+
+The plan may show a join strategy selected by Spark. The strategy depends on statistics, configuration, join conditions and Spark version.
+
+Day 58 will study performance and plan analysis more deeply.
+
+---
+
+# Part 23 — Common engineering checks after a join
+
+Before publishing a joined dataset, ask:
+
+1. What is the grain of the left dataset?
+2. What is the grain of the right dataset?
+3. Is the join key unique where required?
+4. Are null keys present?
+5. How many left-side keys have no match?
+6. How many right-side keys have no match?
+7. Can the join multiply rows?
+8. Does the output row count make sense?
+9. Do business totals reconcile?
+10. Are descriptive values valid for the event date?
+11. Is a historical dimension involved?
+12. Is the selected join type consistent with the requirement?
+
+A join that runs successfully can still be logically wrong.
+
+---
+
+# Part 24 — More practice exercises with worked answers
+
+## Exercise 9 — Left join
+
+A report must keep every order even if the customer lookup is missing. Which join should be used?
+
+**Worked answer:** Left join with orders as the left DataFrame.
+
+## Exercise 10 — Anti join
+
+You need to identify orders whose customer_id does not exist in the customer table. Which operation is useful?
+
+**Worked answer:** Left anti join from orders to customers.
+
+## Exercise 11 — Duplicate dimension key
+
+A customer key appears twice in a dimension. Why can the order total increase after joining?
+
+**Worked answer:** Each order for that key may match both dimension rows, multiplying order records.
+
+## Exercise 12 — Null key
+
+An order has customer_id = null. Will an ordinary equality join match it to another null customer_id?
+
+**Worked answer:** No. Ordinary equality does not treat null as equal to null. Handle missing keys explicitly.
+
+## Exercise 13 — Repartition
+
+Why does repartition often cause a shuffle?
+
+**Worked answer:** Spark redistributes rows across the requested partitions so the new partition layout can be created.
+
+## Exercise 14 — Coalesce
+
+You have 100 partitions and want fewer output partitions. Which operation may be appropriate?
+
+**Worked answer:** coalesce can reduce the number of partitions with less data movement than a full repartition in typical use.
+
+## Exercise 15 — Storage partitioning
+
+Does DataFrame repartition(4) create four city folders?
+
+**Worked answer:** No. repartition changes execution partitions. partitionBy("city") organizes written files into city-based storage prefixes.
+
+## Exercise 16 — Broadcast
+
+A product lookup has 500 MB of data. Should it automatically be broadcast to every executor?
+
+**Worked answer:** No. Check executor memory, network cost, actual compressed/in-memory size and Spark's plan. A 500 MB dataset may be too large for a safe broadcast.
+
+## Exercise 17 — Join validation
+
+The join output has more rows than the order input. What should you inspect?
+
+**Worked answer:** Duplicate keys on the right side, join condition, relationship cardinality and many-to-many matches.
+
+---
+
+# Part 25 — Day 57 practical completion checklist
+
+### Join concepts
+- [ ] Explain join keys and business relationships.
+- [ ] Use inner, left, right and full outer joins.
+- [ ] Use left semi and left anti joins.
+- [ ] Join on differently named columns.
+- [ ] Use aliases to avoid ambiguous columns.
+- [ ] Detect null join keys.
+- [ ] Detect duplicate dimension keys.
+- [ ] Explain join multiplication.
+
+### Spark partitioning
+- [ ] Inspect the number of execution partitions.
+- [ ] Use repartition by count.
+- [ ] Repartition by a key.
+- [ ] Use coalesce to reduce partitions.
+- [ ] Explain the shuffle cost of repartition.
+- [ ] Distinguish execution partitions from storage partitions.
+- [ ] Write Parquet output using partitionBy.
+- [ ] Inspect a partition-filtered execution plan.
+
+### Data correctness
+- [ ] Validate row counts before and after joins.
+- [ ] Find unmatched customer and product keys.
+- [ ] Reconcile line-level sales totals.
+- [ ] Explain why duplicate dimension keys inflate measures.
+- [ ] Keep unmatched records visible for investigation.
+- [ ] Publish only after quality checks pass.
+
+## Final self-assessment
+
+Without looking at the notes, explain:
+
+1. What is a join key?
+2. How do inner, left, right and full joins differ?
+3. When is a left anti join useful?
+4. Why can duplicate dimension keys multiply fact rows?
+5. Why should null join keys be checked?
+6. What is the difference between repartition and coalesce?
+7. What is the difference between execution partitions and partitionBy?
+8. What is a broadcast join and when can it be risky?
+9. Which row-count and total checks should follow a join?
+10. Why can a successful Spark join still produce an incorrect business result?
+
+If you can complete the three-dataset join lab, identify unmatched records and validate totals, you are ready for Day 58.
+
+**Next lesson — Day 58: Spark Performance Optimization.** You will inspect execution plans, understand shuffle and caching, learn partition pruning and data skew, and compare performance using a repeatable experiment.
