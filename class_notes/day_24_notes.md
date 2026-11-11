@@ -48,6 +48,8 @@ By the end, you can:
 
 ## 2. What is a transaction?
 
+![Database transaction lifecycle](images/day_24_transaction_lifecycle.svg)
+
 A transaction is a group of one or more database operations treated as one logical unit of work.
 
 Think of a food delivery order:
@@ -201,6 +203,8 @@ Rollback cancels changes made in the current uncommitted transaction.
 
 ## 7. A two-step transfer simulation
 
+![Bank transfer transaction example](images/day_24_bank_transfer.svg)
+
 We want to transfer ₹1,000 from Asha to Ravi.
 
 Business rules:
@@ -269,6 +273,8 @@ A database driver can inspect the affected-row count and make the commit/rollbac
 ---
 
 ## 8. ACID: the four transaction properties
+
+![ACID transaction properties](images/day_24_acid_properties.svg)
 
 ACID describes four important properties of reliable transactions.
 
@@ -558,6 +564,8 @@ Use locks carefully:
 ---
 
 ## 15. Deadlocks
+
+![Database concurrency and deadlocks](images/day_24_concurrency_locks.svg)
 
 A deadlock occurs when transactions wait on each other in a cycle.
 
