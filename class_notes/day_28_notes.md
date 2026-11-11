@@ -42,6 +42,8 @@ By the end, you can:
 
 ## 2. Understand the database environment
 
+![Database server, database, schema and table](images/day_28_database_environment.svg)
+
 A database application typically connects through a network or local socket to a database server.
 
 Common connection details:
@@ -97,6 +99,8 @@ Always verify the environment before running DDL or DML. Accidentally changing p
 ---
 
 ## 4. Understand roles and permissions
+
+![Roles and least-privilege access](images/day_28_roles_privileges.svg)
 
 A database role determines what actions an identity can perform.
 
@@ -234,6 +238,8 @@ Do not grant broad access such as ALL PRIVILEGES ON *.* unless the account genui
 
 ## 7. Connection management
 
+![Database connection pooling](images/day_28_connection_pooling.svg)
+
 A pipeline connects to a database using connection parameters and a driver.
 
 Common connection problems:
@@ -332,6 +338,8 @@ Do not kill sessions without understanding the query, owner, impact and transact
 ---
 
 ## 9. Backup and restore: understand the difference
+
+![Database backup and restore workflow](images/day_28_backup_restore.svg)
 
 A backup is a copy or recovery artifact used to restore data after loss, corruption or an operational mistake.
 
