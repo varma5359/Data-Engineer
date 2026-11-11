@@ -1748,3 +1748,16 @@ If you can explain the architecture and complete the local pipeline simulation, 
 **Phase 6 complete:** Cloud fundamentals, object storage, S3, managed databases, distributed computing, Spark DataFrames, transformations, joins, partitioning, performance and pipeline integration.
 
 **Next phase — Phase 7: Orchestration, Quality and Monitoring (Days 60–67).** Day 60 begins with workflow orchestration fundamentals: why scheduling alone is not enough, what a DAG is, how task dependencies work and where Apache Airflow fits.
+
+---
+
+## Visual Learning Diagrams
+
+### Cloud batch pipeline
+![Day 59 - Cloud batch pipeline](images/day_59_cloud_batch_pipeline_architecture.svg)
+
+### Cloud pipeline monitoring
+![Day 59 - Cloud pipeline monitoring](images/day_59_cloud_pipeline_monitor.svg)
+
+### Cloud pipeline security
+![Day 59 - Cloud pipeline security](images/day_59_cloud_pipeline_security.svg)
