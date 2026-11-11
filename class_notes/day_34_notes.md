@@ -1,550 +1,546 @@
-# Day 34: Data Transformation and Business Rules
+# Day 34: Data Transformation and Business Rules — Beginner Notebook Class
 
 **Phase:** 4 — Data Processing and Pipelines  
-**Syllabus topic:** Data Transformation and Business Rules  
-**Mini-project:** Transformation Pipeline  
-**Learning time:** 2–3 hours  
-**Level:** Complete beginner to junior Data Engineer  
+**Time:** 2–3 hours  
+**Project:** TechStore Order Transformation Pipeline  
+**Level:** Complete beginner / fresher  
+**Tools:** Python, CSV, Decimal, datetime, Jupyter Notebook  
+**Prerequisites:** Python data types/loops, Day 31 file ingestion, Day 33 database extraction
 
 ---
 
-# 1. What are we learning today?
+# 0. Today's goal
 
-Raw orders contain inconsistent statuses and types. Standardize them without silently changing meaning.
+Extraction brings data into a pipeline. But source data may have inconsistent formatting, invalid values, different status codes, or business rules that need to be applied before analytics.
 
-## 1.1 Learning outcomes
+Today you learn to transform data **without silently changing its meaning**.
 
-By the end of this lesson, you should be able to:
+Flow:
+`Raw input -> Profile -> Parse types -> Validate -> Standardize -> Map business codes -> Derive fields -> Accepted/rejected -> Reconcile`
 
-1. Profile raw values first.
-2. Document each business rule and owner.
-3. Normalize only where semantics permit.
-4. Convert types explicitly; capture conversion failures.
-5. Map unknown codes to exception path.
-6. Calculate derived fields with precision policy.
-7. Validate ranges, required values and cross-column rules.
-8. Preserve raw data and transformation version.
-9. Reconcile counts and totals.
+## 0.1 Business scenario
 
-## 1.2 Pipeline context
+TechStore receives order lines from different systems:
+- status values: "paid", " PAID ", "Shipped";
+- amount arrives as text;
+- quantity and unit price need a line total;
+- unknown status appears after a partner update;
+- a shipped order has no shipped timestamp.
 
-```text
-Business source -> Data Transformation and Business Rules -> Validate/process -> Staging/destination -> Reconcile -> Checkpoint + monitoring
-```
+The analytics team wants consistent curated records. We need approved rules, evidence and rejection handling.
 
-A pipeline is not merely a script that reads data. It is repeatable work with defined input, rules, output, progress, error path and evidence of correctness.
+## 0.2 Learning outcomes
 
-# 2. Business scenario and vocabulary
+You will be able to:
+- distinguish raw, cleaned and curated data;
+- profile values before changing them;
+- convert strings to integer/date/Decimal;
+- normalize only when semantics permit;
+- map source statuses to canonical values;
+- calculate derived fields;
+- validate row and cross-field rules;
+- preserve rejected records and reasons;
+- reconcile counts and totals;
+- build a transformation notebook step by step.
 
-Raw orders contain inconsistent statuses and types. Standardize them without silently changing meaning.
+---
 
-| Term | Beginner meaning | Why it matters |
+# 1. Raw vs transformed data
+
+| Layer | Meaning | Example |
 |---|---|---|
-| **Transformation** |  explicit data change | Used to design and explain reliable pipelines. |
-| **standardization** |  consistent representation | Used to design and explain reliable pipelines. |
-| **business rule** |  business logic | Used to design and explain reliable pipelines. |
-| **mapping** |  source-to-target code | Used to design and explain reliable pipelines. |
-| **derived column** |  calculated value | Used to design and explain reliable pipelines. |
-| **lineage** |  source-to-output history | Used to design and explain reliable pipelines. |
-| **validation** |  check expectations | Used to design and explain reliable pipelines. |
-| **quarantine** |  isolate bad records. | Used to design and explain reliable pipelines. |
+| Raw | Original received representation | " paid ", "1250.50" |
+| Parsed | Values interpreted as types | Decimal('1250.50') |
+| Standardized | Consistent formatting | "PAID" |
+| Curated | Business rules applied and validated | Accepted order with canonical status |
+| Rejected | Cannot safely meet contract | Invalid amount/status with reason |
 
-## Before coding, answer five questions
+**Why preserve raw data?** If a mapping rule changes tomorrow, you can replay original values. If you overwrite raw values, you may lose evidence and make corrections impossible.
 
-1. Where does data come from and who owns it?
-2. Which records/fields must be collected or changed?
-3. What can go wrong (missing values, duplicates, timeout, schema change, partial failure)?
-4. Where does the result go and what is its schema?
-5. How will correctness be proven (counts, keys, totals, status and run metadata)?
+---
 
-# 3. Understand the concept before coding
+# 2. Inspect data before transforming
 
-## 3.1 A small record example
-
-| ID | Value | Status |
-|---:|---:|---|
-| 1 | 100 | valid |
-| 2 | 200 | valid |
-| 3 | -5 | invalid |
-
-A reliable run accounts for all 3 input records: 2 accepted, 1 rejected with a reason, 2 output records. It must not silently discard record 3.
-
-## 3.2 Flow to remember
-
-```text
-Receive -> Inspect -> Validate -> Process -> Persist -> Verify -> Record progress
-                    |                  |
-                    v                  v
-                Reject path       Retry/recovery path
-```
-
-- Receive: obtain source data.
-- Inspect: understand shape, size and metadata.
-- Validate: check rules before trusting it.
-- Process: apply topic-specific operation.
-- Persist: write durably.
-- Verify: compare expected and actual results.
-- Record progress: checkpoint only when safe.
-
-# 4. First practical example
-
-## Task
-
-Demonstrate cleaning with one small operation before scaling it into a pipeline.
-
-## Code
+Create a practice list:
 
 ```python
-import pandas as pd
-data = pd.DataFrame({"status": ["paid", "Paid", "cancelled"]})
-data["status"] = data["status"].str.strip().str.upper()
-print(data)
+raw_statuses = ["paid", " PAID ", "Shipped", "pending", "unknown", None]
+
+for status in raw_statuses:
+    print(repr(status))
 ```
 
-## Expected output
-
+Expected:
 ```text
-      status
-0      PAID
-1      PAID
-2  CANCELLED
+'paid'
+' PAID '
+'Shipped'
+'pending'
+'unknown'
+None
 ```
 
-> Sample output is for the stated sample values. API/database/file results may vary. Do not claim variable outputs are guaranteed or runtime-tested unless you executed them.
+repr helps reveal whitespace and None. Profiling first tells us what is actually present.
 
-## Line-by-line explanation
+## 2.1 Count values
 
-strip removes surrounding spaces; upper normalizes casing. Unknown status codes must be reported, not blindly assigned meaning.
+```python
+from collections import Counter
 
-### After running, answer
+status_counts = Counter(raw_statuses)
+print(status_counts)
+```
 
-- What input did I provide?
-- Which operation ran?
-- Which object holds the result?
-- What does output prove?
-- What does output not prove?
+Expected counts depend on the list: each listed value occurs once.
 
-A successful request/query/read does not automatically prove completeness, uniqueness, business validity or correctness.
+In real data, use frequency counts to identify unexpected variants before deciding a rule.
 
-# 5. Build the pipeline step by step
+---
 
-## Step 1 — Define the input contract
+# 3. Standardize text carefully
 
-Document source and owner, fields/types, required/optional values, unique identity, time/batch boundary, expected volume/frequency, permissions, and source limitations. If these are unknown, clarify before coding.
+## 3.1 Strip whitespace
 
-## Step 2 — Read a tiny sample
+```python
+status = " PAID "
+clean_status = status.strip()
 
-Start with 3–10 safe records. Inspect field names, types, nulls, duplicate keys, cursor/timestamp/version and whether the sample represents real edge cases. Never print credentials or sensitive data.
+print(repr(clean_status))
+```
+Expected:
+```text
+'PAID'
+```
 
-## Step 3A — Validation is a decision
+strip removes whitespace at the beginning/end. It does not remove spaces inside a phrase.
 
-| Rule | Example | Violation action |
+## 3.2 Normalize case
+
+```python
+status = "paid"
+clean_status = status.strip().upper()
+
+print(clean_status)
+```
+Expected:
+```text
+PAID
+```
+
+**Important:** Case normalization is appropriate when status codes are case-insensitive. It may not be appropriate for customer names, passwords, product codes or fields whose case has meaning.
+
+## 3.3 Handle None
+
+```python
+status = None
+
+if status is None:
+    clean_status = None
+else:
+    clean_status = status.strip().upper()
+
+print(clean_status)
+```
+Expected:
+```text
+None
+```
+
+Do not call strip on None. A null value is not a string.
+
+---
+
+# 4. Parse numeric values
+
+## 4.1 Convert quantity
+
+```python
+quantity_text = "3"
+quantity = int(quantity_text)
+
+print(quantity)
+print(type(quantity))
+```
+Expected:
+```text
+3
+<class 'int'>
+```
+
+Try invalid value "three": int raises ValueError. Record a reject reason rather than silently converting to 0.
+
+## 4.2 Parse money with Decimal
+
+```python
+from decimal import Decimal
+
+price_text = "100.00"
+unit_price = Decimal(price_text)
+
+print(unit_price)
+print(type(unit_price))
+```
+Expected:
+```text
+100.00
+<class 'decimal.Decimal'>
+```
+
+Do not construct Decimal from a float for money (Decimal(0.1)); prefer source text Decimal("0.10").
+
+## 4.3 Validate ranges
+
+```python
+amount = Decimal("-25.00")
+
+if amount < 0:
+    print("Reject: amount cannot be negative")
+else:
+    print("Amount accepted")
+```
+Expected:
+```text
+Reject: amount cannot be negative
+```
+
+Parsing answers “is this value a Decimal?” Validation answers “is this Decimal allowed by business rules?” They are different.
+
+---
+
+# 5. Parse dates and timestamps
+
+```python
+from datetime import date
+
+date_text = "2026-11-10"
+order_date = date.fromisoformat(date_text)
+
+print(order_date)
+```
+Expected:
+```text
+2026-11-10
+```
+
+If source format is 10/11/2026, its meaning may be ambiguous (day/month or month/day). Confirm contract before parsing.
+
+Timestamp timezone matters. Do not compare naive and timezone-aware datetimes. Define UTC/business timezone and convert consistently.
+
+---
+
+# 6. Business mapping: source status to canonical status
+
+## 6.1 Why mapping exists
+
+Partners may use different codes for the same meaning:
+- P, PAID, payment_complete;
+- S, SHIPPED, dispatched;
+- W, WAITING, pending.
+
+A mapping table makes business interpretation explicit and reviewable.
+
+## 6.2 Define approved mapping
+
+```python
+status_mapping = {
+    "P": "PAID",
+    "PAID": "PAID",
+    "PAYMENT_COMPLETE": "PAID",
+    "S": "SHIPPED",
+    "SHIPPED": "SHIPPED",
+    "W": "PENDING",
+    "WAITING": "PENDING"
+}
+```
+
+## 6.3 Apply mapping
+
+```python
+source_status = " payment_complete "
+normalized_status = source_status.strip().upper()
+
+canonical_status = status_mapping.get(normalized_status)
+
+print(canonical_status)
+```
+Expected:
+```text
+PAID
+```
+
+get returns mapped value or None if unknown. Unknown is not automatically PENDING or PAID.
+
+## 6.4 Unknown code handling
+
+```python
+source_status = "REFUNDED"
+normalized_status = source_status.strip().upper()
+
+if normalized_status not in status_mapping:
+    print("Reject/exception: unknown status", normalized_status)
+else:
+    print("Mapped:", status_mapping[normalized_status])
+```
+Expected:
+```text
+Reject/exception: unknown status REFUNDED
+```
+
+A business owner may approve a mapping later. Until then, keep it visible.
+
+---
+
+# 7. Derive business values
+
+## 7.1 Line total
+
+```python
+quantity = 3
+unit_price = Decimal("100.00")
+discount = Decimal("10.00")
+
+gross_amount = quantity * unit_price
+net_amount = gross_amount - discount
+
+print("Gross:", gross_amount)
+print("Net:", net_amount)
+```
+Expected:
+```text
+Gross: 300.00
+Net: 290.00
+```
+
+Explain:
+- gross = 3 units × 100 per unit;
+- discount is 10 for this line;
+- net is gross minus discount;
+- currency and discount unit must be documented.
+
+## 7.2 Validate discount
+
+```python
+if discount < 0 or discount > gross_amount:
+    print("Reject: discount outside allowed range")
+else:
+    print("Discount valid")
+```
+Expected:
+```text
+Discount valid
+```
+
+A discount greater than gross may be invalid unless a specific promotion/credit policy allows it.
+
+## 7.3 Null behavior
+
+If quantity or unit_price is missing, do not silently treat it as zero. Choose:
+- reject because required;
+- apply documented default;
+- preserve null and derive null;
+- use a domain-specific rule.
+
+Explain the choice to the business.
+
+---
+
+# 8. Cross-field validation
+
+A row can have individually valid fields but contradictory relationships.
+
+Examples:
+- status SHIPPED but shipped_at is null;
+- cancelled order has positive captured payment when policy says it should be refunded;
+- end_date before start_date;
+- quantity positive but line amount negative.
+
+```python
+status = "SHIPPED"
+shipped_at = None
+
+if status == "SHIPPED" and shipped_at is None:
+    print("Reject: shipped order must have shipped_at")
+```
+Expected:
+```text
+Reject: shipped order must have shipped_at
+```
+
+Cross-field rules must be approved and documented. Do not infer a business rule solely from data patterns.
+
+---
+
+# 9. Transform one complete record
+
+Raw record:
+```python
+raw_record = {
+    "partner_order_id": " P-1001 ",
+    "customer_id": "501",
+    "quantity": "3",
+    "unit_price": "100.00",
+    "discount": "10.00",
+    "status": " payment_complete "
+}
+```
+
+Transformation:
+```python
+partner_order_id = raw_record["partner_order_id"].strip()
+customer_id = int(raw_record["customer_id"])
+quantity = int(raw_record["quantity"])
+unit_price = Decimal(raw_record["unit_price"])
+discount = Decimal(raw_record["discount"])
+
+source_status = raw_record["status"].strip().upper()
+canonical_status = status_mapping[source_status]
+
+gross_amount = quantity * unit_price
+net_amount = gross_amount - discount
+
+curated_record = {
+    "partner_order_id": partner_order_id,
+    "customer_id": customer_id,
+    "quantity": quantity,
+    "unit_price": str(unit_price),
+    "gross_amount": str(gross_amount),
+    "discount": str(discount),
+    "net_amount": str(net_amount),
+    "status": canonical_status
+}
+
+print(curated_record)
+```
+
+Expected:
+```text
+{'partner_order_id': 'P-1001', 'customer_id': 501, 'quantity': 3, 'unit_price': '100.00', 'gross_amount': '300.00', 'discount': '10.00', 'net_amount': '290.00', 'status': 'PAID'}
+```
+
+This example assumes the source status maps to PAYMENT_COMPLETE. The mapping key must exist before execution.
+
+---
+
+# 10. Accepted and rejected transformation output
+
+For each raw record:
+1. preserve source identity;
+2. attempt parsing;
+3. apply approved standardization/mapping;
+4. validate ranges and cross-field rules;
+5. collect all safe error reasons;
+6. accepted record goes to curated output;
+7. rejected record retains source key, run ID and reason;
+8. reconcile counts and business totals.
+
+**Don't silently:**
+- convert invalid amount to zero;
+- map unknown status to a valid state;
+- drop missing records;
+- remove duplicates without deterministic rule;
+- overwrite raw source.
+
+---
+
+# 11. Reconciliation after transformation
+
+Transformation may change values, so reconciliation should reflect expected rules.
+
+## Count check
+`input rows = accepted + rejected`
+
+## Amount check
+If no rows are rejected and no discount/adjustment changes total:
+`source total = curated total`
+
+If business rules change amounts, explain expected difference:
+`curated net = source gross - approved discount`
+
+## Status check
+Count source statuses and canonical statuses. Confirm all source codes are mapped or rejected/exceptioned.
+
+## Duplicate check
+Validate business key before aggregation. Duplicate input can double totals.
+
+---
+
+# 12. Mini-project: TechStore Order Transformation
+
+## Requirement
+Transform partner order rows into a canonical curated format with standardized status, typed IDs, Decimal amount and rejection reasons.
+
+## Milestones
+1. Read raw CSV (Day 31).
+2. Profile status/amount/customer ID values.
+3. Define mapping and business rules.
+4. Parse types with explicit errors.
+5. Calculate gross/net amounts.
+6. Validate required/range/cross-field rules.
+7. Write curated accepted output.
+8. Write rejects with reasons.
+9. Reconcile counts, keys and totals.
+10. Document transformation version and business rule owner.
+
+## Project run summary
+`input_count, accepted_count, rejected_count, unknown_status_count, invalid_amount_count, duplicate_key_count, transformation_version, status`
+
+A transformation is not complete until the rules are explained and the output is verified.
+
+---
+
+# 13. Debugging clinic
+
+| Symptom | Cause | Correct response |
 |---|---|---|
-| Required field | ID exists | Reject/quarantine |
-| Type | Amount numeric | Record conversion reason |
-| Range | Quantity positive | Reject or business review |
-| Identity | Key unique | Deduplicate or fail per contract |
-| Schema | Required columns exist | Stop batch and alert |
-| Completeness | All pages/partitions processed | Mark incomplete; don't checkpoint |
-
-## Step 4 — Process bounded units
-
-A unit can be a page, file, fetch batch, partition or record group. Bounded units control memory, reduce retry scope, provide progress points and isolate failures. Select the unit based on source/target capacity—not a tutorial's arbitrary number.
-
-## Step 5 — Persist safely
-
-Ask: did destination commit finish? Can the batch replay without duplicate effects? Is there a unique key/idempotency token? Can I trace output to source? What if process crashes now?
-
-## Step 6 — Verify
-
-Use at least two: input = accepted + rejected; key uniqueness; totals/ranges; boundary gap/overlap; schema; freshness; source/target reconciliation.
-
-# 6. Mistakes and corrections
-
-## Mistake 1: NULL replaced with zero
-
-**Why dangerous:** Unknown differs from known zero.
-
-**Correct approach:** Define field-specific null/default/reject policy.
-
-## Mistake 2: Drop unknown statuses
-
-**Why dangerous:** Hides source changes.
-
-**Correct approach:** Retain source value and alert/quarantine.
-
-## Mistake 3: Round early
-
-**Why dangerous:** Financial precision loss.
-
-**Correct approach:** Use Decimal and round at approved stage.
-
-## Mistake 4: Mutate raw input
-
-**Why dangerous:** Replay/audit becomes difficult.
-
-**Correct approach:** Preserve raw and produce transformed layer.
-
-## Mistake 5: No rule version
-
-**Why dangerous:** Outputs cannot be reproduced.
-
-**Correct approach:** Record code/rule version per run.
-
-
-## Debugging checklist
-
-1. Confirm source exists and request/query is correct.
-2. Inspect exact raw input for a small failing case.
-3. Confirm schema and types.
-4. Check filters and boundaries (>, >=, dates, cursor).
-5. Check mapping/business rules.
-6. Check duplicate and unique-key behavior.
-7. Check destination write/transaction result.
-8. Inspect checkpoint and update timing.
-9. Reconcile input, accepted, rejected and output counts.
-10. Reproduce with controlled input before changing the full job.
-
-# 7. Mini-project — Transformation Pipeline
-
-## Objective
-
-Build a beginner-readable pipeline demonstrating data transformation and business rules with a happy path, invalid/failure path and verification step.
-
-## Requirements
-
-- Reproducible sample input and defined contract.
-- Predictable processing order and bounded units.
-- Required-field and identity validation.
-- Accepted/rejected outcomes separated.
-- Safe rerun without duplicate effects.
-- Run metadata: run ID, start/end, counts and status.
-- Progress/checkpoint behavior explained.
-- Output reconciled.
-
-## Sample business data
-
-| record_id | event_time | customer_id | amount | status |
-|---:|---|---:|---:|---|
-| 501 | 2026-11-10 09:00:00 | 11 | 1200.00 | PAID |
-| 502 | 2026-11-10 09:15:00 | 12 | 850.00 | PAID |
-| 503 | 2026-11-10 10:00:00 | 11 | 499.00 | PENDING |
-| 504 | 2026-11-10 10:30:00 | 13 | 0.00 | CANCELLED |
-
-These are teaching records. A zero amount or CANCELLED status is not automatically invalid; the business contract decides.
-
-## Part A — Design
-
-1. Name source/destination.
-2. Define unique key and required fields/types.
-3. Decide batch boundary and accepted/rejected rules.
-4. Define checkpoint and output schema.
-5. Define reconciliation checks.
-
-## Part B — Happy path
-
-1. Read a small batch.
-2. Count received records.
-3. Validate required fields.
-4. Process accepted records.
-5. Persist/display output.
-6. Verify counts and values.
-
-## Part C — Failure tests
-
-Test missing field, duplicate key and one transient error/malformed payload. Record expected behavior, actual behavior and correction. A happy-path-only script is not reliable yet.
-
-## Part D — Replay
-
-Run input twice; inspect duplicates; interrupt before checkpoint; restart from safe progress; reconcile final target.
-
-## Acceptance checklist
-
-- [ ] Input contract documented.
-- [ ] Small sample reproducible.
-- [ ] Code split into readable stages.
-- [ ] Outputs shown after important steps.
-- [ ] Invalid data has a reason.
-- [ ] Retry behavior bounded.
-- [ ] Rerun behavior safe.
-- [ ] Checkpoint order explained.
-- [ ] Counts and values reconciled.
-- [ ] Limitations and production improvements documented.
-
-# 8. Production thinking
-
-A classroom script runs on small data. Production additionally considers scale/memory, least-privilege security, secret management, concurrency, retries/checkpoints, source load, data contracts, monitoring/alerts/runbooks, schema changes, cost and auditability. A notebook is not production-ready merely because it executes successfully.
-
-# 9. Practice exercises
-
-## Exercise 1 — Explain
-
-Explain Transformation to a beginner; give a business example; name a failure; explain detection and recovery.
-
-## Exercise 2 — Trace one record
-
-Trace record 502 from source through validation, processing, destination, checkpoint and verification.
-
-## Exercise 3 — Boundary test
-
-Create records immediately before, exactly at and after the boundary. Explain which are processed and why.
-
-## Exercise 4 — Failure test
-
-Interrupt after output persistence but before checkpoint. Restart and explain idempotency and duplicate checks.
-
-## Exercise 5 — Quality test
-
-Make one field invalid, one key duplicated and one record late. Decide action from contract and justify.
-
-## Exercise 6 — Interview practice
-
-Answer aloud: problem solved; end-to-end flow; failure behavior; completeness proof; production improvements.
-
-# 10. Day 34 revision sheet
-
-**Flow:** Define contract -> Read bounded input -> Validate -> Process -> Persist -> Verify -> Checkpoint -> Observe
-
-Never skip: unique record identity; what success guarantees; replay behavior; invalid versus transient error; evidence of destination correctness.
-
-## One-minute project defence
-
-“My Transformation Pipeline receives data from a defined source. It validates the contract and identity, processes controlled units, handles invalid/transient cases explicitly, persists safely, records progress after durable success and reconciles counts/values. I can rerun it safely and diagnose failures from run metadata. Before production I would add automated tests, secret management, monitoring, access controls and scale testing.”
-
-## Self-assessment
-
-- [ ] I can define terms without memorizing.
-- [ ] I can explain code and output.
-- [ ] I can trace a record end-to-end.
-- [ ] I can reproduce/debug a failure.
-- [ ] I can explain checkpoint ordering and replay.
-- [ ] I can prove correctness with checks.
-- [ ] I can defend the project.
-
-**Complete the day when you can explain, run, interpret, test failure and prove the result—not merely read the notes.**
-
-
-# 11. Mentor-led deep dive — Transformation
-
-Read each scenario slowly. Identify input, risk, control and proof.
-
-## 11.1 Raw/curated distinction
-
-Raw versus curated: preserve source representation and provenance in raw layer; apply documented rules in curated layer so replay remains possible.
-
-**Student checkpoint:** Explain this in your own words and name a test that proves it.
-
-## 11.2 Walkthrough
-
-Type conversion: parse CSV amount '1200.50' as Decimal, handle blank/invalid explicitly, validate range and write decimal target; don't let implicit conversion hide bad values.
-
-**Student checkpoint:** Explain this in your own words and name a test that proves it.
-
-## 11.3 Normalization policy
-
-Normalize whitespace/casing only where semantics are case-insensitive; preserve names/address source meaning.
-
-**Student checkpoint:** Explain this in your own words and name a test that proves it.
-
-## 11.4 Mapping design
-
-Mapping table: source_status,target_status,valid_from,valid_to,owner; unknown code becomes observable exception.
-
-**Student checkpoint:** Explain this in your own words and name a test that proves it.
-
-## 11.5 Worked business example
-
-Derived total: quantity 3 × unit_price 100.00 = gross 300.00; discount 10.00 => net 290.00. Explain units, precision and null behavior.
-
-**Student checkpoint:** Explain this in your own words and name a test that proves it.
-
-## 11.6 Filter semantics
-
-Filtering removes downstream records. Record why/count; SQL comparisons with NULL can evaluate unknown and exclude rows.
-
-**Student checkpoint:** Explain this in your own words and name a test that proves it.
-
-## 11.7 Aggregation grain
-
-Aggregate at intended grain (order/day/product); validate keys and dedup first to prevent inflated sums.
-
-**Student checkpoint:** Explain this in your own words and name a test that proves it.
-
-## 11.8 Transformation order
-
-Order: parse -> validate -> standardize -> map -> derive -> aggregate -> output; document exceptions.
-
-**Student checkpoint:** Explain this in your own words and name a test that proves it.
-
-## 11.9 Reject evidence
-
-Reject schema: source ID, original safe reference, run ID, rule, error and timestamp; avoid unnecessary sensitive values.
-
-**Student checkpoint:** Explain this in your own words and name a test that proves it.
-
-## 11.10 Test design
-
-Test normal, boundary, null, invalid, unknown mapping and duplicate; assert exact output/count invariant.
-
-**Student checkpoint:** Explain this in your own words and name a test that proves it.
-
-## 11.11 Reconciliation
-
-Reconcile raw = accepted + rejected; compare totals with documented exclusions; monitor unknown categories/null-rate shifts.
-
-**Student checkpoint:** Explain this in your own words and name a test that proves it.
-
-# 12. Guided lab checkpoints
-
-## Lab checkpoint 1
-
-- Predict the result before running.
-- Execute this stage on a small input.
-- Record output, count and error (if any).
-- Explain which input/rule caused the result.
-- Compare actual result with contract and expected output.
-- Reproduce a failure with the smallest input and fix its cause.
-
-## Lab checkpoint 2
-
-- Predict the result before running.
-- Execute this stage on a small input.
-- Record output, count and error (if any).
-- Explain which input/rule caused the result.
-- Compare actual result with contract and expected output.
-- Reproduce a failure with the smallest input and fix its cause.
-
-## Lab checkpoint 3
-
-- Predict the result before running.
-- Execute this stage on a small input.
-- Record output, count and error (if any).
-- Explain which input/rule caused the result.
-- Compare actual result with contract and expected output.
-- Reproduce a failure with the smallest input and fix its cause.
-
-## Lab checkpoint 4
-
-- Predict the result before running.
-- Execute this stage on a small input.
-- Record output, count and error (if any).
-- Explain which input/rule caused the result.
-- Compare actual result with contract and expected output.
-- Reproduce a failure with the smallest input and fix its cause.
-
-## Lab checkpoint 5
-
-- Predict the result before running.
-- Execute this stage on a small input.
-- Record output, count and error (if any).
-- Explain which input/rule caused the result.
-- Compare actual result with contract and expected output.
-- Reproduce a failure with the smallest input and fix its cause.
-
-## Lab checkpoint 6
-
-- Predict the result before running.
-- Execute this stage on a small input.
-- Record output, count and error (if any).
-- Explain which input/rule caused the result.
-- Compare actual result with contract and expected output.
-- Reproduce a failure with the smallest input and fix its cause.
-
-## Lab checkpoint 7
-
-- Predict the result before running.
-- Execute this stage on a small input.
-- Record output, count and error (if any).
-- Explain which input/rule caused the result.
-- Compare actual result with contract and expected output.
-- Reproduce a failure with the smallest input and fix its cause.
-
-## Lab checkpoint 8
-
-- Predict the result before running.
-- Execute this stage on a small input.
-- Record output, count and error (if any).
-- Explain which input/rule caused the result.
-- Compare actual result with contract and expected output.
-- Reproduce a failure with the smallest input and fix its cause.
-
-
-# 13. Instructor review rubric
-
-| Skill | Beginner evidence |
-|---|---|
-| Concept | Explains what/why plainly |
-| Code | Reads/explains lines, not blindly copies |
-| Output | Derives output from input/rule |
-| Quality | Identifies invalid, duplicate and boundary cases |
-| Reliability | Explains retry, replay and checkpoint |
-| Verification | Uses counts/keys/totals/quality checks |
-| Interview | Gives decision, reason, failure mode and proof |
-
-
-
-# 14. Additional worked lab cells — Transformation
-
-Each cell is a separate experiment. Students should predict, execute, record output and explain the business meaning.
-
-## Lab cell 1
-
-Cell 1 — inspect raw status: create values [' paid ','PAID','paid','unknown']; print original values and counts. Predict which are equivalent before changing them.
-
-**Write in your notebook:** input; expected output; actual output; why it happened; validation evidence; what you would do if it failed.
-
-## Lab cell 2
-
-Cell 2 — normalize approved values: strip whitespace and uppercase; inspect value counts. Do not map 'unknown' to PAID. Keep unknown distinct.
-
-**Write in your notebook:** input; expected output; actual output; why it happened; validation evidence; what you would do if it failed.
-
-## Lab cell 3
-
-Cell 3 — numeric parsing: test '12.50','', 'abc','-4'. Decide blank/null, malformed reject and negative business policy separately; parsing success is not validation success.
-
-**Write in your notebook:** input; expected output; actual output; why it happened; validation evidence; what you would do if it failed.
-
-## Lab cell 4
-
-Cell 4 — Decimal arithmetic: quantity 3, price Decimal('100.00'), discount Decimal('10.00'); calculate gross/net. Show why float may represent decimal fractions imprecisely.
-
-**Write in your notebook:** input; expected output; actual output; why it happened; validation evidence; what you would do if it failed.
-
-## Lab cell 5
-
-Cell 5 — mapping: map PAID/SHIPPED/PENDING to canonical codes; unknown values become rejected/needs-review with original code.
-
-**Write in your notebook:** input; expected output; actual output; why it happened; validation evidence; what you would do if it failed.
-
-## Lab cell 6
-
-Cell 6 — cross-field validation: shipped_at must exist when status=SHIPPED; cancelled order may have zero amount according to business policy. Validate relationships, not only individual fields.
-
-**Write in your notebook:** input; expected output; actual output; why it happened; validation evidence; what you would do if it failed.
-
-## Lab cell 7
-
-Cell 7 — aggregation grain: one order has two lines; sum line totals once per order. Show how duplicate line input doubles amount and why dedup precedes aggregation.
-
-**Write in your notebook:** input; expected output; actual output; why it happened; validation evidence; what you would do if it failed.
-
-## Lab cell 8
-
-Cell 8 — audit: write accepted/rejected counts and total amounts; compare source and transformed totals with excluded records explained.
-
-**Write in your notebook:** input; expected output; actual output; why it happened; validation evidence; what you would do if it failed.
-
-# 15. Lab completion evidence
-
-| Evidence | Student submission |
-|---|---|
-| Input contract | Fields, types, keys, source behavior |
-| Happy-path run | Input and output counts |
-| Invalid case | Error/reject reason and handling |
-| Replay | Proof no duplicate side effect |
-| Boundary case | Proof no gap or unintended overlap |
-| Recovery | Last safe point and restart procedure |
-| Reconciliation | Counts, keys, totals or quality checks |
-| Project defence | Explain decision, risk, control and proof |
-
+| AttributeError strip on None | Null not handled | Check None before string methods |
+| ValueError int | Invalid integer text | Reject with reason |
+| Decimal InvalidOperation | Invalid amount | Record conversion error |
+| Unknown status | Mapping incomplete | Keep exception; ask owner |
+| Wrong total | Duplicate grain or discount rule | Check input keys and formula |
+| Date shifted | Ambiguous timezone/format | Confirm source contract |
+| Accepted count too low | Schema drift/systemic rule | Inspect rejection distribution |
+| Totals don't reconcile | Missing/duplicate/rejected or intended adjustment | Explain and trace each component |
+
+---
+
+# 14. Exercises with answers
+
+1. Difference between raw and curated data?
+2. Why profile before normalizing?
+3. Why is Decimal used for money?
+4. Difference between parsing and validation?
+5. What should unknown status do?
+6. Why preserve rejected records?
+7. What is a cross-field rule?
+8. Why deduplicate before aggregation?
+9. How can transformation affect reconciliation?
+10. What evidence proves a mapping is complete?
+
+**Answer guide**
+1. Raw preserves source; curated applies approved rules.
+2. Discover actual variants and avoid accidental changes.
+3. Decimal supports base-10 financial precision.
+4. Parsing interprets type; validation checks business constraints.
+5. Exception/reject until mapping is approved.
+6. Enables correction, traceability and no silent data loss.
+7. Rule involving multiple fields.
+8. Duplicate lines inflate sums.
+9. Cleaning/mapping/derived values can alter fields/totals by design.
+10. Every observed source code mapped or explicitly exceptioned; unknown count monitored.
+
+---
+
+# 15. Day 34 self-check
+
+- [ ] Profile raw values before changing.
+- [ ] Normalize text only when approved.
+- [ ] Convert int/date/Decimal with error handling.
+- [ ] Map source status using explicit mapping.
+- [ ] Keep unknown status visible.
+- [ ] Calculate gross/net with Decimal.
+- [ ] Validate cross-field rules.
+- [ ] Separate accepted/rejected records.
+- [ ] Reconcile counts and business totals.
+- [ ] Complete transformation project and explain every rule.
+
+**Remember:** Transformation is business meaning encoded as reproducible rules. A technically successful script can still produce incorrect business data if those rules are wrong.
