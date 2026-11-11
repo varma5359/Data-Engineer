@@ -34,6 +34,8 @@ A function is not automatically better for every two-line calculation. Use one w
 
 ## 3. Define and call a function
 
+![How a Python function works](images/day_07_function_execution_flow.svg)
+
 ```python
 def calculate_line_amount(quantity, unit_price):
     line_amount = quantity * unit_price
