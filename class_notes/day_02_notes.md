@@ -316,6 +316,8 @@ A small company may begin with one database. As workloads grow, separating opera
 
 ## 5. OLTP vs OLAP — understand the difference properly
 
+![OLTP vs OLAP comparison](images/day_02_oltp_vs_olap.svg)
+
 ### 5.1 Business purpose
 
 - OLTP helps the business perform its daily operations.
