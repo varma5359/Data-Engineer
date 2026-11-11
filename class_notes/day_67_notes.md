@@ -370,3 +370,16 @@ Rolling back application code does not automatically reverse data already writte
 - [ ] Identify data pipeline-specific tests.
 
 **Phase 7 content ends here.** You have learned orchestration, DAGs, scheduling, reliability, data quality, monitoring, security, containers and automated testing. The next phase applies these skills in an end-to-end Data Engineering capstone.
+
+---
+
+## Visual Learning Diagrams
+
+### CI/CD pipeline
+![Day 67 - CI/CD pipeline](images/day_67_cicd_pipeline.svg)
+
+### Test pyramid
+![Day 67 - Test pyramid](images/day_67_automated_test_pyramid.svg)
+
+### Branch and pull request
+![Day 67 - Branch and pull request](images/day_67_git_branch_pull_request.svg)
