@@ -71,6 +71,8 @@ Number of orders: 3
 
 ## 5. CSV: Comma-Separated Values
 
+![CSV and JSON comparison](images/day_09_csv_vs_json.svg)
+
 ### 5.1 What is CSV?
 
 CSV stores tabular records as rows and fields as columns. It is widely supported by spreadsheets, databases and data tools.
