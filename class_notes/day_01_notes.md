@@ -336,6 +336,8 @@ Do not immediately change production data. First understand the expected result 
 
 ## 6. Data Engineer vs Data Analyst vs Data Scientist
 
+![Data roles comparison](images/day_01_data_roles_comparison.svg)
+
 These roles work with data, but they solve different problems.
 
 ### 6.1 Data Engineer
@@ -404,6 +406,8 @@ The work can overlap. The exact responsibilities depend on the organization.
 ---
 
 ## 7. Understand the data lifecycle
+
+![Detailed data lifecycle](images/day_01_data_lifecycle_detail.svg)
 
 ![How data engineering helps a business](images/day_01_data_engineering_journey.svg)
 
