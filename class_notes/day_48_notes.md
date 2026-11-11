@@ -1313,3 +1313,16 @@ Without looking at the notes, explain:
 If you can explain these decisions and reproduce the SQL workflow, you are ready for Day 49.
 
 **Next lesson — Day 49: Warehouse Performance Optimization.** We will inspect query plans, understand partitioning, indexes, materialization and storage trade-offs, then perform a small before/after performance investigation without inventing benchmark results.
+
+---
+
+## Visual Learning Diagrams
+
+### Warehouse testing layers
+![Day 48 - Warehouse testing layers](images/day_48_warehouse_testing.svg)
+
+### Quality gate before publish
+![Day 48 - Quality gate before publish](images/day_48_data_quality_gates.svg)
+
+### Freshness SLA
+![Day 48 - Freshness SLA](images/day_48_freshness_sla.svg)
