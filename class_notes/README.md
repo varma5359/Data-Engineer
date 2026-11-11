@@ -12,7 +12,7 @@ The course is being rebuilt phase by phase to one consistent beginner-first teac
 | Phase 2 — Python for Data Engineering | 6–18 | Complete | 13/13 days rebuilt and verified |
 | Phase 3 — SQL and Database Engineering | 19–29 | Rebuilt; final technical review | 9/11 days rebuilt and verified; Days 19–20 retained for cross-check |
 | Phase 4 — Data Processing and Pipelines | 30–39 | **Rebuild required** | Existing drafts are not student-ready; re-authoring from teaching standard |
-| Phase 5 — Data Warehousing and Modeling | 40–49 | Pending | 0/10 days verified |
+| Phase 5 — Data Warehousing and Modeling | 40–49 | Authored; runtime validation pending | 10/10 lesson sets prepared |
 | Phase 6 — Cloud and Distributed Processing | 50–59 | Pending | 0/10 days verified |
 | Phase 7 — Orchestration, Quality and Monitoring | 60–67 | Pending | 0/8 days verified |
 | Phase 8 — Data Engineering Capstone | 68–75 | Pending | 0/8 days verified |
@@ -230,3 +230,25 @@ Each day has a class notebook, a guided project workbook and an interview guide.
 | 39 | Pipeline Logging and Observability | [Notes](day_39_notes.md) | [Workbook](day_39_project_workbook.md) | [Guide](day_39_interview.md) |
 
 **Teaching-quality status:** content rebuild and artifact indexing completed for the phase. Runtime validation still belongs to the student environment/CI: execute every workbook, verify installed dependencies, compare outputs, and record environment-specific differences before marking classroom delivery fully validated.
+
+
+## Phase 5 — Data Warehousing and Modeling (Days 40–49)
+
+Each day has separate class notes, a guided project workbook and a complete interview guide. Class notes are written for independent beginner learning. SQL examples use PostgreSQL unless a platform difference is explicitly noted.
+
+| Day | Syllabus topic | Mini-project | Class notes | Project workbook | Interview |
+|---|---|---|---|---|---|
+| 40 | Data Warehouse Architecture | Warehouse Architecture Plan | [Notes](day_40_notes.md) | [Workbook](day_40_project_workbook.md) | [Guide](day_40_interview.md) |
+| 41 | Fact and Dimension Tables | Sales Star Schema | [Notes](day_41_notes.md) | [Workbook](day_41_project_workbook.md) | [Guide](day_41_interview.md) |
+| 42 | Slowly Changing Dimensions | Customer History Model | [Notes](day_42_notes.md) | [Workbook](day_42_project_workbook.md) | [Guide](day_42_interview.md) |
+| 43 | Keys and Data Relationships | Warehouse Key Management | [Notes](day_43_notes.md) | [Workbook](day_43_project_workbook.md) | [Guide](day_43_interview.md) |
+| 44 | Data Marts and Subject-Oriented Modeling | Sales Data Mart | [Notes](day_44_notes.md) | [Workbook](day_44_project_workbook.md) | [Guide](day_44_interview.md) |
+| 45 | Data Quality and Validation | Data Quality Framework | [Notes](day_45_notes.md) | [Workbook](day_45_project_workbook.md) | [Guide](day_45_interview.md) |
+| 46 | Data Reconciliation and Lineage | Source-to-Target Reconciliation | [Notes](day_46_notes.md) | [Workbook](day_46_project_workbook.md) | [Guide](day_46_interview.md) |
+| 47 | Metadata and Data Documentation | Data Dictionary Generator | [Notes](day_47_notes.md) | [Workbook](day_47_project_workbook.md) | [Guide](day_47_interview.md) |
+| 48 | Warehouse Loading Strategies | Warehouse Load Simulator | [Notes](day_48_notes.md) | [Workbook](day_48_project_workbook.md) | [Guide](day_48_interview.md) |
+| 49 | Warehouse Performance Optimization | Warehouse Performance Audit | [Notes](day_49_notes.md) | [Workbook](day_49_project_workbook.md) | [Guide](day_49_interview.md) |
+
+**Phase 5 content status:** All ten lesson sets have been authored for this phase batch. Class notes, project workbooks and interview guides are separate. Runtime execution of SQL examples and environment-specific dbt/warehouse behavior remains to be validated before marking the phase classroom-verified.
+
+**Teaching progression:** architecture -> dimensional model -> historical dimensions -> key management -> subject marts -> quality -> reconciliation and lineage -> metadata -> loading -> performance.
