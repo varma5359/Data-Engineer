@@ -209,6 +209,8 @@ An identifier is used to identify something; it is not necessarily used for arit
 
 ## 4. Three broad categories of data
 
+![Structured, semi-structured and unstructured data](images/day_03_structured_semi_unstructured_data.svg)
+
 Data is often described as structured, semi-structured or unstructured.
 
 These categories help us understand how much predefined organization the data has.
