@@ -161,3 +161,12 @@ The course is being rebuilt phase by phase to one consistent beginner-first teac
 
 ---
 
+
+
+## Day 30 — ETL and Data Extraction (rebuild artifacts)
+
+- [Day 30 Class Notebook](day_30_notes.md) — 697 lines, beginner lesson with SQL/Python walkthrough, output interpretation, validation and debugging.
+- [Day 30 Project Workbook](day_30_project_workbook.md) — 305 lines, step-by-step project cells, exact expected output shapes, acceptance checks and failure drills.
+- [Day 30 Interview Guide](day_30_interview.md) — complete model answers, follow-ups, project defence and common traps.
+
+**Status:** Day 30 is the first rebuilt lesson under the independent-learning standard. Review against the real TechStore schema and execute all cells before marking fully classroom-verified.
