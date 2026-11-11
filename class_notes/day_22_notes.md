@@ -124,6 +124,8 @@ SQL aggregate functions calculate these summaries.
 
 ## 4. First understand aggregate functions
 
+![SQL aggregate functions](images/day_22_aggregate_functions.svg)
+
 The five core aggregate functions are:
 
 | Function | What it calculates | Business question |
@@ -372,6 +374,8 @@ All five metrics summarize the same four product rows.
 
 ## 10. GROUP BY: summarize each group separately
 
+![How GROUP BY works](images/day_22_group_by.svg)
+
 So far, aggregate functions returned one summary for the entire table.
 
 A manager may ask for sales by order. We need one summary per order. GROUP BY divides rows into groups.
@@ -506,6 +510,8 @@ This returns one row per customer/status combination.
 ---
 
 ## 12. WHERE versus HAVING
+
+![WHERE versus HAVING](images/day_22_where_vs_having.svg)
 
 These clauses are different.
 
@@ -860,6 +866,8 @@ A derived table must have an alias in PostgreSQL. Here the alias is order_summar
 ---
 
 ## 20. Common Table Expressions (CTEs)
+
+![Subqueries and CTEs](images/day_22_subquery_cte.svg)
 
 A CTE is a named temporary result defined using WITH. It exists for the duration of one SQL statement.
 
