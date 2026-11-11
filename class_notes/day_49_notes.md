@@ -948,3 +948,567 @@ What must be checked after optimization?
 - [ ] Explain compute and storage cost trade-offs.
 
 **Phase 5 completion:** You have learned warehouse architecture, dimensional modeling, SCD history, key management, data marts, quality, reconciliation, metadata, loading strategies and performance fundamentals. The next phase begins with cloud data engineering fundamentals.
+
+
+---
+
+# Part 14 — Your first performance investigation, step by step
+
+The earlier section created a 200,000-row table and an index. Now perform a controlled investigation rather than assuming that an index is always faster.
+
+Keep this work in the same PostgreSQL session so that the temporary table remains available.
+
+## 14.1 Write down the question
+
+Business question:
+
+"Find the order with ID 12345 and show its date and amount."
+
+The query needs only three columns:
+- order_id;
+- order_date;
+- amount.
+
+It does not need customer_id.
+
+## 14.2 Record the baseline plan
+
+Before creating any additional index, run:
+
+~~~sql
+EXPLAIN (ANALYZE, BUFFERS)
+SELECT order_id, order_date, amount
+FROM performance_orders
+WHERE order_id = 12345;
+~~~
+
+Record:
+- scan type;
+- estimated rows;
+- actual rows;
+- execution time;
+- shared buffer hits and reads, if displayed.
+
+Your actual output depends on PostgreSQL version, cache state and environment. Do not copy a timing from this document.
+
+If you already created the order_id index in Part 4, this is no longer an unindexed baseline. To repeat the comparison, create a fresh training table or drop the index in the isolated training session and rerun ANALYZE.
+
+## 14.3 Understand BUFFERS at a beginner level
+
+With BUFFERS enabled, PostgreSQL can report buffer activity.
+
+- shared hit: a needed page was already in PostgreSQL shared buffers;
+- shared read: PostgreSQL had to read a page into shared buffers.
+
+These values help investigate I/O behavior. They are not a complete measure of physical disk activity or cloud cost.
+
+## 14.4 Compare a query that returns many rows
+
+~~~sql
+EXPLAIN (ANALYZE, BUFFERS)
+SELECT order_id, order_date, amount
+FROM performance_orders
+WHERE amount >= 100;
+~~~
+
+This predicate may match a large part of the table.
+
+An index on amount is not guaranteed to be useful. If many rows qualify, the optimizer may prefer a sequential scan.
+
+The correct plan depends on actual data distribution and statistics.
+
+## 14.5 Compare a date-range query
+
+~~~sql
+EXPLAIN (ANALYZE, BUFFERS)
+SELECT
+    order_id,
+    order_date,
+    amount
+FROM performance_orders
+WHERE order_date >= DATE '2026-03-01'
+  AND order_date < DATE '2026-04-01';
+~~~
+
+This is a range query. It can be a candidate for a date index or date partitioning in an appropriate production table.
+
+Do not add both automatically. First inspect the plan, table size, workload and write cost.
+
+## 14.6 Build an evidence table
+
+Fill this table with your own execution results:
+
+| Measurement | Before change | After change |
+|---|---|---|
+| Query text | Record exact query | Same logical query |
+| Scan type | Record plan node | Record plan node |
+| Estimated rows | Record value | Record value |
+| Actual rows | Record value | Record value |
+| Execution time | Record actual value | Record actual value |
+| Buffer reads/hits | Record if available | Record if available |
+| Output count | Validate | Validate |
+| Output total | Validate if relevant | Validate if relevant |
+
+Do not write "faster" unless the repeated measurements support that conclusion under comparable conditions.
+
+---
+
+# Part 15 — Understand index choices with query patterns
+
+## 15.1 Equality lookup
+
+Example:
+
+~~~sql
+SELECT *
+FROM performance_orders
+WHERE customer_id = 501;
+~~~
+
+This asks for rows belonging to one customer.
+
+An index on customer_id may help if the customer is selective enough and the table is large enough. Inspect the plan rather than assuming.
+
+## 15.2 Range lookup
+
+Example:
+
+~~~sql
+SELECT *
+FROM performance_orders
+WHERE order_date >= DATE '2026-05-01'
+  AND order_date < DATE '2026-06-01';
+~~~
+
+A B-tree index can support many range predicates. A partitioned table may also prune partitions if its partition key and filter align.
+
+## 15.3 Composite index and leading column
+
+Suppose many queries use both customer_id and order_date.
+
+~~~sql
+CREATE INDEX idx_performance_customer_date
+ON performance_orders(customer_id, order_date);
+~~~
+
+This index orders entries first by customer_id and then by order_date within each customer value.
+
+It can be useful for predicates that constrain the leading column and may also support suitable date conditions.
+
+It is not equivalent to an index on (order_date, customer_id).
+
+After creating the index, inspect plans for the real query patterns and consider the additional storage and write overhead.
+
+## 15.4 Partial index
+
+A partial index stores entries only for rows meeting a predicate.
+
+Example:
+
+~~~sql
+CREATE INDEX idx_orders_recent_paid
+ON performance_orders(order_date)
+WHERE amount > 40000;
+~~~
+
+This is a teaching example, not a recommendation for this synthetic table. A partial index is useful only when queries use a predicate compatible with the index condition and the indexed subset is valuable.
+
+Do not create partial indexes without a measured use case.
+
+## 15.5 Index-only scan
+
+An index-only scan can avoid visiting the table heap when the required columns are available from the index and PostgreSQL's visibility information allows it.
+
+For example, an index that includes selected columns may support a narrow lookup:
+
+~~~sql
+CREATE INDEX idx_orders_id_covering
+ON performance_orders(order_id)
+INCLUDE (order_date, amount);
+~~~
+
+This is supported by PostgreSQL B-tree indexes. It increases index size and write maintenance.
+
+The optimizer may still choose another plan. Verify with EXPLAIN ANALYZE.
+
+---
+
+# Part 16 — Understand statistics and estimates
+
+The optimizer needs information about data distribution to choose a plan.
+
+## 16.1 What are table statistics?
+
+Statistics summarize properties such as:
+- approximate row count;
+- value distribution;
+- common values;
+- distinct value estimates;
+- NULL frequency.
+
+PostgreSQL uses statistics when estimating query costs.
+
+## 16.2 Why run ANALYZE?
+
+When a table changes significantly, statistics may no longer describe the current data well.
+
+Run:
+
+~~~sql
+ANALYZE performance_orders;
+~~~
+
+Expected output:
+
+~~~text
+ANALYZE
+~~~
+
+ANALYZE updates planner statistics. It does not change the business rows.
+
+## 16.3 Estimated rows versus actual rows
+
+Suppose a plan estimates 100 rows but actually returns 50,000.
+
+The optimizer's assumption is far from the observed result.
+
+Investigate:
+- stale statistics;
+- uneven distribution;
+- correlated columns;
+- parameter values;
+- filter expressions;
+- data changes.
+
+A large estimate error does not automatically tell you which index to create. It tells you where to investigate.
+
+## 16.4 Why a sequential scan can be correct
+
+Imagine a report needs 190,000 of 200,000 rows.
+
+Using an index to find almost every row and then visiting many table pages may cost more than reading the table sequentially.
+
+The optimizer can choose Seq Scan because it estimates that plan to be cheaper.
+
+The goal is not to eliminate sequential scans. The goal is to choose an efficient plan for the workload.
+
+---
+
+# Part 17 — Partitioning lab: inspect which data is read
+
+The earlier section created sales_partitioned with January and February partitions.
+
+## 17.1 Confirm the training rows
+
+~~~sql
+SELECT *
+FROM sales_partitioned
+ORDER BY sale_date;
+~~~
+
+Expected result: three rows, two in January and one in February.
+
+## 17.2 Inspect a January-only query
+
+~~~sql
+EXPLAIN
+SELECT *
+FROM sales_partitioned
+WHERE sale_date >= DATE '2026-01-01'
+  AND sale_date < DATE '2026-02-01';
+~~~
+
+Inspect whether the plan references only the January partition.
+
+The exact display varies by PostgreSQL version and planning settings. The important idea is that the date predicate allows PostgreSQL to exclude partitions outside the requested range.
+
+## 17.3 Use a clear half-open date interval
+
+For monthly filters, this pattern is often safer:
+
+~~~sql
+WHERE sale_date >= DATE '2026-01-01'
+  AND sale_date < DATE '2026-02-01'
+~~~
+
+It includes the first day and excludes the next month's first day.
+
+For timestamp columns, this avoids guessing the final time of the month, such as 23:59:59.999.
+
+## 17.4 What if a row has no matching partition?
+
+A partitioned table must have a destination partition for inserted values, unless a suitable DEFAULT partition exists.
+
+If no partition matches, PostgreSQL rejects the insert.
+
+Production partition management must plan future partitions and monitor unexpected date ranges. Do not solve this by creating arbitrary partitions without retention and maintenance rules.
+
+---
+
+# Part 18 — Materialization and freshness decision exercise
+
+A dashboard runs the same expensive daily aggregation many times.
+
+Possible designs:
+
+| Design | Query cost | Freshness | Operational work |
+|---|---|---|---|
+| View | Recomputes underlying query when read | Current underlying data | Lower storage, query may be expensive |
+| Physical table | Reads stored result | Depends on load schedule | Pipeline must rebuild/update |
+| Materialized view | Reads stored result | Until refreshed | Refresh schedule and monitoring required |
+
+Ask the business:
+- How fresh must the dashboard be?
+- How often is the query run?
+- How expensive is the aggregation?
+- How much storage is acceptable?
+- Can users tolerate a refresh window?
+- What happens if refresh fails?
+
+Do not materialize a query simply because it is slow. First understand the reason and compare the freshness requirement with the refresh cost.
+
+---
+
+# Part 19 — Performance troubleshooting walkthrough
+
+A dashboard query that used to take 3 seconds now takes 90 seconds.
+
+Do not immediately increase compute or add an index.
+
+Use this sequence.
+
+## Step 1: Confirm the same query and parameters
+
+Check:
+- query text;
+- date range;
+- filter values;
+- user parameters;
+- dashboard-generated SQL.
+
+A report may be slow because it now requests two years instead of one week.
+
+## Step 2: Confirm data volume
+
+Check:
+- row count;
+- table growth;
+- new partitions;
+- file count;
+- data skew;
+- recent backfill.
+
+The workload may be larger than before.
+
+## Step 3: Inspect the execution plan
+
+Look for:
+- sequential scan over a large table;
+- unexpected nested loop with many repeated lookups;
+- large sort;
+- hash operation spilling to disk;
+- missing partition pruning;
+- estimated versus actual row mismatch;
+- expensive function or cast on a filtered column.
+
+These are clues, not automatic diagnoses.
+
+## Step 4: Check joins and grain
+
+A join can multiply rows if the join key is not unique on the expected side.
+
+For example, joining each sales line to multiple active dimension rows can increase row count and distort totals.
+
+Check:
+- join key uniqueness;
+- table grain;
+- filter placement;
+- relationship cardinality.
+
+## Step 5: Change one thing
+
+Possible controlled changes:
+- add a suitable index;
+- rewrite a non-sargable predicate where appropriate;
+- add a correct partition filter;
+- reduce unnecessary selected columns;
+- pre-aggregate only when semantics remain identical;
+- refresh statistics;
+- materialize a frequently reused result.
+
+## Step 6: Validate the result
+
+Compare:
+- output row count;
+- distinct business keys;
+- total sales;
+- date range;
+- NULL behavior;
+- duplicate count.
+
+A faster query that changes the result is not a successful optimization.
+
+## Step 7: Record and monitor
+
+Record:
+- change made;
+- plan before and after;
+- repeated timings;
+- resource/cost observations;
+- correctness evidence;
+- rollback plan.
+
+Monitor after release. Workloads and data distributions change over time.
+
+---
+
+# Part 20 — Production safety and platform differences
+
+## 20.1 EXPLAIN ANALYZE executes
+
+For SELECT statements, it runs the query and measures it.
+
+For data-changing statements, it can execute the write. Use an isolated environment and understand transaction effects before analyzing DML.
+
+## 20.2 Index creation can affect workloads
+
+On a busy production database, index creation can consume resources and may block or compete with writes depending on the command and platform.
+
+PostgreSQL supports CREATE INDEX CONCURRENTLY for certain production scenarios, but it has its own restrictions and operational behavior. Learn the database version and release procedure before using it.
+
+## 20.3 PostgreSQL is not every cloud warehouse
+
+PostgreSQL concepts such as B-tree indexes and table partitions do not map one-to-one to every cloud analytical platform.
+
+Some cloud warehouses rely more on:
+- columnar storage;
+- micro-partitions;
+- clustering;
+- distribution/sort keys;
+- automatic statistics;
+- elastic compute;
+- result caching.
+
+Always read the target platform's execution plan and performance documentation.
+
+## 20.4 Avoid production experiments
+
+Use a development or test dataset for:
+- index creation;
+- partition changes;
+- materialized view refresh experiments;
+- query rewrites;
+- DDL changes.
+
+Production changes need review, monitoring and a rollback plan.
+
+---
+
+# Part 21 — Additional practice exercises with worked answers
+
+## Exercise 6 — Selective query
+
+A query returns one row from a table containing millions of records. What might help?
+
+**Worked answer:** A suitable index may help locate the row, but inspect the execution plan and confirm that the indexed predicate is selective.
+
+## Exercise 7 — Broad query
+
+A query returns 95% of a table. Must it use an index?
+
+**Worked answer:** No. A sequential scan may be cheaper than many index lookups. Let the optimizer choose based on statistics and verify the plan.
+
+## Exercise 8 — Stale statistics
+
+The table has grown from 10,000 rows to 100 million rows, but estimates remain inaccurate. What should you inspect?
+
+**Worked answer:** Check and refresh planner statistics with ANALYZE, then compare estimated and actual rows. Also inspect data distribution and query predicates.
+
+## Exercise 9 — Partition filter
+
+A table is partitioned by sale_date, but a query filters only by product_id. Will it necessarily prune date partitions?
+
+**Worked answer:** No. The query does not restrict the partition key. It may need to examine many or all partitions unless other constraints or pruning opportunities apply.
+
+## Exercise 10 — Materialized view
+
+The source table receives new rows every minute, but the materialized view refreshes once per day. What is the issue?
+
+**Worked answer:** The result can be stale for most of the day. Confirm whether daily freshness meets the consumer requirement or choose a more frequent/incremental approach.
+
+## Exercise 11 — Wrong result after optimization
+
+A rewritten query runs faster but returns 20% fewer sales rows. Is this success?
+
+**Worked answer:** No. Check filters, joins, NULL behavior and date boundaries. Performance improvement is valid only when the intended result is preserved.
+
+## Exercise 12 — Index overhead
+
+A table receives heavy inserts and updates. What should you consider before adding five indexes?
+
+**Worked answer:** Indexes consume storage and add write/maintenance work. Identify the most valuable query patterns and measure the read benefit against write and storage cost.
+
+## Exercise 13 — Skew
+
+One customer owns 70% of all event records. Why may a distributed aggregation be slow?
+
+**Worked answer:** Work can become concentrated on one partition or worker. Investigate skew and choose a suitable distribution or skew-handling strategy without changing aggregation correctness.
+
+## Exercise 14 — Small files
+
+A lakehouse table has hundreds of thousands of tiny files. What problem can occur?
+
+**Worked answer:** File listing, metadata, scheduling and open costs can dominate. Compaction may help, but choose target file sizes based on the platform and workload.
+
+---
+
+# Part 22 — Day 49 practical completion checklist
+
+### Query plans and measurement
+- [ ] Explain what a query plan represents.
+- [ ] Run EXPLAIN on a SELECT statement.
+- [ ] Run EXPLAIN ANALYZE safely in a training environment.
+- [ ] Identify scan and join nodes.
+- [ ] Compare estimated and actual rows.
+- [ ] Record a repeatable performance baseline.
+- [ ] Explain why one timing is not enough.
+
+### Indexes and partitioning
+- [ ] Explain B-tree and composite index concepts.
+- [ ] Explain why index column order matters.
+- [ ] Explain index storage and write overhead.
+- [ ] Explain when a sequential scan can be appropriate.
+- [ ] Create and inspect a range-partitioned table.
+- [ ] Explain partition pruning and half-open date ranges.
+- [ ] Explain why partition key selection matters.
+
+### Materialization and distributed concepts
+- [ ] Compare a view, table and materialized view.
+- [ ] Refresh a materialized view and observe freshness.
+- [ ] Explain columnar storage.
+- [ ] Explain skew, shuffle and small-file overhead.
+- [ ] Explain compute, storage and data movement costs.
+
+### Engineering judgment
+- [ ] Change one optimization variable at a time.
+- [ ] Compare before-and-after plans and timings.
+- [ ] Validate row counts, keys and business totals.
+- [ ] Explain why a faster incorrect result is not an optimization.
+- [ ] Describe production safety and rollback considerations.
+
+## Final self-assessment
+
+Without looking at the notes, explain:
+
+1. Why is a sequential scan not always bad?
+2. What is the difference between EXPLAIN and EXPLAIN ANALYZE?
+3. Why can indexes slow down writes?
+4. How does partition pruning reduce work?
+5. Why must a materialized view be refreshed?
+6. What is the difference between a view and a materialized view?
+7. What causes data skew and shuffle overhead?
+8. What evidence proves an optimization preserved the business result?
+
+If you can answer these questions and perform a basic before-and-after investigation, you have completed the Phase 5 performance fundamentals.
+
+**Phase 5 completion:** You have studied warehouse architecture, dimensional modeling, SCD history, key management, data marts, data quality, reconciliation, metadata, loading strategies and performance fundamentals. The next phase begins with cloud data engineering fundamentals.
