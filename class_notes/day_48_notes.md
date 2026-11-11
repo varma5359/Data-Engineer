@@ -765,3 +765,551 @@ Why should checkpoint be saved after target validation?
 - [ ] Explain loading failure scenarios and recovery.
 
 **Next lesson — Day 49: Warehouse Performance Optimization.** We will inspect query plans, understand partitioning, indexes, materialization and storage trade-offs, then perform a small before/after performance investigation without inventing benchmark results.
+
+
+---
+
+# Part 15 — Run a complete staging-to-warehouse upsert
+
+The earlier sections showed individual loading strategies. Now combine them into a small workflow.
+
+You will:
+1. create a source batch;
+2. stage the rows;
+3. validate the batch;
+4. upsert the warehouse table;
+5. reconcile the target;
+6. understand when a checkpoint may advance.
+
+Keep the SQL statements in one PostgreSQL session because the training tables are temporary.
+
+## 15.1 Understand the business situation
+
+TechStore maintains a product dimension.
+
+The source sends product records every day:
+- new products may arrive;
+- existing product names may change;
+- categories may change;
+- old source updates may be replayed.
+
+The warehouse table stores the latest approved product state. It does not preserve history. This is a Type 1-style current-state table.
+
+## 15.2 Create a fresh staging batch
+
+~~~sql
+CREATE TEMP TABLE daily_product_batch (
+    product_id INTEGER,
+    product_name VARCHAR(100),
+    category VARCHAR(50),
+    source_updated_at TIMESTAMP,
+    batch_id VARCHAR(40)
+);
+~~~
+
+Expected output: CREATE TABLE.
+
+Insert the batch:
+
+~~~sql
+INSERT INTO daily_product_batch VALUES
+(10, 'Laptop Pro', 'Computers', TIMESTAMP '2026-01-05 09:00:00', 'batch-001'),
+(12, 'Keyboard', 'Accessories', TIMESTAMP '2026-01-05 09:00:00', 'batch-001'),
+(13, 'Webcam', 'Accessories', TIMESTAMP '2026-01-05 09:05:00', 'batch-001');
+~~~
+
+Expected output: INSERT 0 3.
+
+The batch contains:
+- product 10, which may already exist;
+- product 12, which may be new;
+- product 13, which is new.
+
+## 15.3 Check batch completeness
+
+~~~sql
+SELECT
+    COUNT(*) AS batch_rows,
+    COUNT(product_id) AS rows_with_product_id,
+    COUNT(product_name) AS rows_with_product_name,
+    COUNT(category) AS rows_with_category
+FROM daily_product_batch;
+~~~
+
+Expected result:
+
+| batch_rows | rows_with_product_id | rows_with_product_name | rows_with_category |
+|---:|---:|---:|---:|
+| 3 | 3 | 3 | 3 |
+
+All three records have the required values in this fixture.
+
+## 15.4 Check duplicate business keys inside the batch
+
+~~~sql
+SELECT
+    product_id,
+    COUNT(*) AS row_count
+FROM daily_product_batch
+GROUP BY product_id
+HAVING COUNT(*) > 1;
+~~~
+
+Expected result: zero rows.
+
+If this query returns a product ID, do not blindly upsert both rows. First decide which source record is authoritative. A common approach is to choose the latest source update only when the source contract guarantees that timestamp ordering is reliable. If two records have the same timestamp but conflicting values, route the conflict for investigation.
+
+## 15.5 Check timestamp and allowed values
+
+~~~sql
+SELECT *
+FROM daily_product_batch
+WHERE source_updated_at IS NULL
+   OR product_id IS NULL
+   OR TRIM(product_name) = ''
+   OR TRIM(category) = '';
+~~~
+
+Expected result: zero rows for the training fixture.
+
+If the query returns records, inspect the original values and apply the approved reject or quarantine policy. Do not convert missing product names into invented labels.
+
+## 15.6 Upsert only after the checks pass
+
+The target table from Part 6 is named warehouse_product_upsert.
+
+~~~sql
+INSERT INTO warehouse_product_upsert
+    (product_id, product_name, category, source_updated_at)
+SELECT
+    product_id,
+    TRIM(product_name),
+    TRIM(category),
+    source_updated_at
+FROM daily_product_batch
+ON CONFLICT (product_id)
+DO UPDATE SET
+    product_name = EXCLUDED.product_name,
+    category = EXCLUDED.category,
+    source_updated_at = EXCLUDED.source_updated_at
+WHERE EXCLUDED.source_updated_at > warehouse_product_upsert.source_updated_at;
+~~~
+
+Expected output for the original Part 6 target state and this three-row batch: INSERT 0 3.
+
+Interpretation:
+- product 10 is updated only if the incoming timestamp is newer;
+- product 12 is inserted;
+- product 13 is inserted;
+- any older replay for an existing key is ignored by the WHERE condition.
+
+PostgreSQL's EXCLUDED refers to the incoming row that conflicted with an existing target row. It does not mean a deleted or excluded business record.
+
+## 15.7 Inspect the target
+
+~~~sql
+SELECT
+    product_id,
+    product_name,
+    category,
+    source_updated_at
+FROM warehouse_product_upsert
+ORDER BY product_id;
+~~~
+
+Expected result:
+
+| product_id | product_name | category | source_updated_at |
+|---:|---|---|---|
+| 10 | Laptop Pro | Computers | 2026-01-05 09:00:00 |
+| 11 | Mouse | Accessories | 2026-01-01 09:00:00 |
+| 12 | Keyboard | Accessories | 2026-01-05 09:00:00 |
+| 13 | Webcam | Accessories | 2026-01-05 09:05:00 |
+
+The exact display of timestamps depends on your SQL client, but the stored values should match the inserted timestamps.
+
+## 15.8 Replay the same batch
+
+Run the upsert statement from 15.6 again without changing the batch.
+
+The target should still contain four product IDs, not seven rows.
+
+Why?
+- product_id is a primary key;
+- existing keys take the conflict path;
+- the incoming timestamp is not newer after the first successful load;
+- no duplicate product rows are created.
+
+This is an example of idempotent current-state loading.
+
+A production pipeline should also record batch identity and execution status. A unique key alone does not solve every replay, ordering or deletion problem.
+
+---
+
+# Part 16 — Understand the checkpoint and commit order
+
+A checkpoint tells the next run where to continue. Saving it too early can permanently skip data.
+
+## 16.1 A dangerous sequence
+
+Imagine a pipeline does this:
+
+1. Reads source changes through 10:00.
+2. Saves checkpoint = 10:00.
+3. Starts writing the target.
+4. Target write fails.
+
+The next run starts after 10:00. The failed records may never be retried.
+
+This is a data-loss risk.
+
+## 16.2 Safer logical sequence
+
+Use this order:
+
+1. Read source changes using the previous committed checkpoint.
+2. Write the batch to durable staging.
+3. Validate staging.
+4. Apply the warehouse write.
+5. Reconcile the target and record the run result.
+6. Commit the new checkpoint only when the required destination work is durable.
+7. Mark the batch successful.
+
+The exact transaction boundary depends on whether staging, target and checkpoint are in the same database or different systems.
+
+## 16.3 Why cross-system pipelines need extra care
+
+A database transaction generally cannot atomically commit writes across unrelated systems without additional distributed transaction support.
+
+For example:
+- source is an external API;
+- staging is object storage;
+- target is PostgreSQL;
+- checkpoint is stored in a workflow database.
+
+A practical design may use:
+- immutable batch IDs;
+- durable staging files;
+- idempotent destination writes;
+- a run-control table;
+- explicit batch states;
+- safe retry rules;
+- reconciliation before marking success.
+
+Do not claim the whole multi-system workflow is atomic unless the architecture actually guarantees it.
+
+## 16.4 Example batch states
+
+| State | Meaning |
+|---|---|
+| EXTRACTED | Source data has been captured |
+| STAGED | Batch is stored durably |
+| VALIDATED | Required staging checks passed |
+| LOADED | Target write completed |
+| RECONCILED | Target comparison passed |
+| COMMITTED | Checkpoint safely advanced |
+| FAILED | A step failed and needs recovery |
+
+A real pipeline may use different states, but transitions should be explicit.
+
+---
+
+# Part 17 — Understand deletes and tombstones
+
+Upsert handles new and changed rows. It does not automatically remove rows that disappeared from the source.
+
+## 17.1 Why a missing source row is ambiguous
+
+Suppose product 11 is absent from today's source extract.
+
+Possible explanations:
+- product 11 was deleted;
+- the source sent only a partial batch;
+- extraction failed to include it;
+- the product is inactive but retained;
+- the source has a filtering defect.
+
+Absence from an incremental batch is not proof of deletion.
+
+## 17.2 What is a tombstone?
+
+A tombstone is a source change record indicating that an entity was deleted or should be treated as deleted.
+
+Example source event:
+
+| product_id | operation | changed_at |
+|---:|---|---|
+| 11 | DELETE | 2026-01-06 10:00:00 |
+
+A pipeline can process that explicit deletion event according to the warehouse policy.
+
+## 17.3 Soft delete example
+
+A current-state warehouse table may store an active flag.
+
+~~~sql
+ALTER TABLE warehouse_product_upsert
+ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT TRUE;
+~~~
+
+Expected output: ALTER TABLE.
+
+If a trusted delete event is received for product 11:
+
+~~~sql
+UPDATE warehouse_product_upsert
+SET is_active = FALSE
+WHERE product_id = 11;
+~~~
+
+Expected output: UPDATE 1.
+
+This preserves the row but marks it inactive. It is not the same as SCD Type 2 history. A historical dimension may need effective dates and a new version row.
+
+Do not infer deletions by comparing a partial incremental batch with the full target. Only use full-snapshot absence as deletion evidence when the source contract explicitly guarantees a complete snapshot.
+
+---
+
+# Part 18 — Loading strategy decision workshop
+
+Use the following situations to choose a strategy. There is no single strategy that is best for every dataset.
+
+| Dataset situation | Likely approach | Reason |
+|---|---|---|
+| Small country reference list | Full load | Cheap to rebuild |
+| Immutable click events | Append with event key | Events are new facts |
+| Product current state | Incremental upsert | Existing products can change |
+| Customer historical address | SCD Type 2 | Previous versions matter |
+| Corrected daily aggregate | Rebuild one date partition | Recompute only affected date |
+| Source sends database log changes | CDC-based apply | Uses source change records |
+| Small derived report table | Full rebuild | Simpler and safer than complex state |
+
+Before selecting, ask:
+- Can the source update old records?
+- Can it delete records?
+- Does the target need history?
+- Can the same batch be replayed?
+- Is a stable key available?
+- Is there a reliable change cursor?
+- How will the result be reconciled?
+
+---
+
+# Part 19 — Loading failures and recovery scenarios
+
+## 19.1 Failure before target write
+
+Situation: extraction succeeds, but staging validation fails.
+
+Correct response:
+- keep the batch evidence;
+- do not publish;
+- record failed rules;
+- correct the source or transformation;
+- replay the batch after approval.
+
+## 19.2 Failure during target write
+
+Situation: the database rejects the write because of a constraint.
+
+Correct response:
+- inspect whether the transaction rolled back;
+- inspect the target state;
+- preserve the failed batch;
+- correct the underlying issue;
+- retry idempotently.
+
+Do not assume a failed client message means zero rows were written unless transaction behavior confirms it.
+
+## 19.3 Failure after target write but before checkpoint
+
+Situation: target data is committed, but the workflow crashes before saving progress.
+
+Correct response:
+- the next run may read the same batch again;
+- destination write must safely handle replay;
+- use stable keys/upsert or a processed-batch ledger;
+- reconcile before marking the batch complete.
+
+## 19.4 Failure after checkpoint but before target write
+
+This is the dangerous ordering described earlier. It can skip data.
+
+Prevention:
+- do not advance the checkpoint before destination durability and required validation;
+- use a transaction where possible;
+- use durable batch states across systems.
+
+## 19.5 Partial batch
+
+Situation: a file contains 10,000 expected rows, but only 6,000 arrive.
+
+Do not overwrite a complete target partition with the partial file.
+
+Check:
+- file delivery completion marker;
+- expected row count or control total;
+- file size/checksum if supplied;
+- source batch identifier;
+- quality and reconciliation results.
+
+---
+
+# Part 20 — Final load validation
+
+After any load, validate more than the SQL command status.
+
+For a current-state product table, check:
+
+## 20.1 Row count
+
+~~~sql
+SELECT COUNT(*) AS product_count
+FROM warehouse_product_upsert;
+~~~
+
+Expected result after the training workflow: 4.
+
+## 20.2 Duplicate business keys
+
+~~~sql
+SELECT
+    product_id,
+    COUNT(*) AS row_count
+FROM warehouse_product_upsert
+GROUP BY product_id
+HAVING COUNT(*) > 1;
+~~~
+
+Expected result: zero rows. The primary key also prevents duplicate product_id values.
+
+## 20.3 Latest source update
+
+~~~sql
+SELECT MAX(source_updated_at) AS latest_source_update
+FROM warehouse_product_upsert;
+~~~
+
+Expected result: 2026-01-05 09:05:00.
+
+This is the latest source update in the training target, not necessarily the time the pipeline ran.
+
+## 20.4 Compare incoming and target keys
+
+For a batch that should be fully applied, verify every staged key exists in the target:
+
+~~~sql
+SELECT b.product_id
+FROM daily_product_batch AS b
+LEFT JOIN warehouse_product_upsert AS w
+    ON b.product_id = w.product_id
+WHERE w.product_id IS NULL;
+~~~
+
+Expected result: zero rows.
+
+This only checks key presence. Also compare important fields and source versions to prove the correct values were applied.
+
+---
+
+# Part 21 — Additional practice exercises with worked answers
+
+## Exercise 7 — Append or upsert?
+
+A product source sends product 20 today and sends a changed product 20 tomorrow. The warehouse needs only the latest product state.
+
+**Worked answer:** Use incremental upsert, not simple append. A stable product key identifies the existing row to update.
+
+## Exercise 8 — Preserve history
+
+A product changes from Accessories to Electronics. Analysts must report historical sales using the category that was valid at the time of each sale.
+
+**Worked answer:** Use a historical dimension approach such as SCD Type 2. A Type 1 upsert would overwrite the old category and lose that history.
+
+## Exercise 9 — Duplicate replay
+
+A batch is processed twice. What prevents the target from containing duplicate business records?
+
+**Worked answer:** Stable keys, unique constraints, deterministic upsert or deduplication, batch tracking and reconciliation. The exact combination depends on the source and target.
+
+## Exercise 10 — Missing product in an incremental batch
+
+Product 25 is not present in today's incremental file. Should the warehouse delete it?
+
+**Worked answer:** No. An incremental file contains only changes or selected rows. Absence does not prove deletion. Require an explicit delete event or a guaranteed complete snapshot with an approved comparison policy.
+
+## Exercise 11 — Checkpoint ordering
+
+The pipeline advances its watermark and then crashes before writing the warehouse. What can happen?
+
+**Worked answer:** The next run may skip records because the checkpoint says they were processed. Advance the checkpoint only after destination work is durable and required validation has passed.
+
+## Exercise 12 — Older replay
+
+A target has product update timestamp 12:00. A replayed source row has timestamp 10:00. Should it overwrite the target?
+
+**Worked answer:** Not under the example current-state rule. The target should retain the newer version. If timestamps are not reliable or can tie, use a stronger source sequence/version.
+
+## Exercise 13 — Full load versus partition overwrite
+
+One date's sales file is corrected. The warehouse has five years of daily partitions. What may be more efficient?
+
+**Worked answer:** Rebuild and replace only the affected date partition, after validating the complete replacement dataset. Ensure the platform's partition replacement is safe and atomic enough for the use case.
+
+## Exercise 14 — dbt run success
+
+A dbt model builds successfully but contains duplicated order lines. Is the model ready?
+
+**Worked answer:** Not automatically. Run uniqueness, relationship, business-rule and reconciliation tests. Successful SQL execution proves the model ran, not that the result is correct.
+
+---
+
+# Part 22 — Day 48 practical completion checklist
+
+### Concepts
+- [ ] Explain full load, append, overwrite, incremental and upsert.
+- [ ] Choose a strategy for a small reference table.
+- [ ] Choose a strategy for immutable events.
+- [ ] Choose a strategy for mutable current-state records.
+- [ ] Explain when SCD Type 2 is required.
+- [ ] Explain why an incremental batch's missing row does not prove deletion.
+- [ ] Explain tombstones and soft deletes.
+
+### SQL practice
+- [ ] Create and load a source reference table.
+- [ ] Perform a full load.
+- [ ] Explain why a repeated append can duplicate data.
+- [ ] Build an INSERT ON CONFLICT upsert.
+- [ ] Use EXCLUDED to refer to incoming values.
+- [ ] Use a source timestamp condition to avoid older overwrites.
+- [ ] Create and validate a staging batch.
+- [ ] Re-run the same batch and inspect the target.
+- [ ] Compare source batch keys with target keys.
+- [ ] Record and interpret row counts and latest source update.
+
+### Production reasoning
+- [ ] Explain idempotency and replay.
+- [ ] Explain safe checkpoint ordering.
+- [ ] Distinguish a database transaction from a multi-system workflow.
+- [ ] Describe failure recovery before and after target writes.
+- [ ] Explain how deletes are captured.
+- [ ] Explain how to validate a replacement partition.
+- [ ] Describe where dbt fits into ELT.
+- [ ] Explain why a successful load command is not proof of correct data.
+
+## Final self-assessment
+
+Without looking at the notes, explain:
+
+1. What is the difference between append and upsert?
+2. Why can a full load be unsafe for a large warehouse fact table?
+3. Why does a mutable source require more than append?
+4. What is the difference between a current-state upsert and SCD Type 2?
+5. Why is a timestamp-only watermark risky?
+6. Why should the checkpoint not advance before the target is durable?
+7. Why does an absent row in an incremental batch not prove deletion?
+8. What checks should run after a warehouse load?
+
+If you can explain these decisions and reproduce the SQL workflow, you are ready for Day 49.
+
+**Next lesson — Day 49: Warehouse Performance Optimization.** We will inspect query plans, understand partitioning, indexes, materialization and storage trade-offs, then perform a small before/after performance investigation without inventing benchmark results.
