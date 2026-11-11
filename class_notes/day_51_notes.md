@@ -1737,3 +1737,16 @@ Without looking at the notes, explain:
 If you can complete the local notebook and explain the design decisions, you are ready for Day 52.
 
 **Next lesson — Day 52: AWS S3 and Storage Management.** We will use the S3 service concepts directly, including bucket/object operations, storage classes, lifecycle policies, access controls and safe upload/download workflows.
+
+---
+
+## Visual Learning Diagrams
+
+### Object storage anatomy
+![Day 51 - Object storage anatomy](images/day_51_object_storage_anatomy.svg)
+
+### Data lake zones
+![Day 51 - Data lake zones](images/day_51_data_lake_zones.svg)
+
+### Lake file formats
+![Day 51 - Lake file formats](images/day_51_lake_file_formats.svg)
