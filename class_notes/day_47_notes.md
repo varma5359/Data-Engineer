@@ -1266,3 +1266,16 @@ Without looking at the notes, explain:
 If you can answer these questions and document a table independently, you are ready for Day 48.
 
 **Next lesson — Day 48: Warehouse Loading Strategies.** We will compare full, incremental, append, overwrite and upsert loading, then learn how staging and transformation models fit into a reliable warehouse load.
+
+---
+
+## Visual Learning Diagrams
+
+### KPI definition to mart
+![Day 47 - KPI definition to mart](images/day_47_data_mart_kpi.svg)
+
+### Semantic layer measures
+![Day 47 - Semantic layer measures](images/day_47_semantic_layer.svg)
+
+### Metric governance
+![Day 47 - Metric governance](images/day_47_metric_governance.svg)
