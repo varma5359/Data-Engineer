@@ -490,3 +490,85 @@ Test empty table, one row, duplicate key, NULL timestamp, timestamp tie, update 
 | Verification | Uses counts/keys/totals/quality checks |
 | Interview | Gives decision, reason, failure mode and proof |
 
+
+
+# 11. Mentor-led deep dive — database ingestion
+
+## 11.1 Parameters
+
+SQL result types,PostgreSQL NUMERIC may return Decimal; timestamp returns datetime; SQL NULL becomes Python None. Inspect types before conversion; don't stringify all rows prematurely.
+
+**Try it:** write a tiny input/output example or a test assertion proving this behavior.
+
+## 11.2 Response metadata
+
+Placeholder example,cur.execute("SELECT ... WHERE order_id = %s", (order_id,)). The second argument is a one-element tuple; comma matters. Placeholder syntax varies by driver.
+
+**Try it:** write a tiny input/output example or a test assertion proving this behavior.
+
+## 11.3 Failure layers
+
+Fetch batches,Use fetchmany(batch_size) repeatedly until empty. Process and persist each batch; don't append every batch into one mega-list. Track batch count and last durable key.
+
+**Try it:** write a tiny input/output example or a test assertion proving this behavior.
+
+## 11.4 Empty result
+
+Keyset boundary,Capture upper_id at start; then read id > last_id AND id <= upper_id ORDER BY id LIMIT batch. This bounds append-only extraction; updates/deletes need separate change mechanism.
+
+**Try it:** write a tiny input/output example or a test assertion proving this behavior.
+
+## 11.5 Loop protection
+
+Compound timestamp,Use updated_at > last_time OR (updated_at=last_time AND id>last_id), ordered by both. Check timestamp precision and timezone; tie key must be unique.
+
+**Try it:** write a tiny input/output example or a test assertion proving this behavior.
+
+## 11.6 Consistency
+
+Index-friendly filter,Avoid wrapping indexed timestamp in a function in WHERE if it prevents index use. Inspect plan and ask DBA; query patterns and indexes depend on database.
+
+**Try it:** write a tiny input/output example or a test assertion proving this behavior.
+
+## 11.7 Retry budget
+
+Source consistency,Concurrent writes can happen during extraction. Choose snapshot, CDC or bounded reconciliation. State the consistency guarantee honestly.
+
+**Try it:** write a tiny input/output example or a test assertion proving this behavior.
+
+## 11.8 Checkpoint
+
+Replica lag,If reading replica, monitor lag and avoid checkpoint boundary beyond replica's applied changes; overlap/reconcile when exact position unavailable.
+
+**Try it:** write a tiny input/output example or a test assertion proving this behavior.
+
+## 11.9 Backfill
+
+Connection lifecycle,Use context managers/try-finally, close cursor/connection, handle transaction semantics. Do not share one cursor concurrently across threads.
+
+**Try it:** write a tiny input/output example or a test assertion proving this behavior.
+
+## 11.10 Security
+
+Operational safety,Read-only account, query timeout, source load monitoring, maintenance-window coordination, explicit columns, bounded batches and cancellation path.
+
+**Try it:** write a tiny input/output example or a test assertion proving this behavior.
+
+## 11.11 Mock testing
+
+Test matrix,Empty table; one record; timestamp tie; null update timestamp; old ID update; hard delete; connection interruption; restart; duplicate replay.
+
+**Try it:** write a tiny input/output example or a test assertion proving this behavior.
+
+# 12. Lab notebook record
+
+For every experiment, maintain this table:
+
+| Experiment | Input/boundary | Expected | Actual | Difference | Fix/test |
+|---|---|---|---|---|---|
+| Happy path | 3 records | 3 extracted | | | |
+| Empty result | 0 records | valid empty run | | | |
+| Duplicate/replay | same batch twice | no duplicate effects | | | |
+| Failure | timeout/connection loss | bounded retry/recovery | | | |
+| Boundary | equal timestamp/cursor | no gap | | | |
+

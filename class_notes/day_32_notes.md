@@ -495,3 +495,91 @@ Show request parameters, status validation, page count, unique IDs, retry count,
 | Verification | Uses counts/keys/totals/quality checks |
 | Interview | Gives decision, reason, failure mode and proof |
 
+
+
+# 11. Mentor-led deep dive — API ingestion
+
+## 11.1 Parameters
+
+Request parameters,Use a dictionary for query parameters when the library supports it; it handles URL encoding. For example params={"limit":3,"status":"PAID"}. Do not manually concatenate user-controlled text into URLs.
+
+**Try it:** write a tiny input/output example or a test assertion proving this behavior.
+
+## 11.2 Response metadata
+
+Response headers,Content-Type indicates media type; Retry-After may advise waiting; provider-specific headers can expose remaining quota. Treat headers as metadata and consult provider docs.
+
+**Try it:** write a tiny input/output example or a test assertion proving this behavior.
+
+## 11.3 Failure layers
+
+HTTP status and exceptions,A request can fail before receiving a response (connection error/timeout). A response can arrive with non-success status. Distinguish transport exception from HTTP error and payload error.
+
+**Try it:** write a tiny input/output example or a test assertion proving this behavior.
+
+## 11.4 Empty result
+
+Empty page,An empty list can be a valid page, not necessarily an error. Determine termination from documented cursor/next link, not solely record count.
+
+**Try it:** write a tiny input/output example or a test assertion proving this behavior.
+
+## 11.5 Loop protection
+
+Cursor repeat guard,Keep a set of seen cursors for a bounded run. If provider returns a previously seen cursor, stop and alert rather than loop forever.
+
+**Try it:** write a tiny input/output example or a test assertion proving this behavior.
+
+## 11.6 Consistency
+
+API consistency,Offset pagination over changing data can shift rows. Prefer cursor/snapshot APIs; otherwise use stable sorting, overlap and dedup/reconciliation.
+
+**Try it:** write a tiny input/output example or a test assertion proving this behavior.
+
+## 11.7 Retry budget
+
+Retry budget,A retry policy needs maximum attempts, maximum elapsed time, eligible errors and terminal alert. A request should not retry forever.
+
+**Try it:** write a tiny input/output example or a test assertion proving this behavior.
+
+## 11.8 Checkpoint
+
+Checkpoint design,Persist page token plus run/window and write status. If data write and checkpoint cannot share transaction, choose replay-safe writes and explain the failure window.
+
+**Try it:** write a tiny input/output example or a test assertion proving this behavior.
+
+## 11.9 Backfill
+
+Backfill and regular runs,Backfill uses explicit historical windows; daily run uses latest boundary. Avoid allowing backfill to overwrite newer records without version/update rules.
+
+**Try it:** write a tiny input/output example or a test assertion proving this behavior.
+
+## 11.10 Security
+
+API security,Use HTTPS, secret store/environment, least privilege, token rotation, redaction and no secrets in notebook outputs or Git history.
+
+**Try it:** write a tiny input/output example or a test assertion proving this behavior.
+
+## 11.11 Mock testing
+
+Mock testing,Mock response sequence: page1 -> page2 -> 429 -> page2 success -> terminal page. Assert IDs and calls; never depend on live API during basic tests.
+
+**Try it:** write a tiny input/output example or a test assertion proving this behavior.
+
+## 11.12 Reconnect/replay
+
+Streaming checkpoint,Persist event ID/offset after destination write; reconnect from last safe offset; expect duplicates and use idempotent event key.
+
+**Try it:** write a tiny input/output example or a test assertion proving this behavior.
+
+# 12. Lab notebook record
+
+For every experiment, maintain this table:
+
+| Experiment | Input/boundary | Expected | Actual | Difference | Fix/test |
+|---|---|---|---|---|---|
+| Happy path | 3 records | 3 extracted | | | |
+| Empty result | 0 records | valid empty run | | | |
+| Duplicate/replay | same batch twice | no duplicate effects | | | |
+| Failure | timeout/connection loss | bounded retry/recovery | | | |
+| Boundary | equal timestamp/cursor | no gap | | | |
+
