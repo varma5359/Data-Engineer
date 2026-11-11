@@ -1436,3 +1436,16 @@ Without looking at the notes, explain:
 If you can inspect a plan, identify a likely bottleneck, run a controlled experiment and validate the result, you are ready for Day 59.
 
 **Next lesson — Day 59: Cloud and Distributed Pipeline Integration.** You will connect S3, managed databases and Spark into a complete batch architecture, then compare it with a streaming design and learn where Kafka fits.
+
+---
+
+## Visual Learning Diagrams
+
+### Spark performance improvement loop
+![Day 58 - Spark performance improvement loop](images/day_58_spark_performance_check.svg)
+
+### Data skew
+![Day 58 - Data skew](images/day_58_spark_skew.svg)
+
+### Cache reused datasets
+![Day 58 - Cache reused datasets](images/day_58_spark_cache.svg)
