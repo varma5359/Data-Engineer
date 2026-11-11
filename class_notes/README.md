@@ -144,20 +144,20 @@ The course is being rebuilt phase by phase to one consistent beginner-first teac
 **Learning format:** beginner-friendly explanations, practical code examples, expected outputs, operational considerations and a separate interview-preparation file for every day.
 ## Phase 4 — Data Processing and Pipelines (Days 30–39)
 
-| Day | Syllabus topic | Mini-project | Class notes | Interview |
-|---|---|---|---|---|
-| 30 | ETL and Data Extraction Patterns | Incremental Extraction Pipeline | [Notes](day_30_notes.md) | [Interview](day_30_interview.md) |
-| 31 | File-Based Data Ingestion | Multi-File Ingestion System | [Notes](day_31_notes.md) | [Interview](day_31_interview.md) |
-| 32 | API-Based Data Ingestion | API Ingestion Pipeline | [Notes](day_32_notes.md) | [Interview](day_32_interview.md) |
-| 33 | Database Ingestion | Database Extractor | [Notes](day_33_notes.md) | [Interview](day_33_interview.md) |
-| 34 | Data Transformation and Business Rules | Transformation Pipeline | [Notes](day_34_notes.md) | [Interview](day_34_interview.md) |
-| 35 | Data Cleaning and Schema Evolution | Data Cleaning Framework | [Notes](day_35_notes.md) | [Project Workbook](day_35_project_workbook.md) | [Interview](day_35_interview.md) |
-| 36 | Batch Processing and Partitioning | Partitioned Batch Processor | [Notes](day_36_notes.md) | [Project Workbook](day_36_project_workbook.md) | [Interview](day_36_interview.md) |
-| 37 | Incremental Loading and Upserts | Incremental Data Loader | [Notes](day_37_notes.md) | [Project Workbook](day_37_project_workbook.md) | [Interview](day_37_interview.md) |
-| 38 | Pipeline Reliability and Failure Handling | Reliable Pipeline Simulator | [Notes](day_38_notes.md) | [Project Workbook](day_38_project_workbook.md) | [Interview](day_38_interview.md) |
-| 39 | Pipeline Logging and Observability | Pipeline Observability Tool | [Notes](day_39_notes.md) | [Project Workbook](day_39_project_workbook.md) | [Interview](day_39_interview.md) |
+| Day | Syllabus topic | Mini-project | Class notes | Project workbook | Interview |
+|---|---|---|---|---|---|
+| 30 | ETL and Data Extraction Patterns | Incremental Extraction Pipeline | [Notes](day_30_notes.md) | [Workbook](day_30_project_workbook.md) | [Interview](day_30_interview.md) |
+| 31 | File-Based Data Ingestion | Multi-File Ingestion System | [Notes](day_31_notes.md) | [Workbook](day_31_project_workbook.md) | [Interview](day_31_interview.md) |
+| 32 | API-Based Data Ingestion | API Ingestion Pipeline | [Notes](day_32_notes.md) | [Workbook](day_32_project_workbook.md) | [Interview](day_32_interview.md) |
+| 33 | Database Ingestion | Database Extractor | [Notes](day_33_notes.md) | [Workbook](day_33_project_workbook.md) | [Interview](day_33_interview.md) |
+| 34 | Data Transformation and Business Rules | Transformation Pipeline | [Notes](day_34_notes.md) | [Workbook](day_34_project_workbook.md) | [Interview](day_34_interview.md) |
+| 35 | Data Cleaning and Schema Evolution | Data Cleaning Framework | [Notes](day_35_notes.md) | [Workbook](day_35_project_workbook.md) | [Interview](day_35_interview.md) |
+| 36 | Batch Processing and Partitioning | Partitioned Batch Processor | [Notes](day_36_notes.md) | [Workbook](day_36_project_workbook.md) | [Interview](day_36_interview.md) |
+| 37 | Incremental Loading and Upserts | Incremental Data Loader | [Notes](day_37_notes.md) | [Workbook](day_37_project_workbook.md) | [Interview](day_37_interview.md) |
+| 38 | Pipeline Reliability and Failure Handling | Reliable Pipeline Simulator | [Notes](day_38_notes.md) | [Workbook](day_38_project_workbook.md) | [Interview](day_38_interview.md) |
+| 39 | Pipeline Logging and Observability | Pipeline Observability Tool | [Notes](day_39_notes.md) | [Workbook](day_39_project_workbook.md) | [Interview](day_39_interview.md) |
 
-**Phase 4 content status:** Days 30–39 include class notes, separate project workbooks and interview guides. Days 35–39 project workbooks have been expanded with setup, fixtures, runnable steps, expected results, explanations, failure drills, troubleshooting and acceptance checklists. Runtime validation in the supported TechPhile environment remains pending.
+**Phase 4 content status:** Days 30–39 include class notes, separate project workbooks and interview guides. Days 35–39 interview guides have been rewritten with complete model answers and scenario reasoning. All ten days have separate class notes, project workbooks and interview guides. Runtime validation in the supported TechPhile environment remains pending.
 
 ---
 
