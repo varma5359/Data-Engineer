@@ -740,3 +740,529 @@ A source changes a numeric customer identifier to text. What do you document?
 - [ ] Explain why documentation must be maintained.
 
 **Next lesson — Day 48: Warehouse Loading Strategies.** We will compare full, incremental, append, overwrite and upsert loading, then learn how staging and transformation models fit into a reliable warehouse load.
+
+
+---
+
+# Part 15 — Document one warehouse table from beginning to end
+
+The previous sections introduced catalog entries, dictionaries and glossaries separately. Now combine them into one documentation exercise.
+
+Imagine a business analyst asks:
+
+"Can I use the sales fact table to calculate monthly paid sales by product category?"
+
+Before answering, the Data Engineer must establish what the table contains and what the metric means.
+
+## 15.1 Start by identifying the asset
+
+Example asset:
+
+| Property | Documentation |
+|---|---|
+| Asset name | mart_sales.fact_sales |
+| Domain | Sales |
+| Purpose | Analyze eligible sales order lines |
+| Grain | One row per order line |
+| Business owner | Sales/Finance data owner |
+| Technical owner | Data Engineering |
+| Refresh | Daily, after source ingestion |
+| Classification | Confidential |
+| Main consumers | Sales dashboard and finance reporting |
+| Status | Certified only after approved checks |
+
+The names and owners are illustrative. In a real company, confirm them with the relevant teams.
+
+## 15.2 Why grain must be written first
+
+Grain explains what one row represents.
+
+Suppose an order contains three products:
+
+| order_id | line_number | product | amount |
+|---:|---:|---|---:|
+| 5001 | 1 | Keyboard | 2000 |
+| 5001 | 2 | Mouse | 500 |
+| 5001 | 3 | Monitor | 12000 |
+
+This is three rows because the table grain is one row per order line.
+
+If a student assumes one row per order, they may count three orders instead of one.
+
+A good documentation page says:
+- one row represents one order line;
+- order_id can repeat;
+- order_id plus line_number identifies a line;
+- sales amount is stored at line grain.
+
+## 15.3 Document the columns
+
+| Column | Type | Required | Business definition | Example |
+|---|---|---|---|---|
+| sales_line_key | BIGINT | Yes | Warehouse-generated row identifier | 900001 |
+| order_id | INTEGER | Yes | Source order identifier | 5001 |
+| line_number | INTEGER | Yes | Position of the product line within the order | 2 |
+| product_key | INTEGER | Yes | Warehouse product dimension key | 301 |
+| order_date_key | INTEGER | Yes | Warehouse date key for order date | 20260102 |
+| quantity | INTEGER | Yes | Number of units on the line | 2 |
+| unit_price | NUMERIC(12,2) | Yes | Price per unit in INR | 250.00 |
+| line_sales_amount | NUMERIC(14,2) | Yes | Quantity multiplied by unit price under the approved sales rule | 500.00 |
+
+The example values are illustrative. Use actual model types and business rules in a real dictionary.
+
+## 15.4 Document the measure definition
+
+Do not write only "sales amount".
+
+Write a definition that explains:
+- what is included;
+- what is excluded;
+- the calculation;
+- the grain;
+- the currency;
+- the date role;
+- whether refunds are included.
+
+Example:
+
+**Paid line sales:** Sum of approved paid order-line amounts, stored in INR, grouped by order date. Pending and cancelled orders are excluded. Refunds are reported separately in the standard gross paid sales metric.
+
+A Finance-approved metric may use a different rule. The business owner must approve it.
+
+---
+
+# Part 16 — Create a business glossary that prevents conflicting reports
+
+## 16.1 The problem with undefined terms
+
+Imagine two analysts produce a metric called "monthly sales".
+
+Analyst A includes paid orders only.
+
+Analyst B includes paid and pending orders.
+
+Both dashboards display "Monthly Sales", but the values differ.
+
+The problem is not SQL syntax. The problem is that the business term has no shared definition.
+
+## 16.2 Build a glossary entry
+
+| Property | Example |
+|---|---|
+| Term | Paid Sales |
+| Definition | Sum of approved paid order-line amounts |
+| Calculation | SUM(line_sales_amount) |
+| Grain | Order line before aggregation |
+| Date role | Order date |
+| Included statuses | PAID |
+| Excluded statuses | PENDING, CANCELLED |
+| Refund treatment | Reported separately |
+| Currency | INR |
+| Owner | Finance |
+| Related terms | Gross Sales, Net Sales, Refund Amount |
+| Status | Approved |
+
+## 16.3 Compare similar business terms
+
+| Term | Example meaning | Why separate definitions matter |
+|---|---|---|
+| Order value | Value recorded for an order | May include pending orders |
+| Paid sales | Value of successfully paid orders | Payment success rule matters |
+| Gross sales | Sales before approved deductions | Refund treatment must be explicit |
+| Net sales | Sales after defined deductions | Discounts/refunds must be defined |
+| Cash received | Actual cash or settlement received | May differ from order date sales |
+
+These are examples, not universal definitions. Never assume two organizations use these terms identically.
+
+## 16.4 Add a change approval process
+
+If Finance changes the definition of Paid Sales:
+1. Record the requested change.
+2. Identify the business reason.
+3. Get approval from the term owner.
+4. Identify affected models and reports.
+5. Update the glossary and metric documentation.
+6. Update SQL transformations if needed.
+7. Reconcile historical and current results.
+8. Communicate the effective date.
+9. Preserve the previous definition and change history.
+
+Do not overwrite an old definition without recording when it changed.
+
+---
+
+# Part 17 — Inspect real table metadata in PostgreSQL
+
+The earlier example used a permanent table called public.orders. Here is a practical way to inspect tables and columns in a database.
+
+## 17.1 Find tables in a schema
+
+Run:
+
+~~~sql
+SELECT
+    table_schema,
+    table_name
+FROM information_schema.tables
+WHERE table_schema NOT IN ('information_schema', 'pg_catalog')
+  AND table_type = 'BASE TABLE'
+ORDER BY table_schema, table_name;
+~~~
+
+This lists visible base tables in schemas other than PostgreSQL's standard metadata schemas.
+
+Expected output depends on your database. If no rows appear, check that you connected to the intended database and have permission to see the tables.
+
+## 17.2 Inspect columns for a known table
+
+Replace the schema and table names with ones that exist in your database.
+
+~~~sql
+SELECT
+    ordinal_position,
+    column_name,
+    data_type,
+    is_nullable,
+    character_maximum_length,
+    numeric_precision,
+    numeric_scale
+FROM information_schema.columns
+WHERE table_schema = 'public'
+  AND table_name = 'orders'
+ORDER BY ordinal_position;
+~~~
+
+Understand the output:
+- ordinal_position gives the column's position;
+- column_name gives its name;
+- data_type gives the SQL type;
+- is_nullable indicates whether NULL is allowed;
+- character_maximum_length applies to character types;
+- numeric_precision and numeric_scale describe numeric capacity.
+
+If the query returns zero rows, the table may not exist in public, may have a different name or may not be visible to your database role.
+
+## 17.3 Inspect constraints
+
+~~~sql
+SELECT
+    tc.constraint_name,
+    tc.constraint_type,
+    kcu.column_name
+FROM information_schema.table_constraints AS tc
+LEFT JOIN information_schema.key_column_usage AS kcu
+    ON tc.constraint_name = kcu.constraint_name
+   AND tc.table_schema = kcu.table_schema
+   AND tc.table_name = kcu.table_name
+WHERE tc.table_schema = 'public'
+  AND tc.table_name = 'orders'
+ORDER BY tc.constraint_type, tc.constraint_name, kcu.ordinal_position;
+~~~
+
+This can help discover primary keys, foreign keys, unique constraints and other table constraints.
+
+A constraint name alone may not communicate the business meaning. Add that meaning to your dictionary.
+
+## 17.4 Technical metadata is not business documentation
+
+PostgreSQL can tell you:
+- column name;
+- type;
+- nullability;
+- constraints.
+
+It cannot reliably infer:
+- whether amount means gross or net sales;
+- whether a date is order date or settlement date;
+- which team approves the metric;
+- whether a customer field is allowed in a report;
+- why a particular status is excluded.
+
+Engineers must capture that context from approved requirements and owners.
+
+---
+
+# Part 18 — Document data contracts and schema changes
+
+A data contract prevents producers and consumers from making incompatible assumptions.
+
+## 18.1 Example contract for an order feed
+
+| Contract item | Agreement |
+|---|---|
+| Dataset | orders feed |
+| Delivery | Daily by 07:00 local business time |
+| Format | CSV |
+| Required fields | order_id, order_date, status |
+| order_id | Stable identifier; not reused |
+| order_date | ISO date format |
+| status | Approved status list |
+| Duplicate policy | One record per order in header feed |
+| Change notice | Notify consumers before breaking changes |
+| Owner | Order application team |
+| Consumer | Warehouse ingestion team |
+
+A contract should also define late-arriving data, deletions, null handling, versioning and compatibility.
+
+## 18.2 Breaking and non-breaking changes
+
+Examples of possible non-breaking changes:
+- adding an optional field, if consumers tolerate additional fields;
+- adding a new value that consumers are explicitly designed to handle.
+
+Examples of possible breaking changes:
+- renaming a required column;
+- changing a numeric identifier to a format consumers cannot parse;
+- changing a field's business meaning;
+- removing a field used by downstream reports.
+
+Whether a change is breaking depends on the contract and consumer behavior.
+
+## 18.3 A safe schema-change workflow
+
+1. Producer proposes the change.
+2. Data owner explains the business reason.
+3. Consumers and downstream dependencies are identified.
+4. Contract version is updated.
+5. Compatibility is assessed.
+6. Test data is shared.
+7. Staging and warehouse transformations are updated.
+8. Quality and reconciliation tests run.
+9. Release timing is agreed.
+10. Old-field deprecation and removal are communicated.
+
+Avoid changing production schemas without an impact review.
+
+## 18.4 Preserve identifiers correctly
+
+Suppose customer codes are:
+
+~~~text
+00125
+00126
+00127
+~~~
+
+If these are converted to integers, they become 125, 126 and 127. The leading zeros disappear.
+
+If the identifier is a code rather than a quantity, text may be the correct type.
+
+A data dictionary should explain whether an identifier is numeric for arithmetic or merely contains digits.
+
+---
+
+# Part 19 — Classify data and document safe handling
+
+## 19.1 Classification is a decision, not a guess
+
+A column should be classified according to the organization's security and privacy policy.
+
+Examples of questions:
+- Is the field publicly available?
+- Does it identify a person?
+- Could it expose confidential business performance?
+- Does it contain credentials, tokens or payment details?
+- Is it permitted in a development dataset?
+- Does it need masking or restricted access?
+
+Do not place real personal information in classroom examples or public documentation.
+
+## 19.2 Example data handling register
+
+| Field | Classification | Example handling |
+|---|---|---|
+| product_category | Internal | Company users with approved access |
+| order_amount | Confidential | Restrict detailed access to approved roles |
+| customer_email | Personal/confidential | Mask or restrict |
+| password_hash | Restricted security data | Never expose in analytics output |
+| payment_token | Restricted sensitive data | Keep out of general reporting |
+
+Use your organization's actual classification categories and retention policy.
+
+## 19.3 Documentation itself can leak information
+
+Do not include:
+- real customer names and emails;
+- API keys;
+- passwords;
+- access tokens;
+- database connection strings;
+- private file paths;
+- screenshots containing sensitive records.
+
+Use synthetic examples and redact secrets.
+
+---
+
+# Part 20 — Documentation in a team workflow
+
+Documentation is useful only when people can find it and trust that it is current.
+
+## 20.1 Where can documentation live?
+
+| Location | Suitable content |
+|---|---|
+| Git repository | Model descriptions, schema files, change history |
+| Data catalog | Asset discovery, owners, classification, lineage |
+| Business glossary | Approved business terminology |
+| dbt documentation | Model and column descriptions, tests and dependencies |
+| Run metadata store | Refresh time, run status, row counts |
+| Access management system | Roles and approved access |
+
+The same information may appear in more than one place, but assign one authoritative owner/source for each definition to avoid conflicting copies.
+
+## 20.2 Documentation review checklist
+
+Before publishing a new model, ask:
+- Does the model have a clear description?
+- Is grain documented?
+- Are keys and relationships listed?
+- Does every important column have a definition?
+- Are units and date roles clear?
+- Is the business owner identified?
+- Is the technical owner identified?
+- Are quality checks documented?
+- Is refresh frequency clear?
+- Is classification assigned?
+- Are upstream and downstream dependencies known?
+- Are limitations and known issues recorded?
+
+## 20.3 Keep change history
+
+A simple change record can look like this:
+
+| Version | Date | Change | Approved by |
+|---|---|---|---|
+| 1.0 | 2026-01-01 | Initial Paid Sales definition | Finance owner |
+| 1.1 | 2026-02-01 | Clarified refund treatment | Finance owner |
+| 1.2 | 2026-03-01 | Added order channel dimension | Sales owner |
+
+The dates and approvals are examples. Record real approval evidence in a real project.
+
+---
+
+# Part 21 — Worked documentation scenario
+
+A new student joins the Data Engineering team. The student sees a table called sales_final and asks whether it can be used for monthly revenue reporting.
+
+Do not answer yes based on the table name.
+
+Investigate in this order:
+
+1. Find the schema and table definition.
+2. Inspect column names, types and constraints.
+3. Identify the table grain.
+4. Find the source-to-target mapping.
+5. Read the business glossary definition for revenue.
+6. Identify the owner.
+7. Check the refresh schedule and last successful run.
+8. Review data quality results.
+9. Trace upstream and downstream lineage.
+10. Confirm the report's date, currency and inclusion rules.
+11. Check classification and access permissions.
+12. Ask the business owner to confirm the intended use if documentation is incomplete.
+
+Possible conclusion:
+
+"The table is technically available, but its revenue definition and refund treatment are not documented. We should not certify it for finance reporting until the Finance owner approves the metric definition and the data team records the mapping and validation evidence."
+
+This is good engineering judgment. A table existing does not mean it is ready for every business use.
+
+---
+
+# Part 22 — Additional practice exercises with worked answers
+
+## Exercise 6 — Grain
+
+A fact table has five rows for order 7001 because the customer bought five different products. What should the table documentation say?
+
+**Worked answer:** One row per order line. order_id can repeat. A line-level key such as order_id plus line_number identifies each order line.
+
+## Exercise 7 — Currency
+
+A numeric column contains 1500. Is its meaning fully documented?
+
+**Worked answer:** No. Document currency, precision, scale, rounding rule and whether the amount is gross, net, paid or refunded.
+
+## Exercise 8 — Business owner
+
+A data engineer knows how a revenue column is calculated in SQL but does not know which deductions Finance expects. Who approves the business definition?
+
+**Worked answer:** The designated Finance/business owner. The engineer documents and implements the approved rule.
+
+## Exercise 9 — Metadata discovery
+
+PostgreSQL shows a column named event_time with type timestamp. Does this tell you the time zone or business meaning?
+
+**Worked answer:** No. Document whether it is UTC or local time, whether it is event time or ingestion time, and which business process it represents.
+
+## Exercise 10 — Contract change
+
+A producer wants to rename a required field tomorrow. What should happen first?
+
+**Worked answer:** Identify consumers and dependencies, assess compatibility, notify owners, update the contract and plan a tested migration. Do not make an unannounced breaking change.
+
+## Exercise 11 — Catalog and dictionary
+
+A user wants to discover all datasets owned by the Sales team and understand the columns of one table. Which resources help?
+
+**Worked answer:** The catalog helps discover assets by owner/domain. The data dictionary provides detailed table and column definitions.
+
+## Exercise 12 — Sensitive examples
+
+A documentation page includes real customer email addresses to demonstrate the format. Is this a good practice?
+
+**Worked answer:** No. Use synthetic examples or redacted values. Documentation must follow privacy, security and access rules.
+
+## Exercise 13 — Outdated definition
+
+A glossary says Paid Sales excludes refunds, but the model was changed to subtract refunds last month. What is the risk?
+
+**Worked answer:** Users may interpret the metric incorrectly and make conflicting decisions. Update the glossary, model documentation, change history and affected reports after business approval.
+
+---
+
+# Part 23 — Day 47 practical completion checklist
+
+### Metadata and discovery
+- [ ] Explain metadata in simple words.
+- [ ] Distinguish technical, business, operational and governance metadata.
+- [ ] Explain what a data catalog is.
+- [ ] Distinguish a catalog, data dictionary and business glossary.
+- [ ] Explain why table grain belongs in documentation.
+
+### Documentation practice
+- [ ] Write a catalog entry for a warehouse table.
+- [ ] Document each important column's type and meaning.
+- [ ] Document currency, units, precision and time zone.
+- [ ] Create a business glossary definition.
+- [ ] Record business and technical owners.
+- [ ] Record refresh frequency and quality expectations.
+- [ ] Record upstream and downstream dependencies.
+- [ ] Document known limitations and change history.
+
+### PostgreSQL and governance
+- [ ] List tables using information_schema.tables.
+- [ ] Inspect columns using information_schema.columns.
+- [ ] Inspect table constraints.
+- [ ] Explain what database metadata cannot tell you.
+- [ ] Explain data contracts and breaking schema changes.
+- [ ] Classify sensitive fields and describe safe handling.
+- [ ] Explain why documentation examples should use synthetic data.
+
+## Final self-assessment
+
+Without looking at the notes, explain:
+
+1. What is metadata, and why does a Data Engineer need it?
+2. How are a data catalog, dictionary and glossary different?
+3. Why must a fact table's grain be documented?
+4. Why is a numeric amount incomplete without currency and business meaning?
+5. Who should approve a business metric definition?
+6. What is a data contract?
+7. How do you investigate a schema change safely?
+8. Why can a technically available table still be unfit for a business report?
+
+If you can answer these questions and document a table independently, you are ready for Day 48.
+
+**Next lesson — Day 48: Warehouse Loading Strategies.** We will compare full, incremental, append, overwrite and upsert loading, then learn how staging and transformation models fit into a reliable warehouse load.
