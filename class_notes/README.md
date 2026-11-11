@@ -186,3 +186,11 @@ The course is being rebuilt phase by phase to one consistent beginner-first teac
 - [Day 32 Interview Guide](day_32_interview.md) — full model answers, follow-up prompts and project defence.
 
 **Status:** Rebuilt under independent-learning standard. Live API tests depend on network and provider availability; mock exercises remain executable offline.
+
+## Day 33 — Database Ingestion (rebuild artifacts)
+
+- [Day 33 Class Notebook](day_33_notes.md) — 522 lines; source safety, SQL parameters, fetch methods, batching, streaming, watermark limits, consistency and recovery.
+- [Day 33 Project Workbook](day_33_project_workbook.md) — guided extraction cells, batch output, reconciliation, failure drills and acceptance criteria.
+- [Day 33 Interview Guide](day_33_interview.md) — full model answers, limitations and project defence.
+
+**Status:** Rebuilt under independent-learning standard. Execute with TechStore schema and verify driver/cursor behavior in the learner environment.
