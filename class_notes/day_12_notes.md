@@ -30,6 +30,8 @@ An API is a contract between systems. It defines which operations are available,
 
 ## 3. Understand the HTTP request
 
+![API request and response flow](images/day_12_api_request_response.svg)
+
 A request may contain:
 
 | Part | Purpose | Example |
@@ -273,6 +275,8 @@ The endpoint returns posts for user 1. Query parameters are encoded into the URL
 
 ## 12. Headers and authentication concepts
 
+![API authentication flow](images/day_12_api_authentication_flow.svg)
+
 Headers communicate metadata. An API may require an access token.
 
 ```python
@@ -348,6 +352,8 @@ except requests.exceptions.JSONDecodeError:
 Do not catch every error and pretend the extraction succeeded. A pipeline must communicate failure to its scheduler or operator.
 
 ## 14. Understand pagination
+
+![API pagination and safe retry](images/day_12_api_pagination_retries.svg)
 
 A large API response is often split into pages to limit response size.
 
