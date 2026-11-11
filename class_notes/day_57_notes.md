@@ -1099,13 +1099,13 @@ Expected output:
 - joined rows: 8.
 
 Why eight?
-- P01 appears in three order lines;
+- P01 appears in two order lines;
 - each P01 line matches two product records;
-- those three lines produce six joined rows;
-- the other three order lines produce one row each;
-- total = nine, not eight.
+- those two lines produce four joined rows instead of two;
+- the other four order lines each produce one joined row;
+- total = 4 + 4 = 8.
 
-The correct count is **9**. Use this arithmetic to check your output.
+The correct joined row count is **8**.
 
 This example demonstrates why row-count validation matters. A duplicate dimension key can multiply fact rows and inflate measures.
 
@@ -1205,14 +1205,6 @@ After repartition: 4
 repartition(4) requests four execution partitions. It normally causes a shuffle to redistribute records.
 
 ## 59. Inspect records per partition
-
-~~~python
-partition_sizes = (
-    orders_four_partitions
-    .groupBy(spark_partition_id())
-    .count()
-)
-~~~
 
 Before running this cell, import the function:
 
