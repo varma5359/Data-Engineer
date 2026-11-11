@@ -2677,3 +2677,16 @@ If you cannot explain one item, return to the section and rerun its example.
 Day 32 teaches API-based data ingestion. The source changes from a partner file to an HTTP API, but the engineering questions remain familiar: identify the source, understand its contract, retrieve data safely, validate it, handle failures, and prove completeness.
 
 **End of Day 31 class notes.**
+
+---
+
+## Visual Learning Diagrams
+
+### File ingestion lifecycle
+![Day 31 - File ingestion lifecycle](images/day_31_file_ingestion_flow.svg)
+
+### File contract and schema
+![Day 31 - File contract and schema](images/day_31_file_contract_schema.svg)
+
+### File arrival checks
+![Day 31 - File arrival checks](images/day_31_file_arrival_checks.svg)
