@@ -318,3 +318,180 @@ Never skip: unique record identity; what success guarantees; replay behavior; in
 - [ ] I can defend the project.
 
 **Complete the day when you can explain, run, interpret, test failure and prove the result—not merely read the notes.**
+
+
+# 11. Mentor-led deep dive — API
+
+This section expands the earlier example into decisions a junior Data Engineer should make. Read each scenario slowly: identify the input, risk, control and proof.
+
+## 11.1 Request URL anatomy
+
+A URL can contain a base host, path and query parameters. For example, /orders?limit=100&status=PAID asks the provider for a filtered/limited set. The provider—not Python—defines what each parameter means. Never guess undocumented parameters.
+
+**Student checkpoint:** Explain this in your own words, then name one test that would prove it.
+
+## 11.2 HTTP response anatomy
+
+A response has status, headers and body. Status tells request outcome; headers can include content type, pagination/rate-limit information; body contains the payload. Inspect these separately while debugging.
+
+**Student checkpoint:** Explain this in your own words, then name one test that would prove it.
+
+## 11.3 Safe request walkthrough
+
+First print status and content type for a public test endpoint. Then parse JSON. Next validate the expected top-level key. Finally validate one record. This order separates network failure, parsing failure and data-contract failure.
+
+**Student checkpoint:** Explain this in your own words, then name one test that would prove it.
+
+## 11.4 Authentication teaching
+
+A token is a credential, not ordinary configuration. Read it from an environment variable or secret manager; do not commit it, paste it in notebook output or include it in exception messages. Rotate it if exposed.
+
+**Student checkpoint:** Explain this in your own words, then name one test that would prove it.
+
+## 11.5 Pagination example
+
+Suppose page 1 returns IDs 1–3 and next_page=2; page 2 returns 4–6 and next_page=null. Your loop should fetch page 2 exactly once, append only validated results and stop when the provider's terminal marker is reached.
+
+**Student checkpoint:** Explain this in your own words, then name one test that would prove it.
+
+## 11.6 Cursor safety
+
+A cursor is opaque. Treat it as a string supplied by the API; do not calculate cursor+1 unless documentation explicitly says it is numeric. Store the exact token safely.
+
+**Student checkpoint:** Explain this in your own words, then name one test that would prove it.
+
+## 11.7 Rate-limit response
+
+When 429 occurs, stop sending immediate requests. Read Retry-After if available, wait, then resume. A tight retry loop makes the provider's problem worse.
+
+**Student checkpoint:** Explain this in your own words, then name one test that would prove it.
+
+## 11.8 Retry classification
+
+Timeout/temporary 503 can be retried. 400 invalid input, 401 credentials and 403 permission normally need correction. 404 may mean endpoint/resource is absent. Make the classification explicit.
+
+**Student checkpoint:** Explain this in your own words, then name one test that would prove it.
+
+## 11.9 Incremental API boundary
+
+If provider offers updated_since, understand whether it is inclusive, timezone-aware and stable. Use overlap/lookback when events can arrive late; deduplicate by stable event/order ID.
+
+**Student checkpoint:** Explain this in your own words, then name one test that would prove it.
+
+## 11.10 API output validation
+
+Check response is a dictionary, expected collection key exists, collection is a list, each item has an ID and required fields, and values have expected types. JSON can be valid but semantically wrong.
+
+**Student checkpoint:** Explain this in your own words, then name one test that would prove it.
+
+## 11.11 Backfill design
+
+For 90-day history, split into date windows or cursor batches. Keep each batch idempotent, record window status, limit provider load, and resume failed windows without starting all over.
+
+**Student checkpoint:** Explain this in your own words, then name one test that would prove it.
+
+## 11.12 Streaming introduction
+
+Streaming differs from paginated request/response. A connection can disconnect; use provider offsets/event IDs, reconnect and replay. Persist events before acknowledging progress.
+
+**Student checkpoint:** Explain this in your own words, then name one test that would prove it.
+
+## 11.13 Project extension
+
+Add a mock response fixture for success, empty page, 429, timeout, malformed JSON and missing field. Students can test failure behavior without repeatedly calling a real API.
+
+**Student checkpoint:** Explain this in your own words, then name one test that would prove it.
+
+## 11.14 Interview evidence
+
+Show request parameters, status validation, page count, unique IDs, retry count, checkpoint and final reconciliation. A screenshot of one successful response is weak evidence.
+
+**Student checkpoint:** Explain this in your own words, then name one test that would prove it.
+
+# 12. Guided lab checkpoints
+
+## Lab checkpoint 1
+
+- **Predict:** Before running anything, write what you expect to happen.
+- **Execute:** Run only this stage with a small input.
+- **Observe:** Record the actual output, row count and error (if any).
+- **Explain:** Why did the output occur? Which input or rule produced it?
+- **Verify:** Compare it with the expected result and contract.
+- **Recover:** If it failed, reproduce with the smallest input and correct the cause.
+
+## Lab checkpoint 2
+
+- **Predict:** Before running anything, write what you expect to happen.
+- **Execute:** Run only this stage with a small input.
+- **Observe:** Record the actual output, row count and error (if any).
+- **Explain:** Why did the output occur? Which input or rule produced it?
+- **Verify:** Compare it with the expected result and contract.
+- **Recover:** If it failed, reproduce with the smallest input and correct the cause.
+
+## Lab checkpoint 3
+
+- **Predict:** Before running anything, write what you expect to happen.
+- **Execute:** Run only this stage with a small input.
+- **Observe:** Record the actual output, row count and error (if any).
+- **Explain:** Why did the output occur? Which input or rule produced it?
+- **Verify:** Compare it with the expected result and contract.
+- **Recover:** If it failed, reproduce with the smallest input and correct the cause.
+
+## Lab checkpoint 4
+
+- **Predict:** Before running anything, write what you expect to happen.
+- **Execute:** Run only this stage with a small input.
+- **Observe:** Record the actual output, row count and error (if any).
+- **Explain:** Why did the output occur? Which input or rule produced it?
+- **Verify:** Compare it with the expected result and contract.
+- **Recover:** If it failed, reproduce with the smallest input and correct the cause.
+
+## Lab checkpoint 5
+
+- **Predict:** Before running anything, write what you expect to happen.
+- **Execute:** Run only this stage with a small input.
+- **Observe:** Record the actual output, row count and error (if any).
+- **Explain:** Why did the output occur? Which input or rule produced it?
+- **Verify:** Compare it with the expected result and contract.
+- **Recover:** If it failed, reproduce with the smallest input and correct the cause.
+
+## Lab checkpoint 6
+
+- **Predict:** Before running anything, write what you expect to happen.
+- **Execute:** Run only this stage with a small input.
+- **Observe:** Record the actual output, row count and error (if any).
+- **Explain:** Why did the output occur? Which input or rule produced it?
+- **Verify:** Compare it with the expected result and contract.
+- **Recover:** If it failed, reproduce with the smallest input and correct the cause.
+
+## Lab checkpoint 7
+
+- **Predict:** Before running anything, write what you expect to happen.
+- **Execute:** Run only this stage with a small input.
+- **Observe:** Record the actual output, row count and error (if any).
+- **Explain:** Why did the output occur? Which input or rule produced it?
+- **Verify:** Compare it with the expected result and contract.
+- **Recover:** If it failed, reproduce with the smallest input and correct the cause.
+
+## Lab checkpoint 8
+
+- **Predict:** Before running anything, write what you expect to happen.
+- **Execute:** Run only this stage with a small input.
+- **Observe:** Record the actual output, row count and error (if any).
+- **Explain:** Why did the output occur? Which input or rule produced it?
+- **Verify:** Compare it with the expected result and contract.
+- **Recover:** If it failed, reproduce with the smallest input and correct the cause.
+
+
+# 13. Instructor review rubric
+
+| Skill | Beginner evidence |
+|---|---|
+| Concept | Explains what/why in plain language |
+| Code | Can read and explain each line, not copy blindly |
+| Output | Can derive output from input and rule |
+| Quality | Identifies invalid, duplicate and boundary cases |
+| Reliability | Explains retry, replay and checkpoint |
+| Verification | Uses counts/keys/totals/quality checks |
+| Interview | Gives decision, reason, failure mode and proof |
+
