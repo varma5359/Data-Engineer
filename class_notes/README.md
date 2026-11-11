@@ -13,7 +13,7 @@ The course is being rebuilt phase by phase to one consistent beginner-first teac
 | Phase 3 — SQL and Database Engineering | 19–29 | Rebuilt; final technical review | 9/11 days rebuilt and verified; Days 19–20 retained for cross-check |
 | Phase 4 — Data Processing and Pipelines | 30–39 | **Rebuild required** | Existing drafts are not student-ready; re-authoring from teaching standard |
 | Phase 5 — Data Warehousing and Modeling | 40–49 | Authored; runtime validation pending | 10/10 lesson sets prepared |
-| Phase 6 — Cloud and Distributed Processing | 50–59 | Pending | 0/10 days verified |
+| Phase 6 — Cloud and Distributed Processing | 50–59 | Authored; runtime validation pending | 10/10 lesson sets prepared |
 | Phase 7 — Orchestration, Quality and Monitoring | 60–67 | Pending | 0/8 days verified |
 | Phase 8 — Data Engineering Capstone | 68–75 | Pending | 0/8 days verified |
 
@@ -252,3 +252,35 @@ Each day has separate class notes, a guided project workbook and a complete inte
 **Phase 5 content status:** All ten lesson sets have been authored for this phase batch. Class notes, project workbooks and interview guides are separate. Runtime execution of SQL examples and environment-specific dbt/warehouse behavior remains to be validated before marking the phase classroom-verified.
 
 **Teaching progression:** architecture -> dimensional model -> historical dimensions -> key management -> subject marts -> quality -> reconciliation and lineage -> metadata -> loading -> performance.
+
+
+## Phase 6 — Cloud and Distributed Processing (Days 50–59)
+
+Each day has separate beginner-first class notes, a guided project workbook and a complete interview guide. Cloud exercises distinguish local simulations from actual AWS deployments. Spark examples use local mode for learning unless a cluster is explicitly configured.
+
+| Day | Approved syllabus topic | Mini-project | Class notes | Project workbook | Interview |
+|---|---|---|---|---|---|
+| 50 | Cloud Data Engineering Fundamentals | Cloud Architecture Design | [Notes](day_50_notes.md) | [Workbook](day_50_project_workbook.md) | [Guide](day_50_interview.md) |
+| 51 | Object Storage and Data Lakes | Cloud Data Lake Layout | [Notes](day_51_notes.md) | [Workbook](day_51_project_workbook.md) | [Guide](day_51_interview.md) |
+| 52 | AWS S3 and Storage Management | Object Storage Organizer | [Notes](day_52_notes.md) | [Workbook](day_52_project_workbook.md) | [Guide](day_52_interview.md) |
+| 53 | Cloud Database Fundamentals | Cloud Database Design | [Notes](day_53_notes.md) | [Workbook](day_53_project_workbook.md) | [Guide](day_53_interview.md) |
+| 54 | Distributed Computing | Parallel Processing Experiment | [Notes](day_54_notes.md) | [Workbook](day_54_project_workbook.md) | [Guide](day_54_interview.md) |
+| 55 | Apache Spark Fundamentals | Spark Data Exploration | [Notes](day_55_notes.md) | [Workbook](day_55_project_workbook.md) | [Guide](day_55_interview.md) |
+| 56 | Spark Transformations and Actions | Spark Transformation Lab | [Notes](day_56_notes.md) | [Workbook](day_56_project_workbook.md) | [Guide](day_56_interview.md) |
+| 57 | Spark Joins and Partitioning | Distributed Sales Analysis | [Notes](day_57_notes.md) | [Workbook](day_57_project_workbook.md) | [Guide](day_57_interview.md) |
+| 58 | Spark Performance Optimization | Spark Performance Experiment | [Notes](day_58_notes.md) | [Workbook](day_58_project_workbook.md) | [Guide](day_58_interview.md) |
+| 59 | Cloud and Distributed Pipeline Integration | Cloud Pipeline Architecture | [Notes](day_59_notes.md) | [Workbook](day_59_project_workbook.md) | [Guide](day_59_interview.md) |
+
+**Phase 6 content status:** All ten lesson sets have been authored for this phase batch. Class notes, project workbooks and interview guides are separate. AWS resource creation, cloud connectivity, Kafka deployment and Spark cluster execution remain environment-specific and have not been claimed as runtime-tested.
+
+**Teaching progression:** cloud foundations and IAM -> object storage and data lakes -> S3 management -> managed databases -> distributed computing -> Spark fundamentals -> transformations/actions -> joins/partitioning -> performance -> integrated batch/streaming architecture.
+
+**Phase 6 completion checklist**
+- [x] Days 50–59 class notes authored.
+- [x] Days 50–59 project workbooks authored separately.
+- [x] Days 50–59 interview guides authored separately.
+- [x] Daily topics and mini-project names checked against career_path.md.
+- [ ] Execute local Python/PySpark examples in the target student environment.
+- [ ] Validate AWS and Kafka examples in an approved cloud/lab environment before claiming deployment readiness.
+
+**Phase 6 content authoring is complete.** Runtime and classroom validation remain to be performed in the target environment.
