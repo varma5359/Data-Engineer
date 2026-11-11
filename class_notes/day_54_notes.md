@@ -685,7 +685,7 @@ print("Correct total:", sum(sales))
 Expected output:
 
 ~~~text
-Wrong total: 2650
+Wrong total: 2250
 Correct total: 2750
 ~~~
 
