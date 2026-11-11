@@ -45,6 +45,8 @@ The version number depends on the environment. If import fails, check that NumPy
 
 ## 4. Create your first array
 
+![NumPy array dimensions](images/day_15_numpy_array_dimensions.svg)
+
 ```python
 import numpy as np
 
@@ -211,6 +213,8 @@ Expected output:
 
 ## 11. Vectorized arithmetic
 
+![NumPy vectorized processing](images/day_15_numpy_vectorization.svg)
+
 Vectorization applies an operation to an array without writing a Python loop for every element.
 
 ```python
@@ -315,6 +319,8 @@ Expected output:
 Use `&` for element-wise AND and `|` for element-wise OR. Put each comparison in parentheses. Do not use Python's `and` with full NumPy arrays.
 
 ## 16. Understand axes
+
+![NumPy axes and broadcasting](images/day_15_numpy_broadcasting_axes.svg)
 
 An axis tells NumPy which dimension to reduce when aggregating.
 
