@@ -1524,3 +1524,16 @@ Without looking at the notes, explain:
 If you can perform the safe upload/download exercise and explain the storage, security and recovery decisions, you are ready for Day 53.
 
 **Next lesson — Day 53: Cloud Database Fundamentals.** We will connect a data pipeline to a managed relational database and learn endpoints, ports, network access, credentials, TLS, connection testing and safe data movement.
+
+---
+
+## Visual Learning Diagrams
+
+### S3 upload and retrieval
+![Day 52 - S3 upload and retrieval](images/day_52_s3_upload_flow.svg)
+
+### S3 prefixes
+![Day 52 - S3 prefixes](images/day_52_s3_prefix_layout.svg)
+
+### S3 lifecycle storage tiers
+![Day 52 - S3 lifecycle storage tiers](images/day_52_s3_lifecycle.svg)
