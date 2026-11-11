@@ -14,7 +14,7 @@ The course is being rebuilt phase by phase to one consistent beginner-first teac
 | Phase 4 — Data Processing and Pipelines | 30–39 | **Rebuild required** | Existing drafts are not student-ready; re-authoring from teaching standard |
 | Phase 5 — Data Warehousing and Modeling | 40–49 | Authored; runtime validation pending | 10/10 lesson sets prepared |
 | Phase 6 — Cloud and Distributed Processing | 50–59 | Authored; runtime validation pending | 10/10 lesson sets prepared |
-| Phase 7 — Orchestration, Quality and Monitoring | 60–67 | Pending | 0/8 days verified |
+| Phase 7 — Orchestration, Quality and Monitoring | 60–67 | Authored; runtime validation pending | 8/8 lesson sets prepared |
 | Phase 8 — Data Engineering Capstone | 68–75 | Pending | 0/8 days verified |
 
 
@@ -284,3 +284,35 @@ Each day has separate beginner-first class notes, a guided project workbook and 
 - [ ] Validate AWS and Kafka examples in an approved cloud/lab environment before claiming deployment readiness.
 
 **Phase 6 content authoring is complete.** Runtime and classroom validation remain to be performed in the target environment.
+
+
+## Phase 7 — Orchestration, Quality and Monitoring (Days 60–67)
+
+Each day has separate beginner-first class notes, a guided project workbook and a complete interview guide. Airflow examples identify the teaching version and distinguish syntax checks from actual Airflow runtime validation. Docker and CI exercises distinguish local examples from verified deployment.
+
+| Day | Approved syllabus topic | Mini-project | Class notes | Project workbook | Interview |
+|---|---|---|---|---|---|
+| 60 | Workflow Orchestration Fundamentals | Workflow DAG Design | [Notes](day_60_notes.md) | [Workbook](day_60_project_workbook.md) | [Guide](day_60_interview.md) |
+| 61 | Airflow DAGs and Tasks | Daily ETL DAG | [Notes](day_61_notes.md) | [Workbook](day_61_project_workbook.md) | [Guide](day_61_interview.md) |
+| 62 | Airflow Scheduling and Reliability | Resilient Workflow | [Notes](day_62_notes.md) | [Workbook](day_62_project_workbook.md) | [Guide](day_62_interview.md) |
+| 63 | Automated Data Quality | Automated Quality Gate | [Notes](day_63_notes.md) | [Workbook](day_63_project_workbook.md) | [Guide](day_63_interview.md) |
+| 64 | Pipeline Monitoring and Alerting | Pipeline Monitoring Dashboard | [Notes](day_64_notes.md) | [Workbook](day_64_project_workbook.md) | [Guide](day_64_interview.md) |
+| 65 | Data Pipeline Security | Secure Data Pipeline | [Notes](day_65_notes.md) | [Workbook](day_65_project_workbook.md) | [Guide](day_65_interview.md) |
+| 66 | Docker for Data Engineering | Containerized ETL Application | [Notes](day_66_notes.md) | [Workbook](day_66_project_workbook.md) | [Guide](day_66_interview.md) |
+| 67 | CI/CD and Automated Pipeline Testing | Data Pipeline CI Workflow | [Notes](day_67_notes.md) | [Workbook](day_67_project_workbook.md) | [Guide](day_67_interview.md) |
+
+**Phase 7 content status:** All eight lesson sets have been authored for this phase batch. Class notes, project workbooks and interview guides are separate. Actual Airflow, Docker and GitHub Actions execution must be completed in the target student environment before claiming classroom/runtime validation.
+
+**Teaching progression:** orchestration concepts -> DAGs and tasks -> scheduling and recovery -> automated data quality -> monitoring and alerts -> security -> Docker -> CI/CD and automated testing.
+
+**Phase 7 completion checklist**
+- [x] Days 60–67 class notes authored.
+- [x] Days 60–67 project workbooks authored separately.
+- [x] Days 60–67 interview guides authored separately.
+- [x] Topics and mini-project names checked against career_path.md.
+- [ ] Execute Airflow DAG examples in the target supported Airflow environment.
+- [ ] Build and run the Docker ETL example.
+- [ ] Run GitHub Actions workflow in a test repository.
+- [ ] Validate the full phase with beginner students.
+
+**Phase 7 content authoring is complete.** Runtime and classroom validation remain to be performed in the target environment.
