@@ -236,6 +236,8 @@ Replace the database/user/password with your own local values. These variables a
 
 ## 5.2 First connection cell
 
+![Day 30 notebook extraction workflow](images/day_30_notebook_workflow.svg)
+
 ```python
 import os
 import psycopg
@@ -409,6 +411,8 @@ CSV is a plain text table format. It is easy to inspect and exchange, but it doe
 
 ## 9.2 Write the file
 
+![Notebook cell execution order](images/day_30_notebook_cell_order.svg)
+
 ```python
 import csv
 
@@ -458,6 +462,8 @@ A file existing does not mean it is correct.
 
 ## 10.1 Count invariant
 
+![Validate an extracted dataset](images/day_30_extraction_validation.svg)
+
 `source query count = Python fetched count = CSV data row count`
 
 Run SQL COUNT again. Compare it with Python and file.
@@ -482,6 +488,8 @@ Duplicate IDs: 0
 If duplicates appear, stop publication and investigate the source query/key. Do not silently drop duplicates unless the business rule says how.
 
 ## 10.3 Date boundary check
+
+![Source-to-target reconciliation](images/day_30_source_target_reconciliation.svg)
 
 ```python
 from datetime import datetime
@@ -512,6 +520,10 @@ This assumes database timestamps and Python boundaries use compatible timezone s
 Read every record each run. Simple but increasingly expensive.
 
 ## Incremental extraction
+
+![Incremental extraction watermark flow](images/day_30_incremental_watermark.svg)
+
+![Full versus incremental extraction](images/day_30_full_vs_incremental.svg)
 Read only new/changed records since a safe boundary. Efficient but requires reliable change tracking.
 
 | Strategy | Example | Main risk |
