@@ -142,3 +142,22 @@ The course is being rebuilt phase by phase to one consistent beginner-first teac
 - Phase 8: Data Engineering Capstone (Days 68–75)
 
 **Learning format:** beginner-friendly explanations, practical code examples, expected outputs, operational considerations and a separate interview-preparation file for every day.
+## Phase 4 — Data Processing and Pipelines (Days 30–39)
+
+| Day | Syllabus topic | Mini-project | Class notes | Interview |
+|---|---|---|---|---|
+| 30 | ETL and Data Extraction Patterns | Incremental Extraction Pipeline | [Notes](day_30_notes.md) | [Interview](day_30_interview.md) |
+| 31 | File-Based Data Ingestion | Multi-File Ingestion System | [Notes](day_31_notes.md) | [Interview](day_31_interview.md) |
+| 32 | API-Based Data Ingestion | API Ingestion Pipeline | [Notes](day_32_notes.md) | [Interview](day_32_interview.md) |
+| 33 | Database Ingestion | Database Extractor | [Notes](day_33_notes.md) | [Interview](day_33_interview.md) |
+| 34 | Data Transformation and Business Rules | Transformation Pipeline | [Notes](day_34_notes.md) | [Interview](day_34_interview.md) |
+| 35 | Data Cleaning and Schema Evolution | Data Cleaning Framework | [Notes](day_35_notes.md) | [Interview](day_35_interview.md) |
+| 36 | Batch Processing and Partitioning | Partitioned Batch Processor | [Notes](day_36_notes.md) | [Interview](day_36_interview.md) |
+| 37 | Incremental Loading and Upserts | Incremental Data Loader | [Notes](day_37_notes.md) | [Interview](day_37_interview.md) |
+| 38 | Pipeline Reliability and Failure Handling | Reliable Pipeline Simulator | [Notes](day_38_notes.md) | [Interview](day_38_interview.md) |
+| 39 | Pipeline Logging and Observability | Pipeline Observability Tool | [Notes](day_39_notes.md) | [Interview](day_39_interview.md) |
+
+**Phase 4 content status:** Days 32–39 class notes and interview guides included. Each lesson includes a beginner explanation, sample code/output, progressive workflow, common mistakes, debugging, project acceptance checks, exercises and production context. Interview guides contain model answers, scenarios and project defence. Execute examples in the course environment before labelling them runtime-tested.
+
+---
+
