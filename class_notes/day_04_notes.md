@@ -384,6 +384,10 @@ Do not silently delete rejected records in a real pipeline. Record why they were
 
 ### 5.4 ETL architecture diagram
 
+![Conventional ETL architecture](https://upload.wikimedia.org/wikipedia/commons/f/fa/Conventional_ETL_Diagram.jpg)
+
+<sub>Image: Remyrosenbaum, Wikimedia Commons, CC BY-SA 4.0. [Source](https://commons.wikimedia.org/wiki/File:Conventional_ETL_Diagram.jpg) · [License](https://creativecommons.org/licenses/by-sa/4.0/).</sub>
+
 ```text
 Order Database
       |
