@@ -1097,3 +1097,16 @@ Before deployment, answer:
 10. What evidence proves recovery is complete?
 
 **End of expanded Day 38 teaching notes.**
+
+---
+
+## Visual Learning Diagrams
+
+### Transient vs permanent failures
+![Day 38 - Transient vs permanent failures](images/day_38_failure_retry_classification.svg)
+
+### Pipeline failure points
+![Day 38 - Pipeline failure points](images/day_38_pipeline_failure_points.svg)
+
+### Timeout and retry backoff
+![Day 38 - Timeout and retry backoff](images/day_38_timeout_retry_backoff.svg)
