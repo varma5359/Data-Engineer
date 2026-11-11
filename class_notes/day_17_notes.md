@@ -28,6 +28,8 @@ Tests provide repeatable evidence that defined behavior works. They do not prove
 
 ## 3. What is a unit test?
 
+![Testing layers for data pipelines](images/day_17_testing_pyramid.svg)
+
 A unit test checks one small unit of code, usually a function, in isolation.
 
 For example, if a function calculates order value, test the calculation without connecting to a database or API.
@@ -116,6 +118,8 @@ Expected output:
 This confirms the module can be imported and the function can run. It is a manual smoke check, not yet a repeatable test suite.
 
 ## 8. Create the first unittest
+
+![Test case lifecycle](images/day_17_test_case_lifecycle.svg)
 
 In `test_transformations.py`:
 
@@ -365,6 +369,8 @@ For every transformation, ask:
 A test case should have a clear input, action and expected result.
 
 ## 17. Unit, integration and end-to-end tests
+
+![Unit, integration and end-to-end tests](images/day_17_unit_integration_e2e.svg)
 
 | Test type | Scope | Example |
 |---|---|---|
