@@ -1045,3 +1045,16 @@ Before writing code, answer:
 If these answers are unknown, the design is not ready for production.
 
 **End of expanded Day 37 teaching notes.**
+
+---
+
+## Visual Learning Diagrams
+
+### Full load vs incremental load
+![Day 37 - Full load vs incremental load](images/day_37_full_vs_incremental.svg)
+
+### Watermark and late-arriving data
+![Day 37 - Watermark and late-arriving data](images/day_37_watermark_late_data.svg)
+
+### Upsert: insert or update
+![Day 37 - Upsert: insert or update](images/day_37_upsert_merge.svg)
