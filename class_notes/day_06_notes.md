@@ -116,6 +116,8 @@ py -c "print('Hello, Data Engineering')"
 
 ## 6. Create and run a Python file
 
+![Python project setup workflow](images/day_06_python_project_setup.svg)
+
 Create a folder named `day06_python`. Inside it, create `first_program.py`.
 
 Code in `first_program.py`:
@@ -195,6 +197,8 @@ Python creates the variable when the assignment statement runs. You do not decla
 - Use descriptive `snake_case` names in ordinary Python code.
 
 ## 9. Inspect data types
+
+![Common Python data types](images/day_06_python_data_types.svg)
 
 ```python
 customer_name = "Asha"
