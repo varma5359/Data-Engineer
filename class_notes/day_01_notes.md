@@ -405,6 +405,8 @@ The work can overlap. The exact responsibilities depend on the organization.
 
 ## 7. Understand the data lifecycle
 
+![How data engineering helps a business](images/day_01_data_engineering_journey.svg)
+
 A data lifecycle describes the stages through which data travels and how it is managed.
 
 For this course, begin with this simple flow:
