@@ -1667,3 +1667,16 @@ Your explanation should cover:
 If you can explain the design and justify the permission boundaries, you have achieved the Day 50 learning outcomes.
 
 **Next lesson — Day 51: Object Storage and Data Lakes.** We will move from cloud architecture concepts to the object-storage model, bucket and object terminology, data lake layers, file naming, partition design and data organization.
+
+---
+
+## Visual Learning Diagrams
+
+### Warehouse capstone end-to-end
+![Day 50 - Warehouse capstone end-to-end](images/day_50_warehouse_capstone.svg)
+
+### Capstone validation
+![Day 50 - Capstone validation](images/day_50_capstone_validation.svg)
+
+### Project review workflow
+![Day 50 - Project review workflow](images/day_50_warehouse_project_review.svg)
