@@ -44,6 +44,8 @@ A syntax error prevents Python from understanding the program. An exception happ
 
 ## 4. Read a traceback
 
+![Exception handling flow](images/day_10_exception_handling_flow.svg)
+
 Run this deliberately failing example:
 
 ```python
