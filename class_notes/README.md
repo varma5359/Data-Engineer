@@ -170,3 +170,11 @@ The course is being rebuilt phase by phase to one consistent beginner-first teac
 - [Day 30 Interview Guide](day_30_interview.md) — complete model answers, follow-ups, project defence and common traps.
 
 **Status:** Day 30 is the first rebuilt lesson under the independent-learning standard. Review against the real TechStore schema and execute all cells before marking fully classroom-verified.
+
+## Day 31 — File-Based Data Ingestion (rebuild artifacts)
+
+- [Day 31 Class Notebook](day_31_notes.md) — 802 lines; CSV/JSON from zero, file discovery, schema and record validation, accept/reject, reconciliation, reruns and debugging.
+- [Day 31 Project Workbook](day_31_project_workbook.md) — 312 lines; input fixture, execution cells, expected results, reconciliation, failure drills and acceptance checklist.
+- [Day 31 Interview Guide](day_31_interview.md) — complete model answers and project defence.
+
+**Status:** Rebuilt under independent-learning standard. Execute cells and test against the student's environment before classroom verification.
