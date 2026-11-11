@@ -472,3 +472,70 @@ After mapping correction, replay raw under new transformation version and record
 | Verification | Uses counts/keys/totals/quality checks |
 | Interview | Gives decision, reason, failure mode and proof |
 
+
+
+# 14. Additional worked lab cells — Schema evolution
+
+Each cell is a separate experiment. Students should predict, execute, record output and explain the business meaning.
+
+## Lab cell 1
+
+Fixture A is original schema; fixture B adds optional campaign_code; fixture C renames customer_id; fixture D changes amount from decimal to text. Label additive, breaking or ambiguous.
+
+**Write in your notebook:** input; expected output; actual output; why it happened; validation evidence; what you would do if it failed.
+
+## Lab cell 2
+
+Compare required set, optional set and received set. Missing required field stops ingestion; unexpected additive field is captured and reviewed under policy.
+
+**Write in your notebook:** input; expected output; actual output; why it happened; validation evidence; what you would do if it failed.
+
+## Lab cell 3
+
+When old and new column names both appear, compare values. If they conflict, quarantine/report; never silently choose one.
+
+**Write in your notebook:** input; expected output; actual output; why it happened; validation evidence; what you would do if it failed.
+
+## Lab cell 4
+
+Validate types with sample and full data. '100' may parse; 'unknown' cannot. Report conversion counts and rejected examples without leaking sensitive data.
+
+**Write in your notebook:** input; expected output; actual output; why it happened; validation evidence; what you would do if it failed.
+
+## Lab cell 5
+
+Duplicate key examples: same event ID same payload (replay), same event ID different payload (conflict), different event IDs same payload (possibly valid). Define each action.
+
+**Write in your notebook:** input; expected output; actual output; why it happened; validation evidence; what you would do if it failed.
+
+## Lab cell 6
+
+Schema compatibility test: old consumer reading new optional column; new consumer reading old file with missing optional field. Set explicit default/null behavior.
+
+**Write in your notebook:** input; expected output; actual output; why it happened; validation evidence; what you would do if it failed.
+
+## Lab cell 7
+
+Version contract (v1/v2), migration notes, producer/consumer owner, rollout date and removal plan. Include rollback/replay strategy.
+
+**Write in your notebook:** input; expected output; actual output; why it happened; validation evidence; what you would do if it failed.
+
+## Lab cell 8
+
+After fix, replay original raw file with corrected mapping version; compare new output and record run lineage.
+
+**Write in your notebook:** input; expected output; actual output; why it happened; validation evidence; what you would do if it failed.
+
+# 15. Lab completion evidence
+
+| Evidence | Student submission |
+|---|---|
+| Input contract | Fields, types, keys, source behavior |
+| Happy-path run | Input and output counts |
+| Invalid case | Error/reject reason and handling |
+| Replay | Proof no duplicate side effect |
+| Boundary case | Proof no gap or unintended overlap |
+| Recovery | Last safe point and restart procedure |
+| Reconciliation | Counts, keys, totals or quality checks |
+| Project defence | Explain decision, risk, control and proof |
+

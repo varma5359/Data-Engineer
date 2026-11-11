@@ -481,3 +481,70 @@ Reconcile raw = accepted + rejected; compare totals with documented exclusions; 
 | Verification | Uses counts/keys/totals/quality checks |
 | Interview | Gives decision, reason, failure mode and proof |
 
+
+
+# 14. Additional worked lab cells — Transformation
+
+Each cell is a separate experiment. Students should predict, execute, record output and explain the business meaning.
+
+## Lab cell 1
+
+Cell 1 — inspect raw status: create values [' paid ','PAID','paid','unknown']; print original values and counts. Predict which are equivalent before changing them.
+
+**Write in your notebook:** input; expected output; actual output; why it happened; validation evidence; what you would do if it failed.
+
+## Lab cell 2
+
+Cell 2 — normalize approved values: strip whitespace and uppercase; inspect value counts. Do not map 'unknown' to PAID. Keep unknown distinct.
+
+**Write in your notebook:** input; expected output; actual output; why it happened; validation evidence; what you would do if it failed.
+
+## Lab cell 3
+
+Cell 3 — numeric parsing: test '12.50','', 'abc','-4'. Decide blank/null, malformed reject and negative business policy separately; parsing success is not validation success.
+
+**Write in your notebook:** input; expected output; actual output; why it happened; validation evidence; what you would do if it failed.
+
+## Lab cell 4
+
+Cell 4 — Decimal arithmetic: quantity 3, price Decimal('100.00'), discount Decimal('10.00'); calculate gross/net. Show why float may represent decimal fractions imprecisely.
+
+**Write in your notebook:** input; expected output; actual output; why it happened; validation evidence; what you would do if it failed.
+
+## Lab cell 5
+
+Cell 5 — mapping: map PAID/SHIPPED/PENDING to canonical codes; unknown values become rejected/needs-review with original code.
+
+**Write in your notebook:** input; expected output; actual output; why it happened; validation evidence; what you would do if it failed.
+
+## Lab cell 6
+
+Cell 6 — cross-field validation: shipped_at must exist when status=SHIPPED; cancelled order may have zero amount according to business policy. Validate relationships, not only individual fields.
+
+**Write in your notebook:** input; expected output; actual output; why it happened; validation evidence; what you would do if it failed.
+
+## Lab cell 7
+
+Cell 7 — aggregation grain: one order has two lines; sum line totals once per order. Show how duplicate line input doubles amount and why dedup precedes aggregation.
+
+**Write in your notebook:** input; expected output; actual output; why it happened; validation evidence; what you would do if it failed.
+
+## Lab cell 8
+
+Cell 8 — audit: write accepted/rejected counts and total amounts; compare source and transformed totals with excluded records explained.
+
+**Write in your notebook:** input; expected output; actual output; why it happened; validation evidence; what you would do if it failed.
+
+# 15. Lab completion evidence
+
+| Evidence | Student submission |
+|---|---|
+| Input contract | Fields, types, keys, source behavior |
+| Happy-path run | Input and output counts |
+| Invalid case | Error/reject reason and handling |
+| Replay | Proof no duplicate side effect |
+| Boundary case | Proof no gap or unintended overlap |
+| Recovery | Last safe point and restart procedure |
+| Reconciliation | Counts, keys, totals or quality checks |
+| Project defence | Explain decision, risk, control and proof |
+

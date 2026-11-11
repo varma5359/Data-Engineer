@@ -468,3 +468,70 @@ Runbook: detect -> inspect run/checkpoint -> inspect partial writes -> fix -> re
 | Verification | Uses counts/keys/totals/quality checks |
 | Interview | Gives decision, reason, failure mode and proof |
 
+
+
+# 14. Additional worked lab cells — Reliability
+
+Each cell is a separate experiment. Students should predict, execute, record output and explain the business meaning.
+
+## Lab cell 1
+
+Failure matrix: crash before read (nothing), after read (re-read), during transform (reprocess batch), during write (transaction/temp output), after commit before checkpoint (replay idempotently).
+
+**Write in your notebook:** input; expected output; actual output; why it happened; validation evidence; what you would do if it failed.
+
+## Lab cell 2
+
+Retry decision table: network timeout=bounded retry; rate limit=wait; bad schema=quarantine/alert; invalid credentials=stop; destination constraint=investigate data/code.
+
+**Write in your notebook:** input; expected output; actual output; why it happened; validation evidence; what you would do if it failed.
+
+## Lab cell 3
+
+Retry timing example 1,2,4,8 seconds capped; add random jitter and global retry budget. Track attempts and elapsed time.
+
+**Write in your notebook:** input; expected output; actual output; why it happened; validation evidence; what you would do if it failed.
+
+## Lab cell 4
+
+Atomic file pattern: write temporary path, flush/close, validate row count, rename to final; clean abandoned temp files on restart.
+
+**Write in your notebook:** input; expected output; actual output; why it happened; validation evidence; what you would do if it failed.
+
+## Lab cell 5
+
+DB pattern: stage rows, validate, transactionally upsert and commit; checkpoint separate with replay-safe key. Explain unavoidable failure window.
+
+**Write in your notebook:** input; expected output; actual output; why it happened; validation evidence; what you would do if it failed.
+
+## Lab cell 6
+
+Poison row: isolate only if rule says row-level reject is safe. If every row fails due schema mismatch, fail the entire batch and alert.
+
+**Write in your notebook:** input; expected output; actual output; why it happened; validation evidence; what you would do if it failed.
+
+## Lab cell 7
+
+Idempotency test: run same input twice; output row count and target values remain same. Test same key with changed source version too.
+
+**Write in your notebook:** input; expected output; actual output; why it happened; validation evidence; what you would do if it failed.
+
+## Lab cell 8
+
+Recovery runbook: identify failed run and safe cursor; inspect partial destination; repair cause; replay bounded unit; reconcile; record recovered status.
+
+**Write in your notebook:** input; expected output; actual output; why it happened; validation evidence; what you would do if it failed.
+
+# 15. Lab completion evidence
+
+| Evidence | Student submission |
+|---|---|
+| Input contract | Fields, types, keys, source behavior |
+| Happy-path run | Input and output counts |
+| Invalid case | Error/reject reason and handling |
+| Replay | Proof no duplicate side effect |
+| Boundary case | Proof no gap or unintended overlap |
+| Recovery | Last safe point and restart procedure |
+| Reconciliation | Counts, keys, totals or quality checks |
+| Project defence | Explain decision, risk, control and proof |
+

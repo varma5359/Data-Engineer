@@ -467,3 +467,70 @@ Runbook explains find run ID, inspect logs/metrics, verify source/target, restar
 | Verification | Uses counts/keys/totals/quality checks |
 | Interview | Gives decision, reason, failure mode and proof |
 
+
+
+# 14. Additional worked lab cells — Observability
+
+Each cell is a separate experiment. Students should predict, execute, record output and explain the business meaning.
+
+## Lab cell 1
+
+Create run record: run_id, start_time, end_time, status, rows_read, rows_written, rejects, retries, duration, watermark, error_code. Define status when rejects exist.
+
+**Write in your notebook:** input; expected output; actual output; why it happened; validation evidence; what you would do if it failed.
+
+## Lab cell 2
+
+Metric exercise: input=1000, accepted=990, rejected=10, written=990. Assert input=accepted+rejected and accepted=written unless target policy explains differences.
+
+**Write in your notebook:** input; expected output; actual output; why it happened; validation evidence; what you would do if it failed.
+
+## Lab cell 3
+
+Freshness calculation: current time minus latest source event time; separate source delay from job duration. Timezone must be consistent.
+
+**Write in your notebook:** input; expected output; actual output; why it happened; validation evidence; what you would do if it failed.
+
+## Lab cell 4
+
+Alert exercise: expected daily 10k rows, actual 0; run technically success but data incident. Alert on zero/unusual count based on baseline and business schedule.
+
+**Write in your notebook:** input; expected output; actual output; why it happened; validation evidence; what you would do if it failed.
+
+## Lab cell 5
+
+Dashboard panels: run status, duration trend, counts, reject percentage, lag, retries, failures and source/destination health. Explain operator question per panel.
+
+**Write in your notebook:** input; expected output; actual output; why it happened; validation evidence; what you would do if it failed.
+
+## Lab cell 6
+
+PII redaction test: deliberately raise error containing token/customer details; inspect logs and verify sensitive values are masked/absent.
+
+**Write in your notebook:** input; expected output; actual output; why it happened; validation evidence; what you would do if it failed.
+
+## Lab cell 7
+
+Runbook rehearsal: find run_id, inspect stage logs, identify failed boundary, verify target, rerun safely, compare counts and close incident.
+
+**Write in your notebook:** input; expected output; actual output; why it happened; validation evidence; what you would do if it failed.
+
+## Lab cell 8
+
+SLO example: 95% of daily runs complete by 07:00; measure over agreed window, alert before breach if lag/duration trend indicates risk.
+
+**Write in your notebook:** input; expected output; actual output; why it happened; validation evidence; what you would do if it failed.
+
+# 15. Lab completion evidence
+
+| Evidence | Student submission |
+|---|---|
+| Input contract | Fields, types, keys, source behavior |
+| Happy-path run | Input and output counts |
+| Invalid case | Error/reject reason and handling |
+| Replay | Proof no duplicate side effect |
+| Boundary case | Proof no gap or unintended overlap |
+| Recovery | Last safe point and restart procedure |
+| Reconciliation | Counts, keys, totals or quality checks |
+| Project defence | Explain decision, risk, control and proof |
+

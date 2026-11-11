@@ -460,3 +460,70 @@ Counts alone miss changed values; compare key sets, aggregates, sampled/full che
 | Verification | Uses counts/keys/totals/quality checks |
 | Interview | Gives decision, reason, failure mode and proof |
 
+
+
+# 14. Additional worked lab cells — Incremental upsert
+
+Each cell is a separate experiment. Students should predict, execute, record output and explain the business meaning.
+
+## Lab cell 1
+
+Input batch contains IDs 101 existing, 104 new, 101 updated twice. Deduplicate staging deterministically before target upsert; explain which 101 wins (source version/updated_at).
+
+**Write in your notebook:** input; expected output; actual output; why it happened; validation evidence; what you would do if it failed.
+
+## Lab cell 2
+
+Create unique target order_id; attempt duplicate insert and observe conflict. Explain constraint as correctness guard, not merely performance.
+
+**Write in your notebook:** input; expected output; actual output; why it happened; validation evidence; what you would do if it failed.
+
+## Lab cell 3
+
+Compare full load and incremental: initial snapshot, then changes after cursor; state how snapshot-to-change handoff avoids gap.
+
+**Write in your notebook:** input; expected output; actual output; why it happened; validation evidence; what you would do if it failed.
+
+## Lab cell 4
+
+Checkpoint scenario A: target commit succeeds, checkpoint fails; replay safe via upsert. Scenario B: checkpoint commits first, target fails; data is skipped—unsafe.
+
+**Write in your notebook:** input; expected output; actual output; why it happened; validation evidence; what you would do if it failed.
+
+## Lab cell 5
+
+Boundary: same timestamp two IDs; compound cursor includes key tie-break. Late update arrives with older timestamp; overlap or CDC/reconciliation required.
+
+**Write in your notebook:** input; expected output; actual output; why it happened; validation evidence; what you would do if it failed.
+
+## Lab cell 6
+
+Deletes: source tombstone has order_id and operation DELETE. Decide hard-delete target vs soft-delete/history, and test downstream report behavior.
+
+**Write in your notebook:** input; expected output; actual output; why it happened; validation evidence; what you would do if it failed.
+
+## Lab cell 7
+
+Merge conflict: staging two rows same key with different amounts. Define deterministic winner and conflict alert; don't let arbitrary row order decide.
+
+**Write in your notebook:** input; expected output; actual output; why it happened; validation evidence; what you would do if it failed.
+
+## Lab cell 8
+
+Reconciliation: compare target key set, source/target count, amount totals and selected record versions; count alone cannot detect stale values.
+
+**Write in your notebook:** input; expected output; actual output; why it happened; validation evidence; what you would do if it failed.
+
+# 15. Lab completion evidence
+
+| Evidence | Student submission |
+|---|---|
+| Input contract | Fields, types, keys, source behavior |
+| Happy-path run | Input and output counts |
+| Invalid case | Error/reject reason and handling |
+| Replay | Proof no duplicate side effect |
+| Boundary case | Proof no gap or unintended overlap |
+| Recovery | Last safe point and restart procedure |
+| Reconciliation | Counts, keys, totals or quality checks |
+| Project defence | Explain decision, risk, control and proof |
+

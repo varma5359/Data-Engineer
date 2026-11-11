@@ -461,3 +461,70 @@ Partition correctness needs stable date derivation, timezone, null/invalid date 
 | Verification | Uses counts/keys/totals/quality checks |
 | Interview | Gives decision, reason, failure mode and proof |
 
+
+
+# 14. Additional worked lab cells — Batch partitioning
+
+Each cell is a separate experiment. Students should predict, execute, record output and explain the business meaning.
+
+## Lab cell 1
+
+Rows-per-batch exercise: 25 records, batch size 10 => batches 10,10,5. Explain final partial batch; never drop it because it is smaller.
+
+**Write in your notebook:** input; expected output; actual output; why it happened; validation evidence; what you would do if it failed.
+
+## Lab cell 2
+
+Memory thought experiment: 1 KB average row × 1 million ≈ 1 GB raw payload plus Python object overhead. Bounded batches reduce peak memory.
+
+**Write in your notebook:** input; expected output; actual output; why it happened; validation evidence; what you would do if it failed.
+
+## Lab cell 3
+
+Partition by event date: derive date in documented timezone; show one record near midnight and compare UTC versus local date.
+
+**Write in your notebook:** input; expected output; actual output; why it happened; validation evidence; what you would do if it failed.
+
+## Lab cell 4
+
+Pruning exercise: list three date folders; query one date; identify folders that can be skipped. Then query month and explain more folders scanned.
+
+**Write in your notebook:** input; expected output; actual output; why it happened; validation evidence; what you would do if it failed.
+
+## Lab cell 5
+
+Small-file exercise: 1000 files × 10 KB = 10 MB data but 1000 file opens. Compaction reduces file count while preserving rows/schema.
+
+**Write in your notebook:** input; expected output; actual output; why it happened; validation evidence; what you would do if it failed.
+
+## Lab cell 6
+
+Skew exercise: partition counts 100,100,100,900. Average hides imbalance; inspect max/median and explain straggler.
+
+**Write in your notebook:** input; expected output; actual output; why it happened; validation evidence; what you would do if it failed.
+
+## Lab cell 7
+
+Late data correction: append record with yesterday event_date today; reprocess that partition and make output idempotent; record correction run.
+
+**Write in your notebook:** input; expected output; actual output; why it happened; validation evidence; what you would do if it failed.
+
+## Lab cell 8
+
+Validation: total output rows equals sum partition rows; min/max event date per partition; no record in wrong date folder; no duplicate event key.
+
+**Write in your notebook:** input; expected output; actual output; why it happened; validation evidence; what you would do if it failed.
+
+# 15. Lab completion evidence
+
+| Evidence | Student submission |
+|---|---|
+| Input contract | Fields, types, keys, source behavior |
+| Happy-path run | Input and output counts |
+| Invalid case | Error/reject reason and handling |
+| Replay | Proof no duplicate side effect |
+| Boundary case | Proof no gap or unintended overlap |
+| Recovery | Last safe point and restart procedure |
+| Reconciliation | Counts, keys, totals or quality checks |
+| Project defence | Explain decision, risk, control and proof |
+
