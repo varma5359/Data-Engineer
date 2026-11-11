@@ -1,637 +1,1075 @@
 # Day 39: Pipeline Logging and Observability
-
 **Phase:** 4 — Data Processing and Pipelines  
-**Syllabus topic:** Pipeline Logging and Observability  
-**Mini-project:** Pipeline Observability Tool  
 **Learning time:** 2–3 hours  
-**Level:** Complete beginner to junior Data Engineer  
+**Audience:** Complete beginners and freshers  
+**Topic boundary:** These are class notes only. The project workbook and interview guide remain separate files.
+
+> A pipeline can finish without an exception and still produce the wrong result. Logging and observability help a Data Engineer understand what happened, how much data moved, how long each stage took and whether the output is trustworthy. Today we learn to measure the pipeline, not merely print “success”.
+
+## Learning outcomes
+
+By the end of this lesson, you should be able to:
+- explain logging, metrics, monitoring and observability;
+- distinguish logs, metrics and traces;
+- create and propagate a run ID;
+- record stage start, completion and failure;
+- understand structured logs;
+- measure rows read, accepted, rejected and written;
+- calculate duration and rejection rate;
+- understand freshness, latency and throughput;
+- distinguish SLA, SLO and alert threshold;
+- design useful alerts without alert fatigue;
+- understand metric cardinality;
+- protect sensitive information in logs;
+- build a basic run summary;
+- investigate a failed or suspicious pipeline run.
+
+## Today's flow
+
+`Run starts -> Assign run ID -> Log stages -> Measure data -> Reconcile -> Evaluate thresholds -> Alert -> Investigate`
 
 ---
 
-# 1. What are we learning today?
+# 1. Why do Data Engineers need observability?
 
-A job can exit zero but load zero rows or run slowly. Operators need evidence beyond a success message.
+Imagine a daily pipeline normally processes 100,000 orders in five minutes.
 
-## 1.1 Learning outcomes
+Today it reports:
 
-By the end of this lesson, you should be able to:
+`Job completed successfully`
 
-1. Define operator questions.
-2. Generate and propagate run ID.
-3. Log stage start/end, source, counts, duration.
-4. Capture error context without secrets.
-5. Measure rows/files, rejects, retries, lag and duration.
-6. Define thresholds/alerts.
-7. Compare runs in dashboards.
-8. Write recovery runbooks.
-9. Test by deliberately failing a run.
+But the analytics dashboard contains zero orders.
 
-## 1.2 Pipeline context
+The process may have exited normally while:
+- the source query returned no rows;
+- the date filter was wrong;
+- the API returned only the first page;
+- every record was rejected;
+- the destination write was skipped;
+- the output path was wrong.
 
-```text
-Business source -> Pipeline Logging and Observability -> Validate/process -> Staging/destination -> Reconcile -> Checkpoint + monitoring
-```
+A success message does not explain what happened.
 
-A pipeline is not merely a script that reads data. It is repeatable work with defined input, rules, output, progress, error path and evidence of correctness.
+Observability gives operators evidence about the internal state of a system through its outputs.
 
-# 2. Business scenario and vocabulary
+## 1.1 What questions should an operator answer?
 
-A job can exit zero but load zero rows or run slowly. Operators need evidence beyond a success message.
+For each run:
+1. Which pipeline ran?
+2. Which run instance is this?
+3. When did it start?
+4. When did it finish?
+5. Which source was read?
+6. How many records were read?
+7. How many were accepted?
+8. How many were rejected?
+9. How many were written?
+10. How long did each stage take?
+11. Did retries occur?
+12. Did reconciliation pass?
+13. What failed?
+14. Is the output fresh enough for the business?
 
-| Term | Beginner meaning | Why it matters |
-|---|---|---|
-| **Log** |  execution event | Used to design and explain reliable pipelines. |
-| **metric** |  numeric measurement | Used to design and explain reliable pipelines. |
-| **trace** |  connected work | Used to design and explain reliable pipelines. |
-| **run ID** |  execution identifier | Used to design and explain reliable pipelines. |
-| **structured log** |  named fields | Used to design and explain reliable pipelines. |
-| **SLA** |  service agreement | Used to design and explain reliable pipelines. |
-| **SLO** |  target | Used to design and explain reliable pipelines. |
-| **alert** |  notification | Used to design and explain reliable pipelines. |
-| **observability** |  infer state from outputs. | Used to design and explain reliable pipelines. |
+If the system cannot answer these questions, troubleshooting becomes guesswork.
 
-## Before coding, answer five questions
+---
 
-1. Where does data come from and who owns it?
-2. Which records/fields must be collected or changed?
-3. What can go wrong (missing values, duplicates, timeout, schema change, partial failure)?
-4. Where does the result go and what is its schema?
-5. How will correctness be proven (counts, keys, totals, status and run metadata)?
+# 2. Understand logging
 
-# 3. Understand the concept before coding
+A log is a recorded event describing something that happened.
 
-## 3.1 A small record example
+Examples:
+- pipeline started;
+- database connection opened;
+- 5,000 rows fetched;
+- 120 records rejected;
+- output file published;
+- checkpoint saved;
+- API request timed out.
 
-| ID | Value | Status |
-|---:|---:|---|
-| 1 | 100 | valid |
-| 2 | 200 | valid |
-| 3 | -5 | invalid |
+Logs help explain the sequence of events.
 
-A reliable run accounts for all 3 input records: 2 accepted, 1 rejected with a reason, 2 output records. It must not silently discard record 3.
+## 2.1 Print versus logging
 
-## 3.2 Flow to remember
+Python's `print` displays a value to the current output stream.
 
-```text
-Receive -> Inspect -> Validate -> Process -> Persist -> Verify -> Record progress
-                    |                  |
-                    v                  v
-                Reject path       Retry/recovery path
-```
+Logging provides levels, timestamps, formatting and integration with log collection systems.
 
-- Receive: obtain source data.
-- Inspect: understand shape, size and metadata.
-- Validate: check rules before trusting it.
-- Process: apply topic-specific operation.
-- Persist: write durably.
-- Verify: compare expected and actual results.
-- Record progress: checkpoint only when safe.
+For a tiny learning example, print is fine. For a pipeline, structured logging is more useful.
 
-# 4. First practical example
-
-## Task
-
-Demonstrate structured logs with one small operation before scaling it into a pipeline.
-
-## Code
+## 2.2 Import logging
 
 ```python
 import logging
-logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
-logging.info("run_id=%s rows_read=%d rows_written=%d status=%s",
-             "run-001", 12000, 11998, "SUCCESS")
 ```
 
-## Expected output
+The logging module is included with Python.
+
+## 2.3 Configure a basic logger
+
+```python
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(levelname)s %(message)s"
+)
+```
+
+Explanation:
+- `basicConfig` configures the default logging system.
+- `level=logging.INFO` sets the minimum level displayed.
+- `format` controls the text layout.
+- `%(levelname)s` inserts the severity name.
+- `%(message)s` inserts the log message.
+
+## 2.4 Write an INFO log
+
+```python
+logging.info("Pipeline started")
+```
+
+Expected output resembles:
 
 ```text
-INFO run_id=run-001 rows_read=12000 rows_written=11998 status=SUCCESS
+INFO Pipeline started
 ```
 
-> Sample output is for the stated sample values. API/database/file results may vary. Do not claim variable outputs are guaranteed or runtime-tested unless you executed them.
-
-## Line-by-line explanation
-
-logging.info emits INFO. Include run ID/counters. Production JSON logging stores fields separately; simple format demonstrates concept.
-
-### After running, answer
-
-- What input did I provide?
-- Which operation ran?
-- Which object holds the result?
-- What does output prove?
-- What does output not prove?
-
-A successful request/query/read does not automatically prove completeness, uniqueness, business validity or correctness.
-
-# 5. Build the pipeline step by step
-
-## Step 1 — Define the input contract
-
-Document source and owner, fields/types, required/optional values, unique identity, time/batch boundary, expected volume/frequency, permissions, and source limitations. If these are unknown, clarify before coding.
-
-## Step 2 — Read a tiny sample
-
-Start with 3–10 safe records. Inspect field names, types, nulls, duplicate keys, cursor/timestamp/version and whether the sample represents real edge cases. Never print credentials or sensitive data.
-
-## Step 3A — Validation is a decision
-
-| Rule | Example | Violation action |
-|---|---|---|
-| Required field | ID exists | Reject/quarantine |
-| Type | Amount numeric | Record conversion reason |
-| Range | Quantity positive | Reject or business review |
-| Identity | Key unique | Deduplicate or fail per contract |
-| Schema | Required columns exist | Stop batch and alert |
-| Completeness | All pages/partitions processed | Mark incomplete; don't checkpoint |
-
-## Step 4 — Process bounded units
-
-A unit can be a page, file, fetch batch, partition or record group. Bounded units control memory, reduce retry scope, provide progress points and isolate failures. Select the unit based on source/target capacity—not a tutorial's arbitrary number.
-
-## Step 5 — Persist safely
-
-Ask: did destination commit finish? Can the batch replay without duplicate effects? Is there a unique key/idempotency token? Can I trace output to source? What if process crashes now?
-
-## Step 6 — Verify
-
-Use at least two: input = accepted + rejected; key uniqueness; totals/ranges; boundary gap/overlap; schema; freshness; source/target reconciliation.
-
-# 6. Mistakes and corrections
-
-## Mistake 1: Log secrets/PII
-
-**Why dangerous:** Security risk.
-
-**Correct approach:** Redact/minimize.
-
-## Mistake 2: Only log success
-
-**Why dangerous:** Cannot diagnose zero rows/slow run.
-
-**Correct approach:** Include counts/duration/reconciliation.
-
-## Mistake 3: Alert every error
-
-**Why dangerous:** Alert fatigue.
-
-**Correct approach:** Threshold, dedupe and severity.
-
-## Mistake 4: Customer ID metric labels
-
-**Why dangerous:** High cardinality.
-
-**Correct approach:** Bound metric labels; details in logs.
-
-## Mistake 5: No run ID
-
-**Why dangerous:** Concurrent events cannot correlate.
-
-**Correct approach:** Propagate run ID.
-
-
-## Debugging checklist
-
-1. Confirm source exists and request/query is correct.
-2. Inspect exact raw input for a small failing case.
-3. Confirm schema and types.
-4. Check filters and boundaries (>, >=, dates, cursor).
-5. Check mapping/business rules.
-6. Check duplicate and unique-key behavior.
-7. Check destination write/transaction result.
-8. Inspect checkpoint and update timing.
-9. Reconcile input, accepted, rejected and output counts.
-10. Reproduce with controlled input before changing the full job.
-
-# 7. Mini-project — Pipeline Observability Tool
-
-## Objective
-
-Build a beginner-readable pipeline demonstrating pipeline logging and observability with a happy path, invalid/failure path and verification step.
-
-## Requirements
-
-- Reproducible sample input and defined contract.
-- Predictable processing order and bounded units.
-- Required-field and identity validation.
-- Accepted/rejected outcomes separated.
-- Safe rerun without duplicate effects.
-- Run metadata: run ID, start/end, counts and status.
-- Progress/checkpoint behavior explained.
-- Output reconciled.
-
-## Sample business data
-
-| record_id | event_time | customer_id | amount | status |
-|---:|---|---:|---:|---|
-| 501 | 2026-11-10 09:00:00 | 11 | 1200.00 | PAID |
-| 502 | 2026-11-10 09:15:00 | 12 | 850.00 | PAID |
-| 503 | 2026-11-10 10:00:00 | 11 | 499.00 | PENDING |
-| 504 | 2026-11-10 10:30:00 | 13 | 0.00 | CANCELLED |
-
-These are teaching records. A zero amount or CANCELLED status is not automatically invalid; the business contract decides.
-
-## Part A — Design
-
-1. Name source/destination.
-2. Define unique key and required fields/types.
-3. Decide batch boundary and accepted/rejected rules.
-4. Define checkpoint and output schema.
-5. Define reconciliation checks.
-
-## Part B — Happy path
-
-1. Read a small batch.
-2. Count received records.
-3. Validate required fields.
-4. Process accepted records.
-5. Persist/display output.
-6. Verify counts and values.
-
-## Part C — Failure tests
-
-Test missing field, duplicate key and one transient error/malformed payload. Record expected behavior, actual behavior and correction. A happy-path-only script is not reliable yet.
-
-## Part D — Replay
-
-Run input twice; inspect duplicates; interrupt before checkpoint; restart from safe progress; reconcile final target.
-
-## Acceptance checklist
-
-- [ ] Input contract documented.
-- [ ] Small sample reproducible.
-- [ ] Code split into readable stages.
-- [ ] Outputs shown after important steps.
-- [ ] Invalid data has a reason.
-- [ ] Retry behavior bounded.
-- [ ] Rerun behavior safe.
-- [ ] Checkpoint order explained.
-- [ ] Counts and values reconciled.
-- [ ] Limitations and production improvements documented.
-
-# 8. Production thinking
-
-A classroom script runs on small data. Production additionally considers scale/memory, least-privilege security, secret management, concurrency, retries/checkpoints, source load, data contracts, monitoring/alerts/runbooks, schema changes, cost and auditability. A notebook is not production-ready merely because it executes successfully.
-
-# 9. Practice exercises
-
-## Exercise 1 — Explain
-
-Explain Log to a beginner; give a business example; name a failure; explain detection and recovery.
-
-## Exercise 2 — Trace one record
-
-Trace record 502 from source through validation, processing, destination, checkpoint and verification.
-
-## Exercise 3 — Boundary test
-
-Create records immediately before, exactly at and after the boundary. Explain which are processed and why.
-
-## Exercise 4 — Failure test
-
-Interrupt after output persistence but before checkpoint. Restart and explain idempotency and duplicate checks.
-
-## Exercise 5 — Quality test
-
-Make one field invalid, one key duplicated and one record late. Decide action from contract and justify.
-
-## Exercise 6 — Interview practice
-
-Answer aloud: problem solved; end-to-end flow; failure behavior; completeness proof; production improvements.
-
-# 10. Day 39 revision sheet
-
-**Flow:** Define contract -> Read bounded input -> Validate -> Process -> Persist -> Verify -> Checkpoint -> Observe
-
-Never skip: unique record identity; what success guarantees; replay behavior; invalid versus transient error; evidence of destination correctness.
-
-## One-minute project defence
-
-“My Pipeline Observability Tool receives data from a defined source. It validates the contract and identity, processes controlled units, handles invalid/transient cases explicitly, persists safely, records progress after durable success and reconciles counts/values. I can rerun it safely and diagnose failures from run metadata. Before production I would add automated tests, secret management, monitoring, access controls and scale testing.”
-
-## Self-assessment
-
-- [ ] I can define terms without memorizing.
-- [ ] I can explain code and output.
-- [ ] I can trace a record end-to-end.
-- [ ] I can reproduce/debug a failure.
-- [ ] I can explain checkpoint ordering and replay.
-- [ ] I can prove correctness with checks.
-- [ ] I can defend the project.
-
-**Complete the day when you can explain, run, interpret, test failure and prove the result—not merely read the notes.**
-
-
-# 11. Mentor-led deep dive — Observability
-
-Read each scenario slowly. Identify input, risk, control and proof.
-
-## 11.1 Raw/curated distinction
-
-Run lifecycle statuses RUNNING, SUCCESS, SUCCESS_WITH_REJECTS, FAILED, CANCELLED; define transitions and completion criteria.
-
-**Student checkpoint:** Explain this in your own words and name a test that proves it.
-
-## 11.2 Walkthrough
-
-Structured event fields run_id, stage, source, read/written/rejected, retries, duration, status/error code; avoid secrets.
-
-**Student checkpoint:** Explain this in your own words and name a test that proves it.
-
-## 11.3 Normalization policy
-
-Metrics: rows_read/written, rejects, duration, lag, retry/failure totals; define units and aggregation.
-
-**Student checkpoint:** Explain this in your own words and name a test that proves it.
-
-## 11.4 Mapping design
-
-Freshness: latest source event versus now/target observation; distinguish source lateness from pipeline delay.
-
-**Student checkpoint:** Explain this in your own words and name a test that proves it.
-
-## 11.5 Worked business example
-
-Alerts: no run by deadline, duration 3x baseline, unexpected zero rows, rejects threshold, lag SLO, repeated retries.
-
-**Student checkpoint:** Explain this in your own words and name a test that proves it.
-
-## 11.6 Filter semantics
-
-Alert quality: severity, owner, dedupe, actionable message/runbook; alert symptoms users care about.
-
-**Student checkpoint:** Explain this in your own words and name a test that proves it.
-
-## 11.7 Aggregation grain
-
-Dashboard: run status/duration, counts, freshness, retries/errors, source/destination health and run IDs.
-
-**Student checkpoint:** Explain this in your own words and name a test that proves it.
-
-## 11.8 Transformation order
-
-Redact tokens/passwords, minimize PII, restrict access/retention; stack traces can leak connection details.
-
-**Student checkpoint:** Explain this in your own words and name a test that proves it.
-
-## 11.9 Reject evidence
-
-Runbook explains find run ID, inspect logs/metrics, verify source/target, restart/replay, escalate and close incident.
-
-**Student checkpoint:** Explain this in your own words and name a test that proves it.
-
-# 12. Guided lab checkpoints
-
-## Lab checkpoint 1
-
-- Predict the result before running.
-- Execute this stage on a small input.
-- Record output, count and error (if any).
-- Explain which input/rule caused the result.
-- Compare actual result with contract and expected output.
-- Reproduce a failure with the smallest input and fix its cause.
-
-## Lab checkpoint 2
-
-- Predict the result before running.
-- Execute this stage on a small input.
-- Record output, count and error (if any).
-- Explain which input/rule caused the result.
-- Compare actual result with contract and expected output.
-- Reproduce a failure with the smallest input and fix its cause.
-
-## Lab checkpoint 3
-
-- Predict the result before running.
-- Execute this stage on a small input.
-- Record output, count and error (if any).
-- Explain which input/rule caused the result.
-- Compare actual result with contract and expected output.
-- Reproduce a failure with the smallest input and fix its cause.
-
-## Lab checkpoint 4
-
-- Predict the result before running.
-- Execute this stage on a small input.
-- Record output, count and error (if any).
-- Explain which input/rule caused the result.
-- Compare actual result with contract and expected output.
-- Reproduce a failure with the smallest input and fix its cause.
-
-## Lab checkpoint 5
-
-- Predict the result before running.
-- Execute this stage on a small input.
-- Record output, count and error (if any).
-- Explain which input/rule caused the result.
-- Compare actual result with contract and expected output.
-- Reproduce a failure with the smallest input and fix its cause.
-
-## Lab checkpoint 6
-
-- Predict the result before running.
-- Execute this stage on a small input.
-- Record output, count and error (if any).
-- Explain which input/rule caused the result.
-- Compare actual result with contract and expected output.
-- Reproduce a failure with the smallest input and fix its cause.
-
-## Lab checkpoint 7
-
-- Predict the result before running.
-- Execute this stage on a small input.
-- Record output, count and error (if any).
-- Explain which input/rule caused the result.
-- Compare actual result with contract and expected output.
-- Reproduce a failure with the smallest input and fix its cause.
-
-## Lab checkpoint 8
-
-- Predict the result before running.
-- Execute this stage on a small input.
-- Record output, count and error (if any).
-- Explain which input/rule caused the result.
-- Compare actual result with contract and expected output.
-- Reproduce a failure with the smallest input and fix its cause.
-
-
-# 13. Instructor review rubric
-
-| Skill | Beginner evidence |
-|---|---|
-| Concept | Explains what/why plainly |
-| Code | Reads/explains lines, not blindly copies |
-| Output | Derives output from input/rule |
-| Quality | Identifies invalid, duplicate and boundary cases |
-| Reliability | Explains retry, replay and checkpoint |
-| Verification | Uses counts/keys/totals/quality checks |
-| Interview | Gives decision, reason, failure mode and proof |
-
-
-
-# 14. Additional worked lab cells — Observability
-
-Each cell is a separate experiment. Students should predict, execute, record output and explain the business meaning.
-
-## Lab cell 1
-
-Create run record: run_id, start_time, end_time, status, rows_read, rows_written, rejects, retries, duration, watermark, error_code. Define status when rejects exist.
-
-**Write in your notebook:** input; expected output; actual output; why it happened; validation evidence; what you would do if it failed.
-
-## Lab cell 2
-
-Metric exercise: input=1000, accepted=990, rejected=10, written=990. Assert input=accepted+rejected and accepted=written unless target policy explains differences.
-
-**Write in your notebook:** input; expected output; actual output; why it happened; validation evidence; what you would do if it failed.
-
-## Lab cell 3
-
-Freshness calculation: current time minus latest source event time; separate source delay from job duration. Timezone must be consistent.
-
-**Write in your notebook:** input; expected output; actual output; why it happened; validation evidence; what you would do if it failed.
-
-## Lab cell 4
-
-Alert exercise: expected daily 10k rows, actual 0; run technically success but data incident. Alert on zero/unusual count based on baseline and business schedule.
-
-**Write in your notebook:** input; expected output; actual output; why it happened; validation evidence; what you would do if it failed.
-
-## Lab cell 5
-
-Dashboard panels: run status, duration trend, counts, reject percentage, lag, retries, failures and source/destination health. Explain operator question per panel.
-
-**Write in your notebook:** input; expected output; actual output; why it happened; validation evidence; what you would do if it failed.
-
-## Lab cell 6
-
-PII redaction test: deliberately raise error containing token/customer details; inspect logs and verify sensitive values are masked/absent.
-
-**Write in your notebook:** input; expected output; actual output; why it happened; validation evidence; what you would do if it failed.
-
-## Lab cell 7
-
-Runbook rehearsal: find run_id, inspect stage logs, identify failed boundary, verify target, rerun safely, compare counts and close incident.
-
-**Write in your notebook:** input; expected output; actual output; why it happened; validation evidence; what you would do if it failed.
-
-## Lab cell 8
-
-SLO example: 95% of daily runs complete by 07:00; measure over agreed window, alert before breach if lag/duration trend indicates risk.
-
-**Write in your notebook:** input; expected output; actual output; why it happened; validation evidence; what you would do if it failed.
-
-# 15. Lab completion evidence
-
-| Evidence | Student submission |
-|---|---|
-| Input contract | Fields, types, keys, source behavior |
-| Happy-path run | Input and output counts |
-| Invalid case | Error/reject reason and handling |
-| Replay | Proof no duplicate side effect |
-| Boundary case | Proof no gap or unintended overlap |
-| Recovery | Last safe point and restart procedure |
-| Reconciliation | Counts, keys, totals or quality checks |
-| Project defence | Explain decision, risk, control and proof |
-
-
+The exact timestamp and formatting depend on configuration.
+
+## 2.5 Why log events rather than random messages?
+
+A useful log tells an operator:
+- what happened;
+- where it happened;
+- which run it belongs to;
+- whether it is expected or a problem.
+
+Avoid vague logs such as:
+- `here`;
+- `done`;
+- `something failed`.
+
+Prefer:
+- `source_extract_completed rows_read=5000`;
+- `validation_completed accepted=4900 rejected=100`;
+- `destination_write_failed batch_id=12 error_type=TimeoutError`.
 
 ---
 
-# Guided execution lab — Pipeline Observability Tool (runnable fixture)
+# 3. Understand logging levels
 
-Observability means using logs, metrics and traces to understand what a pipeline did, how well it performed and why it failed.
+| Level | Meaning | Example |
+|---|---|---|
+| DEBUG | Detailed diagnostic information | Current batch boundary |
+| INFO | Normal progress | Extract stage completed |
+| WARNING | Unexpected but recoverable condition | Rejection rate increased |
+| ERROR | An operation failed | Database write failed |
+| CRITICAL | Severe condition requiring urgent action | Pipeline cannot continue and data integrity is at risk |
 
-## Cell 1 — Create a run record
+## 3.1 DEBUG
+
+Use DEBUG for details useful during diagnosis.
+
+Do not enable highly verbose debug output permanently if it creates excessive volume or exposes sensitive values.
+
+## 3.2 INFO
+
+Use INFO for normal milestones:
+- run started;
+- source connected;
+- page completed;
+- output published.
+
+## 3.3 WARNING
+
+Use WARNING when the pipeline can continue but an operator should notice:
+- unusually high rejection rate;
+- missing optional feed;
+- retry occurred;
+- processing slower than normal.
+
+## 3.4 ERROR
+
+Use ERROR when a stage or operation fails.
+
+Include safe context such as run ID, stage and error type.
+
+## 3.5 CRITICAL
+
+Use CRITICAL for severe failures that prevent safe continuation or threaten data integrity.
+
+Do not mark every ordinary validation failure as critical.
+
+---
+
+# 4. Understand a run ID
+
+A run ID uniquely identifies one execution of a pipeline.
+
+Example:
+- pipeline: daily_orders;
+- run_id: run-20261111-001;
+- start time: 02:00;
+- status: SUCCESS.
+
+If the pipeline runs twice, each execution should have a different run ID.
+
+## 4.1 Why is run ID important?
+
+Without a run ID, logs from two overlapping executions may be mixed together.
+
+A run ID allows the operator to:
+- filter logs;
+- connect stage metrics;
+- find the correct output;
+- inspect retries;
+- investigate one incident.
+
+## 4.2 Create a UUID run ID
 
 ```python
-from datetime import datetime, timezone
+import uuid
 
-run_id = "run-20260110-001"
-started_at = datetime.now(timezone.utc)
-metrics = {
-    "input_rows": 1000,
-    "accepted_rows": 970,
-    "rejected_rows": 30,
-    "written_rows": 970,
-    "retry_count": 1,
-    "status": "SUCCESS"
+run_id = str(uuid.uuid4())
+
+print(run_id)
+```
+
+The output is a unique-looking identifier. Its exact value changes on each execution.
+
+## 4.3 Reuse the same run ID across stages
+
+The run ID should be created once at the start of the run and passed to every stage.
+
+Do not create a new run ID for each log line. That would make one run appear to be many unrelated runs.
+
+## 4.4 Run ID and batch ID
+
+A run can contain multiple batches.
+
+Example:
+- run_id identifies the whole daily execution;
+- batch_id identifies one unit within that run.
+
+Together they allow an operator to find one failed batch within a larger run.
+
+---
+
+# 5. Log the pipeline lifecycle
+
+A useful pipeline records key transitions.
+
+Example lifecycle:
+
+`STARTED -> EXTRACTING -> VALIDATING -> WRITING -> RECONCILING -> SUCCEEDED`
+
+A failure may move the run to FAILED or PARTIAL according to the pipeline contract.
+
+## 5.1 Log run start
+
+```python
+logging.info("run_id=%s event=run_started", run_id)
+```
+
+The format placeholders receive the run ID.
+
+## 5.2 Log stage completion
+
+```python
+logging.info(
+    "run_id=%s stage=extract status=completed rows_read=%d",
+    run_id,
+    5000
+)
+```
+
+This records the stage, status and number of rows read.
+
+## 5.3 Log stage failure
+
+```python
+logging.error(
+    "run_id=%s stage=load status=failed error_type=%s",
+    run_id,
+    "TimeoutError"
+)
+```
+
+This captures safe diagnostic context. In a real exception handler, use the actual exception type and a redacted message.
+
+## 5.4 Avoid logging the entire data record
+
+A record may contain:
+- customer email;
+- address;
+- phone number;
+- payment details;
+- access token.
+
+Log record identifiers only when policy allows, and prefer aggregate counts or masked references.
+
+---
+
+# 6. Understand structured logging
+
+A plain text log is readable but can be difficult for machines to filter reliably.
+
+Structured logging stores named fields.
+
+Example JSON log:
+
+```json
+{
+  "timestamp": "2026-11-11T02:00:00Z",
+  "level": "INFO",
+  "run_id": "run-001",
+  "pipeline": "daily_orders",
+  "stage": "extract",
+  "rows_read": 5000,
+  "status": "SUCCESS"
 }
 ```
 
-A run ID correlates messages from the same execution. Use UTC timestamps in shared systems to avoid timezone ambiguity.
+Each value has a field name.
 
-## Cell 2 — Validate operational invariants
+A log platform can filter:
+- all logs for run-001;
+- all ERROR events;
+- all events from daily_orders;
+- all extraction stages with rows_read equal to zero.
 
-```python
-assert metrics["input_rows"] == metrics["accepted_rows"] + metrics["rejected_rows"]
-assert metrics["accepted_rows"] == metrics["written_rows"]
-print("Reconciliation checks passed")
-```
+## 6.1 Why JSON logs help
 
-Expected: `Reconciliation checks passed`. These are correctness metrics, not just performance metrics.
+They support:
+- filtering;
+- aggregation;
+- dashboards;
+- alert rules;
+- correlation across services.
 
-## Cell 3 — Structured log event
+## 6.2 Structured log concept in Python
 
 ```python
 import json
 
-log_event = {
-    "timestamp": started_at.isoformat(),
-    "level": "INFO",
+log_record = {
     "run_id": run_id,
-    "stage": "write_curated",
-    "status": metrics["status"],
-    "input_rows": metrics["input_rows"],
-    "accepted_rows": metrics["accepted_rows"],
-    "rejected_rows": metrics["rejected_rows"],
-    "written_rows": metrics["written_rows"],
-    "retry_count": metrics["retry_count"]
+    "pipeline": "daily_orders",
+    "stage": "extract",
+    "rows_read": 5000,
+    "status": "SUCCESS"
 }
-print(json.dumps(log_event, indent=2))
+
+print(json.dumps(log_record))
 ```
 
-Expected: a JSON object with named fields. The timestamp varies each run. Never put passwords, tokens, full connection strings or sensitive personal data in logs.
+Expected output is one JSON-formatted line containing the supplied fields.
 
-## Cell 4 — Calculate a rejection rate
+This demonstrates serialization. Production systems should use an approved structured logging handler rather than relying only on print.
 
-```python
-rejection_rate = metrics["rejected_rows"] / metrics["input_rows"]
-print("Rejection rate:", round(rejection_rate * 100, 2), "%")
-```
+---
 
-Expected: `Rejection rate: 3.0 %`. This metric becomes useful when compared with a baseline and agreed threshold.
+# 7. Understand metrics
 
-## Cell 5 — Simulate a failed run and classify it
+A metric is a numeric measurement collected over time.
 
-```python
-failure = {
-    "run_id": "run-20260110-002",
-    "stage": "read_source",
-    "error_type": "TimeoutError",
-    "retryable": True,
-    "attempt": 1
-}
-print(failure)
-```
-
-A timeout may be transient and retryable. A schema validation failure is normally permanent until the source or contract is corrected. Alert based on impact and policy, not every harmless warning.
-
-## Metrics to publish
-
-- run success/failure;
-- duration and stage duration;
-- input, accepted, rejected and written row counts;
-- rejection rate;
+Examples:
+- rows read;
+- rows written;
+- rejected records;
+- request latency;
+- job duration;
 - retry count;
-- data freshness/lag;
-- last successful watermark/checkpoint;
-- per-partition status.
+- bytes processed;
+- output freshness.
 
-## Alert design
+Metrics help detect changes and trends.
 
-An alert should answer: what failed, which run, what impact, when it started, whether retry is happening, where to investigate and who owns it. Avoid alerting on every log line; use thresholds, persistence and severity.
+## 7.1 Counter
 
-## Lab submission
+A counter measures a value that increases over time, such as:
+- records processed;
+- errors observed;
+- API requests sent.
 
-Save one successful and one failed run record, structured log examples, reconciliation result, rejection-rate calculation, alert rule and a short incident explanation.
+## 7.2 Gauge
+
+A gauge represents a value that can go up or down, such as:
+- current queue depth;
+- active worker count;
+- current memory usage.
+
+## 7.3 Histogram
+
+A histogram records distributions, such as:
+- request duration;
+- batch processing time;
+- record size.
+
+It helps answer whether a few operations are very slow.
+
+## 7.4 Metric versus log
+
+A metric says:
+
+`rows_rejected = 100`
+
+A log may explain:
+
+`run_id=run-001 stage=validation rejected=100 reason=invalid_amount`
+
+Metrics show trends. Logs provide event details.
+
+---
+
+# 8. Measure record counts
+
+A pipeline should measure records at important boundaries.
+
+Common counters:
+- input_rows;
+- rows_read;
+- rows_validated;
+- rows_accepted;
+- rows_rejected;
+- rows_written;
+- rows_updated;
+- rows_inserted.
+
+Do not use one generic `count` for every stage. Name the measurement clearly.
+
+## 8.1 Example counts
+
+```python
+rows_read = 1000
+rows_accepted = 970
+rows_rejected = 30
+rows_written = 970
+
+print(rows_read)
+print(rows_accepted)
+print(rows_rejected)
+print(rows_written)
+```
+
+The values are a teaching fixture.
+
+## 8.2 Reconciliation metric
+
+```python
+accounted_rows = rows_accepted + rows_rejected
+
+if rows_read == accounted_rows:
+    reconciliation_status = "PASSED"
+else:
+    reconciliation_status = "FAILED"
+
+print(reconciliation_status)
+```
+
+Expected output:
+
+```text
+PASSED
+```
+
+The check proves the read rows were classified. It does not prove the output file or destination contains the correct values.
+
+## 8.3 Output reconciliation
+
+```python
+if rows_written == rows_accepted:
+    print("Write count matches accepted count")
+else:
+    print("Write count mismatch")
+```
+
+This checks the counts. Also validate keys and important values.
+
+---
+
+# 9. Measure rejection rate
+
+Rejection rate helps identify data-quality problems.
+
+For the teaching example:
+- rows read = 1,000;
+- rows rejected = 30.
+
+The rejection rate is 3 percent.
+
+## 9.1 Calculate safely
+
+```python
+if rows_read > 0:
+    rejection_rate = (rows_rejected / rows_read) * 100
+else:
+    rejection_rate = 0
+
+print(rejection_rate)
+```
+
+Expected output:
+
+```text
+3.0
+```
+
+If no rows were read, the calculation must avoid division by zero. Whether a zero-row run is acceptable is a separate business rule.
+
+## 9.2 Why monitor rejection rate?
+
+A sudden increase may indicate:
+- source schema changed;
+- a new status value appeared;
+- a producer sent malformed data;
+- transformation logic is wrong;
+- source quality deteriorated.
+
+The metric tells us something changed. Logs and rejected records help explain why.
+
+---
+
+# 10. Measure duration and throughput
+
+## 10.1 What is duration?
+
+Duration is the time taken by a stage or full run.
+
+A pipeline may be successful but too slow to meet the business deadline.
+
+## 10.2 Measure duration with time.perf_counter
+
+```python
+import time
+
+start_time = time.perf_counter()
+
+total = 0
+for number in range(100000):
+    total = total + number
+
+end_time = time.perf_counter()
+
+duration_seconds = end_time - start_time
+
+print(duration_seconds)
+```
+
+The exact duration depends on the computer and current load.
+
+`perf_counter` is useful for measuring elapsed time within one process.
+
+## 10.3 Throughput
+
+Throughput measures how much work is processed per unit of time.
+
+Example:
+- 10,000 rows;
+- 20 seconds;
+- 500 rows per second.
+
+## 10.4 Calculate throughput
+
+```python
+rows_processed = 10000
+duration_seconds = 20
+
+if duration_seconds > 0:
+    rows_per_second = rows_processed / duration_seconds
+else:
+    rows_per_second = 0
+
+print(rows_per_second)
+```
+
+Expected output:
+
+```text
+500.0
+```
+
+Throughput alone does not prove quality. A pipeline can process incorrect data very quickly.
+
+---
+
+# 11. Understand freshness and latency
+
+## 11.1 Freshness
+
+Freshness describes how recently the available data reflects the source.
+
+Example:
+- latest source event: 02:10;
+- latest warehouse event: 02:15;
+- data freshness lag: 5 minutes.
+
+## 11.2 Latency
+
+Latency is the time between an event or request and its result.
+
+For a data pipeline, define which points are being compared:
+- source event time to destination availability;
+- job start to job finish;
+- API request to response.
+
+## 11.3 Why freshness matters
+
+A daily dashboard may be acceptable with data updated by 07:00.
+
+A fraud detection system may need data within seconds.
+
+The business use case defines the required freshness.
+
+## 11.4 Do not confuse job completion with freshness
+
+A job can finish successfully while processing an old source partition.
+
+Measure the latest business timestamp or source watermark, not only job end time.
+
+---
+
+# 12. Understand traces and correlation
+
+A trace follows one operation across multiple components.
+
+Example:
+`Orchestrator -> Python extractor -> API provider -> Database loader`
+
+A trace ID can connect events from different services.
+
+## 12.1 Run ID versus trace ID
+
+A run ID identifies a pipeline execution.
+
+A trace ID identifies a connected request or distributed operation. One pipeline run may contain multiple traces.
+
+A span ID can identify one operation within a trace.
+
+For beginner batch pipelines, a run ID is a useful first correlation field. Distributed systems may need trace IDs and spans.
+
+## 12.2 Why correlation matters
+
+If the API extractor and database loader use unrelated identifiers, an operator may struggle to connect the API response to the destination write.
+
+Propagate correlation identifiers across stages.
+
+---
+
+# 13. Understand SLA, SLO and alert thresholds
+
+## 13.1 SLA
+
+A Service Level Agreement is an agreement with a customer or business stakeholder about a service level.
+
+Example:
+- daily report must be available by 07:00.
+
+## 13.2 SLO
+
+A Service Level Objective is an internal target for service performance.
+
+Example:
+- 99 percent of daily pipeline runs complete before 06:30 over a defined period.
+
+## 13.3 Alert threshold
+
+An alert threshold is a condition that triggers a notification.
+
+Example:
+- job is still running at 06:15;
+- rejection rate exceeds 5 percent;
+- source row count is zero when data is expected;
+- freshness lag exceeds 30 minutes.
+
+These concepts are related but not interchangeable.
+
+## 13.4 Define thresholds from business needs
+
+Do not invent an alert threshold because it looks round.
+
+Use:
+- historical baseline;
+- business deadline;
+- acceptable quality level;
+- operational response time;
+- cost of false alerts.
+
+---
+
+# 14. Design useful alerts
+
+An alert should tell an operator:
+- what happened;
+- how serious it is;
+- which pipeline/run is affected;
+- what business data may be affected;
+- where to investigate;
+- what action is expected.
+
+## 14.1 High rejection rate
+
+Condition:
+- rejection rate exceeds approved threshold.
+
+Possible cause:
+- schema drift;
+- source data quality issue;
+- transformation defect.
+
+## 14.2 Zero rows
+
+Condition:
+- rows_read = 0 when a delivery is expected.
+
+Possible cause:
+- missing source file;
+- incorrect filter;
+- API pagination failure;
+- source delay.
+
+Zero rows may be valid for some feeds. The expected-volume contract matters.
+
+## 14.3 Long duration
+
+Condition:
+- run duration exceeds its historical or agreed threshold.
+
+Possible cause:
+- source slowdown;
+- increased data volume;
+- query plan change;
+- destination bottleneck.
+
+## 14.4 Alert fatigue
+
+If every harmless warning sends an urgent alert, operators may stop responding.
+
+Use:
+- severity levels;
+- deduplication;
+- thresholds;
+- grouping;
+- maintenance windows;
+- clear ownership.
+
+---
+
+# 15. Understand metric cardinality
+
+Cardinality means the number of distinct values a metric label can take.
+
+Low-cardinality labels:
+- pipeline name;
+- stage;
+- environment;
+- status.
+
+High-cardinality labels:
+- customer_id;
+- order_id;
+- email address;
+- unique request ID.
+
+Putting every order_id into metric labels can create millions of time series.
+
+Use metrics for bounded dimensions. Put detailed identifiers in appropriately protected logs or traces.
+
+---
+
+# 16. Protect sensitive data in logs
+
+Logs often have broad access and long retention.
+
+Never log:
+- passwords;
+- API tokens;
+- database connection strings;
+- full payment card details;
+- unnecessary personal data;
+- private keys.
+
+Use:
+- redaction;
+- masking;
+- field allowlists;
+- access controls;
+- retention limits.
+
+A log line should contain enough information to diagnose the issue without exposing the record's sensitive content.
+
+---
+
+# 17. Build a simple run summary
+
+## 17.1 Define run measurements
+
+```python
+run_summary = {
+    "run_id": run_id,
+    "pipeline": "daily_orders",
+    "rows_read": 1000,
+    "rows_accepted": 970,
+    "rows_rejected": 30,
+    "rows_written": 970,
+    "status": "SUCCESS"
+}
+
+print(run_summary)
+```
+
+This dictionary represents one run summary.
+
+## 17.2 Add rejection rate
+
+```python
+run_summary["rejection_rate"] = (
+    run_summary["rows_rejected"] /
+    run_summary["rows_read"]
+) * 100
+
+print(run_summary["rejection_rate"])
+```
+
+The calculation assumes rows_read is greater than zero. A production implementation must handle zero rows.
+
+## 17.3 Add a duration field
+
+```python
+run_summary["duration_seconds"] = 42.5
+
+print(run_summary)
+```
+
+A run summary should be stored durably, not only printed and lost when the process ends.
+
+## 17.4 Save a JSON summary
+
+```python
+import json
+
+with open("run_summary.json", "w", encoding="utf-8") as file:
+    json.dump(run_summary, file, indent=2)
+
+print("Run summary saved")
+```
+
+The summary can later be loaded by a dashboard or monitoring process.
+
+---
+
+# 18. Investigate an unhealthy run
+
+Suppose a pipeline usually reads 100,000 rows. Today's run reads 2,000 and completes in 20 seconds.
+
+The run status is SUCCESS.
+
+Do not accept success without investigation.
+
+Check:
+1. source delivery count;
+2. query date range;
+3. API page count;
+4. source maximum timestamp;
+5. accepted and rejected counts;
+6. output row count;
+7. previous run trend;
+8. source schema changes;
+9. run ID and stage logs.
+
+A sudden count drop may be a business event or a pipeline defect. Use evidence to distinguish them.
+
+---
+
+# 19. Common observability mistakes
+
+## Mistake 1 — Log only “success”
+
+**Risk:** Operators cannot explain zero rows or incomplete output.
+
+**Correction:** Log stage, counts, duration and reconciliation status.
+
+## Mistake 2 — No run ID
+
+**Risk:** Concurrent runs cannot be separated.
+
+**Correction:** Create one run ID and propagate it.
+
+## Mistake 3 — Log every record
+
+**Risk:** Huge log volume and possible sensitive data exposure.
+
+**Correction:** Log aggregate metrics and selected safe identifiers.
+
+## Mistake 4 — Use customer ID as a metric label
+
+**Risk:** Very high cardinality.
+
+**Correction:** Keep metric labels bounded; use protected logs for detail.
+
+## Mistake 5 — Alert on every warning
+
+**Risk:** Alert fatigue.
+
+**Correction:** Set severity, thresholds and ownership.
+
+## Mistake 6 — Measure duration only
+
+**Risk:** A fast job may have processed zero rows.
+
+**Correction:** Measure counts, freshness and quality as well.
+
+## Mistake 7 — Trust process exit code alone
+
+**Risk:** The program may exit successfully with incorrect data.
+
+**Correction:** Include reconciliation and business checks.
+
+## Mistake 8 — Log secrets
+
+**Risk:** Credential exposure.
+
+**Correction:** Redact and minimize sensitive fields.
+
+---
+
+# 20. Practical exercises
+
+## Exercise 1 — Choose the right log level
+
+Pipeline started normally.
+
+Expected level: INFO.
+
+A retry occurred but the pipeline recovered.
+
+Expected level: WARNING or an equivalent retry event, depending on the logging policy.
+
+A destination write failed and the run stopped.
+
+Expected level: ERROR.
+
+## Exercise 2 — Calculate rejection rate
+
+Rows read = 2,000. Rows rejected = 40.
+
+Expected rate: 2 percent.
+
+## Exercise 3 — Calculate throughput
+
+Rows processed = 12,000. Duration = 60 seconds.
+
+Expected throughput: 200 rows per second.
+
+## Exercise 4 — Identify missing observability
+
+A job reports SUCCESS but does not report rows_read.
+
+Expected answer: the operator cannot determine whether the job processed the expected amount of data.
+
+## Exercise 5 — Identify cardinality risk
+
+Should every unique order_id be a metric label?
+
+Expected answer: no. It creates very high cardinality.
+
+## Exercise 6 — Explain run ID
+
+Two executions overlap. Why is a run ID necessary?
+
+Expected answer: it allows logs, metrics and outputs to be associated with the correct execution.
+
+## Exercise 7 — Explain freshness
+
+A job finishes at 07:00 but the newest source event is from yesterday.
+
+Expected answer: job completion does not prove data freshness. Inspect the latest business timestamp and source boundary.
+
+## Exercise 8 — Design an alert
+
+A daily feed normally contains at least 10,000 records. Today's count is zero.
+
+Expected reasoning: alert if the feed contract says a delivery is expected. Confirm source arrival, filters and pagination.
+
+---
+
+# 21. Debugging checklist
+
+When an operator reports a pipeline issue:
+
+1. Find the pipeline name.
+2. Find the run ID.
+3. Check run start and end times.
+4. Check stage transitions.
+5. Inspect source and destination names.
+6. Compare rows read, accepted, rejected and written.
+7. Check reconciliation status.
+8. Inspect duration and throughput.
+9. Check latest source and destination timestamps.
+10. Inspect retry count and failure type.
+11. Review safe error details.
+12. Check whether alerts fired.
+13. Compare with historical runs.
+14. Confirm no secrets or sensitive values were exposed.
+15. Record root cause and corrective action.
+
+---
+
+# 22. Day 39 revision checklist
+
+You should be able to explain:
+- logging;
+- log levels;
+- metrics;
+- monitoring;
+- observability;
+- run ID;
+- batch ID;
+- structured logs;
+- counters, gauges and histograms;
+- rows read, accepted, rejected and written;
+- rejection rate;
+- duration and throughput;
+- freshness and latency;
+- trace ID and span;
+- SLA and SLO;
+- alert threshold;
+- alert fatigue;
+- metric cardinality;
+- sensitive data redaction;
+- run summary;
+- reconciliation-based health checks.
+
+---
+
+# 23. Key takeaways
+
+1. A successful process exit does not prove correct data.
+2. Logs explain events; metrics measure behavior; traces connect operations.
+3. Create one run ID and propagate it.
+4. Record stage transitions and failure context.
+5. Measure rows read, accepted, rejected and written.
+6. Measure duration, throughput and freshness.
+7. Reconcile data before marking a run successful.
+8. Define SLA, SLO and alert thresholds clearly.
+9. Avoid high-cardinality metric labels.
+10. Never log secrets or unnecessary personal data.
+11. Use alerts that lead to a clear operational action.
+12. Compare current runs with historical behavior.
+
+## Phase 4 class-notes completion checkpoint
+
+The Phase 4 learning sequence now covers:
+- Day 30: ETL and Data Extraction;
+- Day 31: File-Based Data Ingestion;
+- Day 32: API-Based Data Ingestion;
+- Day 33: Database Ingestion;
+- Day 34: Data Transformation and Business Rules;
+- Day 35: Data Cleaning and Schema Evolution;
+- Day 36: Batch Processing and Partitioning;
+- Day 37: Incremental Loading and Upserts;
+- Day 38: Pipeline Reliability and Failure Handling;
+- Day 39: Pipeline Logging and Observability.
+
+This list describes the course sequence, not a claim that every file has been runtime-tested.
+
+**End of Day 39 class notes.**

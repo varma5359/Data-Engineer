@@ -1,613 +1,1099 @@
 # Day 38: Pipeline Reliability and Failure Handling
-
 **Phase:** 4 — Data Processing and Pipelines  
-**Syllabus topic:** Pipeline Reliability and Failure Handling  
-**Mini-project:** Reliable Pipeline Simulator  
 **Learning time:** 2–3 hours  
-**Level:** Complete beginner to junior Data Engineer  
+**Audience:** Complete beginners and freshers  
+**Topic boundary:** This file contains class notes only. The separate project workbook and interview guide remain separate.
+
+> A pipeline is not reliable merely because it works once. A production pipeline must behave safely when the network fails, a source is unavailable, a process crashes halfway through a batch or an operator reruns a job. Today we learn to design for failure instead of pretending failure will never happen.
+
+## Learning outcomes
+
+By the end of this lesson, you should be able to:
+- explain pipeline reliability and failure handling;
+- identify failure points across a pipeline;
+- distinguish transient and permanent failures;
+- understand timeout, retry, backoff and jitter;
+- design bounded retry behavior;
+- explain idempotency and safe replay;
+- understand partial writes and atomic publication;
+- use transactions to protect database changes;
+- explain checkpoint ordering;
+- isolate invalid records using quarantine/dead-letter patterns;
+- test failures deliberately;
+- reconcile output after recovery;
+- understand why exactly-once claims require careful proof.
+
+## Today's flow
+
+`Receive -> Validate -> Process -> Persist -> Verify -> Checkpoint`
+
+Failure paths must be designed for every stage.
 
 ---
 
-# 1. What are we learning today?
+# 1. What does reliability mean?
 
-Pipeline may crash after reading, partially writing or committing before checkpoint. Design replay to preserve correctness.
+A reliable data pipeline produces correct, complete and traceable results repeatedly, including after expected failures.
 
-## 1.1 Learning outcomes
+Reliability is not just uptime. A job that runs every day but silently loses 2% of its records is not reliable.
 
-By the end of this lesson, you should be able to:
+A reliable pipeline should:
+- process the intended source range;
+- preserve data during failures;
+- avoid unintended duplicates;
+- expose errors clearly;
+- recover from known failure types;
+- retain evidence of completed work;
+- avoid advancing progress before safe completion.
 
-1. Map failure points.
-2. Classify transient/permanent errors.
-3. Set finite retries/backoff/jitter/timeouts.
-4. Use stable keys and idempotent writes.
-5. Persist progress after durable output.
-6. Use transactions or temp-file atomic publication.
-7. Isolate bad records with metadata.
-8. Make replay explicit and safe.
-9. Test crash points and reconcile.
+## 1.1 A simple pipeline
 
-## 1.2 Pipeline context
+`Database -> Extract -> Transform -> Validate -> Load -> Report`
 
-```text
-Business source -> Pipeline Reliability and Failure Handling -> Validate/process -> Staging/destination -> Reconcile -> Checkpoint + monitoring
-```
+Every arrow is a possible failure point.
 
-A pipeline is not merely a script that reads data. It is repeatable work with defined input, rules, output, progress, error path and evidence of correctness.
+Examples:
+- database connection fails;
+- extraction query times out;
+- malformed record breaks transformation;
+- target database rejects an insert;
+- process crashes after some rows are written;
+- checkpoint is saved incorrectly;
+- report reads an incomplete output.
 
-# 2. Business scenario and vocabulary
+## 1.2 What is a partial failure?
 
-Pipeline may crash after reading, partially writing or committing before checkpoint. Design replay to preserve correctness.
+A partial failure happens when some work succeeds and later work fails.
 
-| Term | Beginner meaning | Why it matters |
+Example:
+- 10 batches are expected;
+- batches 1 to 6 are written;
+- batch 7 fails;
+- batches 8 to 10 are not processed.
+
+The pipeline must not mark the full run successful.
+
+## 1.3 Why success messages are not enough
+
+A script may print `Completed` even if:
+- no rows were read;
+- only one page was fetched;
+- rejected records were discarded;
+- output was written to the wrong location;
+- the checkpoint advanced too far.
+
+Success must be supported by verification evidence.
+
+---
+
+# 2. Map the pipeline failure points
+
+Use this example:
+
+`Source -> Extract -> Validate -> Transform -> Load -> Reconcile -> Checkpoint`
+
+At each stage, ask what can fail.
+
+| Stage | Example failure | Safe response |
 |---|---|---|
-| **Transient** |  temporary | Used to design and explain reliable pipelines. |
-| **permanent** |  requires correction | Used to design and explain reliable pipelines. |
-| **retry policy** |  attempts/delay | Used to design and explain reliable pipelines. |
-| **exponential backoff** |  growing wait | Used to design and explain reliable pipelines. |
-| **idempotent** |  safe repeat | Used to design and explain reliable pipelines. |
-| **dead-letter** |  isolated failures | Used to design and explain reliable pipelines. |
-| **atomicity** |  all-or-nothing | Used to design and explain reliable pipelines. |
-| **recovery** |  return to known correct state. | Used to design and explain reliable pipelines. |
+| Source | Database unavailable | Stop/retry within policy |
+| Extract | Timeout | Retry if safe |
+| Validate | Required field missing | Reject/quarantine record |
+| Transform | Invalid conversion | Record reason |
+| Load | Destination unavailable | Retry or stop batch |
+| Reconcile | Count mismatch | Do not publish/checkpoint |
+| Checkpoint | State store unavailable | Replay safely |
 
-## Before coding, answer five questions
+A failure response should be designed before the incident happens.
 
-1. Where does data come from and who owns it?
-2. Which records/fields must be collected or changed?
-3. What can go wrong (missing values, duplicates, timeout, schema change, partial failure)?
-4. Where does the result go and what is its schema?
-5. How will correctness be proven (counts, keys, totals, status and run metadata)?
+## 2.1 Failure classification
 
-# 3. Understand the concept before coding
+Common categories:
+- transient infrastructure failure;
+- permanent configuration failure;
+- authentication/authorization failure;
+- malformed source data;
+- schema incompatibility;
+- destination constraint failure;
+- resource exhaustion;
+- software defect;
+- operator error.
 
-## 3.1 A small record example
+Different categories need different responses.
 
-| ID | Value | Status |
-|---:|---:|---|
-| 1 | 100 | valid |
-| 2 | 200 | valid |
-| 3 | -5 | invalid |
+---
 
-A reliable run accounts for all 3 input records: 2 accepted, 1 rejected with a reason, 2 output records. It must not silently discard record 3.
+# 3. Transient versus permanent errors
 
-## 3.2 Flow to remember
+## 3.1 Transient error
 
-```text
-Receive -> Inspect -> Validate -> Process -> Persist -> Verify -> Record progress
-                    |                  |
-                    v                  v
-                Reject path       Retry/recovery path
-```
+A transient error may disappear without changing the request.
 
-- Receive: obtain source data.
-- Inspect: understand shape, size and metadata.
-- Validate: check rules before trusting it.
-- Process: apply topic-specific operation.
-- Persist: write durably.
-- Verify: compare expected and actual results.
-- Record progress: checkpoint only when safe.
+Examples:
+- short network interruption;
+- temporary service overload;
+- database connection reset;
+- HTTP 503 during a brief outage.
 
-# 4. First practical example
+A bounded retry may help.
 
-## Task
+## 3.2 Permanent error
 
-Demonstrate idempotency with one small operation before scaling it into a pipeline.
+A permanent error requires a correction.
 
-## Code
+Examples:
+- invalid SQL;
+- missing required column;
+- expired credential;
+- insufficient permission;
+- unsupported data type;
+- invalid endpoint.
+
+Repeating the same request does not solve the underlying issue.
+
+## 3.3 Why classification matters
+
+If every error is retried:
+- permanent errors waste time;
+- API quotas may be consumed;
+- the source may be overloaded;
+- the pipeline hides a configuration defect;
+- recovery takes longer.
+
+Retry only errors that are understood and safe to retry.
+
+---
+
+# 4. Understand timeouts
+
+A timeout limits how long a program waits for an operation.
+
+Examples:
+- database connection timeout;
+- HTTP connect timeout;
+- HTTP read timeout;
+- query execution timeout;
+- task execution timeout.
+
+## 4.1 Why no timeout is dangerous
+
+A pipeline may wait for a remote system for an uncontrolled period.
+
+This can:
+- hold a worker;
+- hold a database connection;
+- block downstream tasks;
+- miss a reporting deadline.
+
+## 4.2 Choose a timeout based on the operation
+
+A tiny metadata request may need a short timeout.
+
+A large export may need a longer read timeout.
+
+Do not set every timeout to one hour simply to avoid failures. Understand expected service behavior and job deadlines.
+
+## 4.3 Distinguish timeout types
+
+A connection timeout means the client could not establish a connection in time.
+
+A read timeout means the connection was established but the response did not arrive in time.
+
+The recovery path may differ.
+
+---
+
+# 5. Understand retry
+
+A retry repeats an operation after a failure.
+
+Retries are useful for transient failures when repeating the operation is safe.
+
+## 5.1 One retry example
 
 ```python
-import time
-for attempt in range(1, 4):
-    try:
-        print("Attempt", attempt)
-        # call the operation here
-        break
-    except TimeoutError:
-        if attempt == 3:
-            raise
-        time.sleep(2 ** attempt)
+attempt = 1
+
+while attempt <= 3:
+    print("Attempt:", attempt)
+    attempt = attempt + 1
 ```
 
-## Expected output
+Expected output:
+
+```text
+Attempt: 1
+Attempt: 2
+Attempt: 3
+```
+
+This demonstrates a bounded attempt counter. It does not call an external service.
+
+## 5.2 Why bound the number of attempts?
+
+Without a limit, a pipeline may retry forever.
+
+A bounded policy defines:
+- maximum attempts;
+- maximum elapsed time;
+- delay between attempts;
+- error categories eligible for retry;
+- final failure behavior.
+
+## 5.3 Retry does not guarantee success
+
+A retry can fail again. After the permitted attempts, the pipeline must stop, alert or route work for manual recovery.
+
+Do not print success simply because a retry loop ended.
+
+---
+
+# 6. Understand exponential backoff
+
+Exponential backoff increases the waiting time between attempts.
+
+Example sequence:
+- first retry waits 2 seconds;
+- second retry waits 4 seconds;
+- third retry waits 8 seconds.
+
+This reduces repeated pressure on an unavailable service.
+
+## 6.1 Calculate a simple delay
+
+```python
+for attempt in range(1, 4):
+    delay_seconds = 2 ** attempt
+    print(delay_seconds)
+```
+
+Expected output:
+
+```text
+2
+4
+8
+```
+
+The exponent operator `**` means power.
+
+## 6.2 Why cap the delay?
+
+An exponential value can grow very large.
+
+A production policy normally defines a maximum delay and maximum total retry duration.
+
+## 6.3 What is jitter?
+
+Jitter adds a random variation to retry delays.
+
+If many workers fail together and all retry at exactly the same time, they may overload the service again.
+
+Jitter spreads retries over time.
+
+For a beginner lesson, remember:
+- backoff increases waiting;
+- cap prevents unlimited delay;
+- jitter avoids synchronized retry spikes.
+
+---
+
+# 7. Retry only safe operations
+
+## 7.1 Read request
+
+A GET request is generally designed to retrieve data and is often safe to retry. It can still consume quota and return a different result if source data changes.
+
+## 7.2 Insert operation
+
+An insert may create a duplicate if the first request succeeded but the response was lost.
+
+Before retrying, the pipeline must know how it identifies an already-created record.
+
+## 7.3 Payment or external side effect
+
+A payment request must not be blindly repeated. It may charge twice unless the provider supports an idempotency key and the client uses it correctly.
+
+## 7.4 Database upsert
+
+A database upsert using a stable unique key can support safe replay when update rules are deterministic.
+
+The whole workflow must still account for transactions and checkpoint state.
+
+---
+
+# 8. Understand idempotency
+
+An operation is idempotent when repeating it produces the same intended final state as performing it once.
+
+Example:
+- write order 101 with status PAID;
+- repeat the same write;
+- destination still has one order 101 with status PAID.
+
+## 8.1 Non-idempotent example
+
+```python
+total = 0
+
+total = total + 100
+total = total + 100
+
+print(total)
+```
+
+Expected output:
+
+```text
+200
+```
+
+Repeating the operation changes the total again.
+
+## 8.2 Idempotent assignment example
+
+```python
+order_status = {}
+
+order_status[101] = "PAID"
+order_status[101] = "PAID"
+
+print(order_status)
+```
+
+Expected output:
+
+```text
+{101: 'PAID'}
+```
+
+The stable key and assignment produce one final state for this example.
+
+## 8.3 Idempotency key
+
+Some APIs accept a unique idempotency key for a request.
+
+The provider uses the key to recognize a repeated operation.
+
+The client must follow the provider's exact rules for key scope, retention and reuse.
+
+## 8.4 Idempotency is end-to-end
+
+A database write may be idempotent while a notification sent after the write is not.
+
+Consider every side effect:
+- database row;
+- file publication;
+- email;
+- message;
+- external API call;
+- checkpoint.
+
+Do not claim a pipeline is idempotent because one step is idempotent.
+
+---
+
+# 9. Understand atomicity and partial writes
+
+Atomicity means an operation happens completely or not at all from the perspective of the protected transaction.
+
+## 9.1 Database transaction
+
+A database transaction can group multiple changes.
+
+If all statements succeed, COMMIT makes the changes durable according to database guarantees.
+
+If a failure occurs before commit, ROLLBACK can undo the transaction's uncommitted changes.
+
+## 9.2 Why transactions matter
+
+Suppose a pipeline writes:
+- order header;
+- order lines;
+- payment summary.
+
+If only the header is written and the rest fails, the destination may be inconsistent.
+
+A transaction can protect related database writes when they belong in one transaction boundary.
+
+## 9.3 Transaction example
+
+```sql
+BEGIN;
+
+INSERT INTO target_orders (order_id, status)
+VALUES (101, 'PAID');
+
+UPDATE target_customers
+SET last_order_id = 101
+WHERE customer_id = 501;
+
+COMMIT;
+```
+
+The example demonstrates two changes in one transaction. Use a practice database and confirm the schema before running it.
+
+## 9.4 Rollback example
+
+```sql
+BEGIN;
+
+UPDATE target_orders
+SET status = 'CANCELLED'
+WHERE order_id = 101;
+
+ROLLBACK;
+```
+
+The update is rolled back instead of being committed.
+
+## 9.5 Transaction size trade-off
+
+One huge transaction can:
+- hold locks for a long time;
+- consume resources;
+- increase rollback cost.
+
+Very small transactions can:
+- increase commit overhead;
+- complicate consistency across related records.
+
+Choose transaction boundaries based on business consistency and database capacity.
+
+---
+
+# 10. Publish files safely
+
+A file write can fail after part of the output has been written.
+
+If downstream systems read the final filename while it is incomplete, they may consume partial data.
+
+## 10.1 Temporary file pattern
+
+Conceptual steps:
+1. write to a temporary file;
+2. close the file;
+3. validate the file;
+4. rename it to the final name;
+5. publish a completion marker or manifest.
+
+## 10.2 Why use a temporary filename?
+
+The final output name should mean that the output is complete and ready.
+
+A temporary file communicates that processing is still in progress.
+
+## 10.3 Atomic rename caveat
+
+A rename may be atomic on the same filesystem, but guarantees differ across filesystems and object stores.
+
+Cloud object storage may require a manifest or commit marker rather than a filesystem rename.
+
+Do not assume local filesystem behavior applies to cloud storage.
+
+---
+
+# 11. Understand checkpoint ordering
+
+A checkpoint records progress.
+
+Unsafe sequence:
+
+`Save checkpoint -> Output write -> Crash`
+
+The next run may start after data that was never safely published.
+
+Safer sequence:
+
+`Extract -> Process -> Persist -> Verify -> Commit/publish -> Save checkpoint`
+
+## 11.1 Output succeeds but checkpoint fails
+
+The next run may replay the same data.
+
+Idempotent writes allow the pipeline to process the same source range again without creating duplicate effects.
+
+## 11.2 Checkpoint succeeds but output fails
+
+This is dangerous. The pipeline may skip records that never reached the destination.
+
+Checkpoint advancement must depend on durable output evidence.
+
+## 11.3 Separate source and target transactions
+
+When the source database and target database are different systems, one ordinary database transaction cannot automatically commit both.
+
+The architecture must use a safe pattern such as:
+- idempotent writes;
+- durable batch manifest;
+- outbox/inbox pattern where appropriate;
+- staged publication;
+- recovery/reconciliation.
+
+Do not claim one atomic transaction spans unrelated systems unless the architecture actually provides it.
+
+---
+
+# 12. Handle bad records with quarantine
+
+Not every failure should stop an entire batch.
+
+Some record-level failures can be isolated:
+- invalid amount;
+- missing optional mapping;
+- unsupported status;
+- malformed individual event.
+
+A quarantine area stores the record and the reason for rejection.
+
+## 12.1 Record-level versus batch-level failure
+
+**Record-level failure:** One row is invalid while the file structure is still usable.
+
+**Batch-level failure:** The file cannot be trusted as a whole, such as a missing required column or incomplete transfer.
+
+A batch-level schema failure may require stopping the entire delivery.
+
+## 12.2 What is a dead-letter queue?
+
+A dead-letter queue (DLQ) is a location for messages or records that cannot be processed successfully after the defined policy.
+
+It may be implemented using:
+- a message queue;
+- a database table;
+- object storage;
+- a rejected file.
+
+A DLQ should retain enough safe metadata to diagnose and reprocess the item.
+
+## 12.3 Rejection metadata
+
+Useful fields:
+- source identifier;
+- source record key;
+- run ID;
+- failure stage;
+- error code;
+- rejection reason;
+- received time;
+- rule version;
+- original payload location.
+
+Do not put secrets or unnecessary personal data into the error record.
+
+---
+
+# 13. Simulate a retry with Python
+
+## 13.1 Simulate attempts without a network
+
+```python
+attempt = 0
+maximum_attempts = 3
+success = False
+
+while attempt < maximum_attempts:
+    attempt = attempt + 1
+    print("Attempt", attempt)
+
+    if attempt == 3:
+        success = True
+        break
+
+print("Success:", success)
+```
+
+Expected output:
 
 ```text
 Attempt 1
 Attempt 2
 Attempt 3
+Success: True
 ```
 
-> Sample output is for the stated sample values. API/database/file results may vary. Do not claim variable outputs are guaranteed or runtime-tested unless you executed them.
+This is a deterministic teaching simulation. It does not prove a real API or database will succeed on the third attempt.
 
-## Line-by-line explanation
+## 13.2 Simulate a permanent error
 
-At most three attempts; waits 2 then 4 seconds. Production logic classifies errors, caps delay, adds jitter and avoids retrying non-idempotent effects blindly.
+```python
+error_type = "INVALID_CONFIGURATION"
 
-### After running, answer
+if error_type == "TRANSIENT":
+    print("Retry may be allowed")
+else:
+    print("Stop and correct the configuration")
+```
 
-- What input did I provide?
-- Which operation ran?
-- Which object holds the result?
-- What does output prove?
-- What does output not prove?
+Expected output:
 
-A successful request/query/read does not automatically prove completeness, uniqueness, business validity or correctness.
+```text
+Stop and correct the configuration
+```
 
-# 5. Build the pipeline step by step
-
-## Step 1 — Define the input contract
-
-Document source and owner, fields/types, required/optional values, unique identity, time/batch boundary, expected volume/frequency, permissions, and source limitations. If these are unknown, clarify before coding.
-
-## Step 2 — Read a tiny sample
-
-Start with 3–10 safe records. Inspect field names, types, nulls, duplicate keys, cursor/timestamp/version and whether the sample represents real edge cases. Never print credentials or sensitive data.
-
-## Step 3A — Validation is a decision
-
-| Rule | Example | Violation action |
-|---|---|---|
-| Required field | ID exists | Reject/quarantine |
-| Type | Amount numeric | Record conversion reason |
-| Range | Quantity positive | Reject or business review |
-| Identity | Key unique | Deduplicate or fail per contract |
-| Schema | Required columns exist | Stop batch and alert |
-| Completeness | All pages/partitions processed | Mark incomplete; don't checkpoint |
-
-## Step 4 — Process bounded units
-
-A unit can be a page, file, fetch batch, partition or record group. Bounded units control memory, reduce retry scope, provide progress points and isolate failures. Select the unit based on source/target capacity—not a tutorial's arbitrary number.
-
-## Step 5 — Persist safely
-
-Ask: did destination commit finish? Can the batch replay without duplicate effects? Is there a unique key/idempotency token? Can I trace output to source? What if process crashes now?
-
-## Step 6 — Verify
-
-Use at least two: input = accepted + rejected; key uniqueness; totals/ranges; boundary gap/overlap; schema; freshness; source/target reconciliation.
-
-# 6. Mistakes and corrections
-
-## Mistake 1: Retry forever
-
-**Why dangerous:** Hides outage/consumes resources.
-
-**Correct approach:** Bound attempts and alert.
-
-## Mistake 2: Retry POST blindly
-
-**Why dangerous:** May duplicate effects.
-
-**Correct approach:** Idempotency key/reconcile.
-
-## Mistake 3: Catch all and continue
-
-**Why dangerous:** Hides defects/data loss.
-
-**Correct approach:** Catch expected errors; surface others.
-
-## Mistake 4: Claim exactly once casually
-
-**Why dangerous:** Failures cause replay.
-
-**Correct approach:** At-least-once + idempotent effect; state guarantee.
-
-## Mistake 5: Delete raw before output durable
-
-**Why dangerous:** Loses evidence.
-
-**Correct approach:** Retain until verified and retention allows.
-
-
-## Debugging checklist
-
-1. Confirm source exists and request/query is correct.
-2. Inspect exact raw input for a small failing case.
-3. Confirm schema and types.
-4. Check filters and boundaries (>, >=, dates, cursor).
-5. Check mapping/business rules.
-6. Check duplicate and unique-key behavior.
-7. Check destination write/transaction result.
-8. Inspect checkpoint and update timing.
-9. Reconcile input, accepted, rejected and output counts.
-10. Reproduce with controlled input before changing the full job.
-
-# 7. Mini-project — Reliable Pipeline Simulator
-
-## Objective
-
-Build a beginner-readable pipeline demonstrating pipeline reliability and failure handling with a happy path, invalid/failure path and verification step.
-
-## Requirements
-
-- Reproducible sample input and defined contract.
-- Predictable processing order and bounded units.
-- Required-field and identity validation.
-- Accepted/rejected outcomes separated.
-- Safe rerun without duplicate effects.
-- Run metadata: run ID, start/end, counts and status.
-- Progress/checkpoint behavior explained.
-- Output reconciled.
-
-## Sample business data
-
-| record_id | event_time | customer_id | amount | status |
-|---:|---|---:|---:|---|
-| 501 | 2026-11-10 09:00:00 | 11 | 1200.00 | PAID |
-| 502 | 2026-11-10 09:15:00 | 12 | 850.00 | PAID |
-| 503 | 2026-11-10 10:00:00 | 11 | 499.00 | PENDING |
-| 504 | 2026-11-10 10:30:00 | 13 | 0.00 | CANCELLED |
-
-These are teaching records. A zero amount or CANCELLED status is not automatically invalid; the business contract decides.
-
-## Part A — Design
-
-1. Name source/destination.
-2. Define unique key and required fields/types.
-3. Decide batch boundary and accepted/rejected rules.
-4. Define checkpoint and output schema.
-5. Define reconciliation checks.
-
-## Part B — Happy path
-
-1. Read a small batch.
-2. Count received records.
-3. Validate required fields.
-4. Process accepted records.
-5. Persist/display output.
-6. Verify counts and values.
-
-## Part C — Failure tests
-
-Test missing field, duplicate key and one transient error/malformed payload. Record expected behavior, actual behavior and correction. A happy-path-only script is not reliable yet.
-
-## Part D — Replay
-
-Run input twice; inspect duplicates; interrupt before checkpoint; restart from safe progress; reconcile final target.
-
-## Acceptance checklist
-
-- [ ] Input contract documented.
-- [ ] Small sample reproducible.
-- [ ] Code split into readable stages.
-- [ ] Outputs shown after important steps.
-- [ ] Invalid data has a reason.
-- [ ] Retry behavior bounded.
-- [ ] Rerun behavior safe.
-- [ ] Checkpoint order explained.
-- [ ] Counts and values reconciled.
-- [ ] Limitations and production improvements documented.
-
-# 8. Production thinking
-
-A classroom script runs on small data. Production additionally considers scale/memory, least-privilege security, secret management, concurrency, retries/checkpoints, source load, data contracts, monitoring/alerts/runbooks, schema changes, cost and auditability. A notebook is not production-ready merely because it executes successfully.
-
-# 9. Practice exercises
-
-## Exercise 1 — Explain
-
-Explain Transient to a beginner; give a business example; name a failure; explain detection and recovery.
-
-## Exercise 2 — Trace one record
-
-Trace record 502 from source through validation, processing, destination, checkpoint and verification.
-
-## Exercise 3 — Boundary test
-
-Create records immediately before, exactly at and after the boundary. Explain which are processed and why.
-
-## Exercise 4 — Failure test
-
-Interrupt after output persistence but before checkpoint. Restart and explain idempotency and duplicate checks.
-
-## Exercise 5 — Quality test
-
-Make one field invalid, one key duplicated and one record late. Decide action from contract and justify.
-
-## Exercise 6 — Interview practice
-
-Answer aloud: problem solved; end-to-end flow; failure behavior; completeness proof; production improvements.
-
-# 10. Day 38 revision sheet
-
-**Flow:** Define contract -> Read bounded input -> Validate -> Process -> Persist -> Verify -> Checkpoint -> Observe
-
-Never skip: unique record identity; what success guarantees; replay behavior; invalid versus transient error; evidence of destination correctness.
-
-## One-minute project defence
-
-“My Reliable Pipeline Simulator receives data from a defined source. It validates the contract and identity, processes controlled units, handles invalid/transient cases explicitly, persists safely, records progress after durable success and reconciles counts/values. I can rerun it safely and diagnose failures from run metadata. Before production I would add automated tests, secret management, monitoring, access controls and scale testing.”
-
-## Self-assessment
-
-- [ ] I can define terms without memorizing.
-- [ ] I can explain code and output.
-- [ ] I can trace a record end-to-end.
-- [ ] I can reproduce/debug a failure.
-- [ ] I can explain checkpoint ordering and replay.
-- [ ] I can prove correctness with checks.
-- [ ] I can defend the project.
-
-**Complete the day when you can explain, run, interpret, test failure and prove the result—not merely read the notes.**
-
-
-# 11. Mentor-led deep dive — Reliability
-
-Read each scenario slowly. Identify input, risk, control and proof.
-
-## 11.1 Raw/curated distinction
-
-Failure map: before read, after read, transform, during write, after commit/before checkpoint, after checkpoint. For each identify durable state and restart action.
-
-**Student checkpoint:** Explain this in your own words and name a test that proves it.
-
-## 11.2 Walkthrough
-
-Retry table: timeout retry; 429 respect wait; 503 backoff; invalid schema quarantine/alert; auth stop and fix.
-
-**Student checkpoint:** Explain this in your own words and name a test that proves it.
-
-## 11.3 Normalization policy
-
-Backoff attempts 1/2/3 waits 2/4 seconds; cap and jitter to avoid synchronized retries.
-
-**Student checkpoint:** Explain this in your own words and name a test that proves it.
-
-## 11.4 Mapping design
-
-File output: temporary file -> close/validate -> atomic rename if filesystem supports; rerun checks source/run identity.
-
-**Student checkpoint:** Explain this in your own words and name a test that proves it.
-
-## 11.5 Worked business example
-
-Database output: unique key/upsert or transactionally deduplicated staging; replay must not add rows twice.
-
-**Student checkpoint:** Explain this in your own words and name a test that proves it.
-
-## 11.6 Filter semantics
-
-Poison row: isolate with reason/source offset if safe; systemic schema/logic errors should fail/alert, not be skipped.
-
-**Student checkpoint:** Explain this in your own words and name a test that proves it.
-
-## 11.7 Aggregation grain
-
-Exactly-once nuance: delivery may be at-least-once; idempotency/transaction makes effect effectively once. Explain boundaries.
-
-**Student checkpoint:** Explain this in your own words and name a test that proves it.
-
-## 11.8 Transformation order
-
-Runbook: detect -> inspect run/checkpoint -> inspect partial writes -> fix -> replay bounded input -> reconcile -> mark recovered/notify.
-
-**Student checkpoint:** Explain this in your own words and name a test that proves it.
-
-# 12. Guided lab checkpoints
-
-## Lab checkpoint 1
-
-- Predict the result before running.
-- Execute this stage on a small input.
-- Record output, count and error (if any).
-- Explain which input/rule caused the result.
-- Compare actual result with contract and expected output.
-- Reproduce a failure with the smallest input and fix its cause.
-
-## Lab checkpoint 2
-
-- Predict the result before running.
-- Execute this stage on a small input.
-- Record output, count and error (if any).
-- Explain which input/rule caused the result.
-- Compare actual result with contract and expected output.
-- Reproduce a failure with the smallest input and fix its cause.
-
-## Lab checkpoint 3
-
-- Predict the result before running.
-- Execute this stage on a small input.
-- Record output, count and error (if any).
-- Explain which input/rule caused the result.
-- Compare actual result with contract and expected output.
-- Reproduce a failure with the smallest input and fix its cause.
-
-## Lab checkpoint 4
-
-- Predict the result before running.
-- Execute this stage on a small input.
-- Record output, count and error (if any).
-- Explain which input/rule caused the result.
-- Compare actual result with contract and expected output.
-- Reproduce a failure with the smallest input and fix its cause.
-
-## Lab checkpoint 5
-
-- Predict the result before running.
-- Execute this stage on a small input.
-- Record output, count and error (if any).
-- Explain which input/rule caused the result.
-- Compare actual result with contract and expected output.
-- Reproduce a failure with the smallest input and fix its cause.
-
-## Lab checkpoint 6
-
-- Predict the result before running.
-- Execute this stage on a small input.
-- Record output, count and error (if any).
-- Explain which input/rule caused the result.
-- Compare actual result with contract and expected output.
-- Reproduce a failure with the smallest input and fix its cause.
-
-## Lab checkpoint 7
-
-- Predict the result before running.
-- Execute this stage on a small input.
-- Record output, count and error (if any).
-- Explain which input/rule caused the result.
-- Compare actual result with contract and expected output.
-- Reproduce a failure with the smallest input and fix its cause.
-
-## Lab checkpoint 8
-
-- Predict the result before running.
-- Execute this stage on a small input.
-- Record output, count and error (if any).
-- Explain which input/rule caused the result.
-- Compare actual result with contract and expected output.
-- Reproduce a failure with the smallest input and fix its cause.
-
-
-# 13. Instructor review rubric
-
-| Skill | Beginner evidence |
-|---|---|
-| Concept | Explains what/why plainly |
-| Code | Reads/explains lines, not blindly copies |
-| Output | Derives output from input/rule |
-| Quality | Identifies invalid, duplicate and boundary cases |
-| Reliability | Explains retry, replay and checkpoint |
-| Verification | Uses counts/keys/totals/quality checks |
-| Interview | Gives decision, reason, failure mode and proof |
-
-
-
-# 14. Additional worked lab cells — Reliability
-
-Each cell is a separate experiment. Students should predict, execute, record output and explain the business meaning.
-
-## Lab cell 1
-
-Failure matrix: crash before read (nothing), after read (re-read), during transform (reprocess batch), during write (transaction/temp output), after commit before checkpoint (replay idempotently).
-
-**Write in your notebook:** input; expected output; actual output; why it happened; validation evidence; what you would do if it failed.
-
-## Lab cell 2
-
-Retry decision table: network timeout=bounded retry; rate limit=wait; bad schema=quarantine/alert; invalid credentials=stop; destination constraint=investigate data/code.
-
-**Write in your notebook:** input; expected output; actual output; why it happened; validation evidence; what you would do if it failed.
-
-## Lab cell 3
-
-Retry timing example 1,2,4,8 seconds capped; add random jitter and global retry budget. Track attempts and elapsed time.
-
-**Write in your notebook:** input; expected output; actual output; why it happened; validation evidence; what you would do if it failed.
-
-## Lab cell 4
-
-Atomic file pattern: write temporary path, flush/close, validate row count, rename to final; clean abandoned temp files on restart.
-
-**Write in your notebook:** input; expected output; actual output; why it happened; validation evidence; what you would do if it failed.
-
-## Lab cell 5
-
-DB pattern: stage rows, validate, transactionally upsert and commit; checkpoint separate with replay-safe key. Explain unavoidable failure window.
-
-**Write in your notebook:** input; expected output; actual output; why it happened; validation evidence; what you would do if it failed.
-
-## Lab cell 6
-
-Poison row: isolate only if rule says row-level reject is safe. If every row fails due schema mismatch, fail the entire batch and alert.
-
-**Write in your notebook:** input; expected output; actual output; why it happened; validation evidence; what you would do if it failed.
-
-## Lab cell 7
-
-Idempotency test: run same input twice; output row count and target values remain same. Test same key with changed source version too.
-
-**Write in your notebook:** input; expected output; actual output; why it happened; validation evidence; what you would do if it failed.
-
-## Lab cell 8
-
-Recovery runbook: identify failed run and safe cursor; inspect partial destination; repair cause; replay bounded unit; reconcile; record recovered status.
-
-**Write in your notebook:** input; expected output; actual output; why it happened; validation evidence; what you would do if it failed.
-
-# 15. Lab completion evidence
-
-| Evidence | Student submission |
-|---|---|
-| Input contract | Fields, types, keys, source behavior |
-| Happy-path run | Input and output counts |
-| Invalid case | Error/reject reason and handling |
-| Replay | Proof no duplicate side effect |
-| Boundary case | Proof no gap or unintended overlap |
-| Recovery | Last safe point and restart procedure |
-| Reconciliation | Counts, keys, totals or quality checks |
-| Project defence | Explain decision, risk, control and proof |
-
-
+The point is to classify the failure before deciding to retry.
 
 ---
 
-# Guided execution lab — Reliable Pipeline Simulator (runnable fixture)
+# 14. Simulate a crash during a batch
 
-This is a deterministic simulation of a retry-safe load. It demonstrates the key design: stable record identity, idempotent writes, bounded retry, and checkpoint only after success.
+Suppose a batch has five records.
 
-## Cell 1 — Source batch
+The process writes two records and then crashes.
 
-```python
-source_batch = [
-    {"event_id": "E1", "order_id": 501, "amount": 100},
-    {"event_id": "E2", "order_id": 502, "amount": 200},
-    {"event_id": "E3", "order_id": 503, "amount": 300}
-]
-target_by_event = {}
-checkpoint = 0
-```
+If the output file is treated as final, the destination may contain only part of the batch.
 
-`event_id` identifies an event uniquely. `target_by_event` acts like a destination table with a unique key.
-
-## Cell 2 — Idempotent write
+## 14.1 Track completed records
 
 ```python
-for event in source_batch:
-    target_by_event[event["event_id"]] = event
-print("Rows in target:", len(target_by_event))
+source_records = [101, 102, 103, 104, 105]
+written_records = []
+
+for record in source_records:
+    if record == 103:
+        print("Simulated failure")
+        break
+
+    written_records.append(record)
+
+print(written_records)
 ```
 
-Expected: 3. A dictionary assignment by stable key replaces the same event rather than adding a duplicate.
+Expected output:
 
-## Cell 3 — Replay the same batch
-
-```python
-for event in source_batch:
-    target_by_event[event["event_id"]] = event
-print("Rows after replay:", len(target_by_event))
+```text
+Simulated failure
+[101, 102]
 ```
 
-Expected: still 3. This illustrates idempotent effect for this key/value operation. It does not prove every external side effect is idempotent.
+The batch is incomplete. Do not mark it successful.
 
-## Cell 4 — Simulate failure before checkpoint
+## 14.2 Why not save the checkpoint at 105?
 
-```python
-checkpoint = 0
-print("Target persisted rows:", len(target_by_event))
-print("Checkpoint:", checkpoint)
-```
+Only records 101 and 102 were written in this simulation. Saving 105 would claim that records 103, 104 and 105 were processed when they were not.
 
-The target has data but checkpoint has not advanced. On restart, the batch is replayed. Because writes use stable event IDs, replay does not duplicate the target records.
+## 14.3 Recovery options
 
-## Cell 5 — Verify then checkpoint
+- discard incomplete temporary output and replay the whole batch;
+- resume from a verified per-record checkpoint;
+- upsert all records again using stable keys;
+- use a transaction if all writes are in one database.
 
-```python
-expected_ids = {event["event_id"] for event in source_batch}
-actual_ids = set(target_by_event.keys())
-assert expected_ids.issubset(actual_ids)
-checkpoint = 3
-print("Verified:", True)
-print("Checkpoint:", checkpoint)
-```
+Choose a method that can prove completeness.
 
-Expected: Verified True; Checkpoint 3. In production, checkpoint and target commit should be coordinated transactionally where possible; otherwise use an outbox/manifest/recovery protocol.
+---
 
-## Cell 6 — Bounded retry policy
+# 15. Failure-point testing
 
-A retry should be limited and only used for transient failures (temporary network error, throttling, service unavailable). Do not retry permanent errors such as invalid schema forever. Use exponential backoff with jitter, a maximum attempt count, timeout and dead-letter/quarantine path.
+A reliable pipeline should be tested by deliberately simulating expected failures.
 
-## Failure drill
+Possible tests:
+1. source connection unavailable;
+2. API timeout;
+3. malformed file;
+4. missing required column;
+5. invalid record;
+6. destination write failure;
+7. process crash after a partial batch;
+8. checkpoint store unavailable;
+9. repeated run with the same input;
+10. duplicate source key.
 
-1. Fail before any target write: replay the full batch.
-2. Fail after E1 and E2: replay all; stable keys prevent duplicates.
-3. Change E2 amount and same event ID: decide whether events are immutable or versioned. Do not silently overwrite immutable event history.
-4. Make a malformed record: route to reject/quarantine, don't retry a permanent validation failure.
-5. Confirm checkpoint never indicates progress beyond durable target data.
+For each test, define:
+- setup;
+- expected pipeline state;
+- expected output;
+- expected checkpoint;
+- recovery action;
+- evidence to inspect.
+
+## 15.1 Test a missing source file
+
+Expected behavior:
+- job reports missing input;
+- no false success output is published;
+- checkpoint does not advance;
+- operator receives a clear status.
+
+## 15.2 Test invalid data
+
+Expected behavior:
+- invalid record is rejected with a reason;
+- valid records may continue if the contract allows record-level isolation;
+- input = accepted + rejected;
+- rejection rate is measured.
+
+## 15.3 Test destination failure
+
+Expected behavior:
+- batch is not marked committed;
+- checkpoint does not advance;
+- recovery can replay safely;
+- no duplicate side effects occur.
+
+---
+
+# 16. Understand at-least-once and exactly-once claims
+
+## 16.1 At-least-once processing
+
+A record may be processed more than once, but the design aims not to lose it.
+
+This is common in distributed systems because a process may not know whether a remote write succeeded before a connection failed.
+
+## 16.2 At-most-once processing
+
+The system avoids processing a record more than once, but failures can cause records to be lost if progress is advanced incorrectly.
+
+## 16.3 Exactly-once effect
+
+Exactly-once processing is difficult across independent systems.
+
+A practical design often uses:
+- at-least-once delivery;
+- stable event identity;
+- idempotent destination writes;
+- durable checkpoints;
+- reconciliation.
+
+This can create an exactly-once *effect* for a specific destination operation, but only when the guarantees are correctly implemented.
+
+Do not say “exactly once” without identifying:
+- the system boundary;
+- the delivery guarantee;
+- the deduplication key;
+- the transaction boundary;
+- the failure/recovery behavior.
+
+---
+
+# 17. Common reliability mistakes
+
+## Mistake 1 — Retry forever
+
+**Risk:** The pipeline consumes resources and hides a permanent defect.
+
+**Correction:** Set maximum attempts and maximum elapsed time.
+
+## Mistake 2 — Retry every exception
+
+**Risk:** Authentication, schema and programming errors repeat without benefit.
+
+**Correction:** Classify errors and retry only safe transient failures.
+
+## Mistake 3 — Retry a non-idempotent operation blindly
+
+**Risk:** Duplicate side effects.
+
+**Correction:** Use idempotency keys, stable IDs or reconciliation.
+
+## Mistake 4 — Save checkpoint before destination commit
+
+**Risk:** Records can be skipped permanently.
+
+**Correction:** Checkpoint only after verified durable output.
+
+## Mistake 5 — Mark partial output successful
+
+**Risk:** Downstream systems consume incomplete data.
+
+**Correction:** Use temporary outputs, manifests and reconciliation.
+
+## Mistake 6 — Catch every error and continue
+
+**Risk:** Serious defects become hidden data loss.
+
+**Correction:** Handle known record errors; fail clearly on unexpected system errors.
+
+## Mistake 7 — Claim exactly once without evidence
+
+**Risk:** Replays may still duplicate or lose data.
+
+**Correction:** State the actual delivery and idempotency guarantees.
+
+---
+
+# 18. Recovery runbook structure
+
+A runbook is an operational guide for responding to a known failure.
+
+A useful runbook includes:
+- alert name;
+- what failed;
+- affected source and destination;
+- how to inspect run ID;
+- how to inspect the failing batch;
+- whether checkpoint advanced;
+- whether output was committed;
+- whether replay is safe;
+- steps to restore service;
+- verification after recovery;
+- escalation owner.
+
+Do not tell operators to “rerun the job” without first checking whether partial output exists.
+
+---
+
+# 19. Practical exercises
+
+## Exercise 1 — Classify failure
+
+Database server is temporarily unavailable.
+
+Expected answer: likely transient; use bounded retries and alert if exhausted.
+
+## Exercise 2 — Classify failure
+
+SQL references a column that does not exist.
+
+Expected answer: permanent until query/schema is corrected. Do not retry unchanged SQL repeatedly.
+
+## Exercise 3 — Checkpoint order
+
+Output write fails. Should checkpoint advance?
+
+Expected answer: no.
+
+## Exercise 4 — Replay
+
+The destination upsert succeeded but checkpoint save failed.
+
+Expected answer: the next run may replay; stable-key idempotent upsert should prevent duplicate rows.
+
+## Exercise 5 — Partial file
+
+A process crashes halfway through writing final.csv.
+
+Expected answer: downstream readers must not treat it as complete. Use temporary output and controlled publication.
+
+## Exercise 6 — Bad record
+
+One row has invalid amount but the rest of the file is structurally valid.
+
+Expected answer: quarantine the row if the contract allows record-level rejection; retain its reason.
+
+## Exercise 7 — API POST
+
+A create request times out. Should it automatically be sent again?
+
+Expected answer: only if the API supports a suitable idempotency mechanism or the client can safely determine whether the first request succeeded.
+
+## Exercise 8 — Exactly once
+
+A queue can deliver a message more than once. How can a database target avoid duplicate effects?
+
+Expected answer: stable message ID, unique constraint and idempotent write, plus correct checkpoint/acknowledgment order.
+
+---
+
+# 20. Debugging checklist
+
+When a pipeline fails:
+
+1. Identify the run ID.
+2. Identify the exact stage and batch.
+3. Classify the failure.
+4. Determine whether the operation is safe to retry.
+5. Inspect whether any output was partially written.
+6. Inspect whether the destination committed.
+7. Inspect whether the checkpoint advanced.
+8. Confirm rejected records were retained.
+9. Check whether the source range is still available.
+10. Choose replay, resume or manual correction.
+11. Reconcile counts and keys after recovery.
+12. Confirm the next run starts from the correct checkpoint.
+13. Record the root cause and prevention action.
+
+---
+
+# 21. Day 38 revision checklist
+
+You should be able to explain:
+- pipeline reliability;
+- partial failure;
+- transient and permanent errors;
+- timeout;
+- retry and retry limit;
+- exponential backoff;
+- jitter;
+- idempotency;
+- idempotency key;
+- database transaction;
+- atomic file publication;
+- checkpoint ordering;
+- quarantine and dead-letter queue;
+- failure-point testing;
+- at-least-once and at-most-once;
+- exactly-once effect and its limits;
+- recovery runbook;
+- post-recovery reconciliation.
+
+---
+
+# 22. Key takeaways
+
+1. Reliability means correct and recoverable processing, not just a successful process exit.
+2. Identify failure points before deployment.
+3. Classify errors before retrying.
+4. Use bounded retries, backoff and jitter.
+5. Retry only operations that are safe to repeat.
+6. Idempotency makes replay safer.
+7. Use transactions or controlled file publication to protect partial writes.
+8. Save checkpoints after durable and verified output.
+9. Quarantine record-level failures with useful reasons.
+10. Test failure scenarios deliberately.
+11. State delivery guarantees precisely; do not casually promise exactly once.
+12. Reconcile the destination after recovery.
+
+## What comes next
+
+Day 39 focuses on pipeline logging and observability. You will learn how to identify each run, measure row counts and durations, capture safe error context, define alerts and understand whether a pipeline is healthy.
+
+**End of Day 38 class notes.**
+
+---
+
+# 23. Circuit breakers and protecting dependencies
+
+A retry policy repeats an operation. A circuit breaker temporarily stops calls to a dependency that is repeatedly failing.
+
+A circuit breaker commonly has three states:
+- **Closed:** requests are allowed.
+- **Open:** requests are blocked for a period because failures crossed a threshold.
+- **Half-open:** a limited test request is allowed to check whether the dependency recovered.
+
+## 23.1 Why use a circuit breaker?
+
+If an API or database is down, hundreds of workers retrying continuously can make recovery harder. A circuit breaker reduces pressure and gives the dependency time to recover.
+
+## 23.2 Circuit breaker versus retry
+
+| Retry | Circuit breaker |
+|---|---|
+| Repeats one failed operation | Stops or limits future calls after repeated failures |
+| Useful for short transient errors | Useful for sustained dependency failure |
+| Has attempts and delays | Has state and recovery threshold |
+| Can still overload a failing service | Helps protect a failing service |
+
+A small local notebook may need only a timeout and bounded retry. A distributed pipeline with many workers may need a circuit breaker.
+
+# 24. Concurrency and duplicate execution
+
+Two copies of the same pipeline may start at the same time. Both can read the same checkpoint, extract the same range, write output and attempt to advance progress.
+
+A stable key helps with duplicate writes, but it does not automatically solve checkpoint races.
+
+## 24.1 Prevent overlapping runs
+
+Possible controls:
+- scheduler concurrency limit;
+- database lock or lease;
+- run registry with a unique active-run constraint;
+- partition ownership;
+- optimistic checkpoint version.
+
+## 24.2 Checkpoint compare-and-set concept
+
+A process reads checkpoint version 10. Before saving version 11, it verifies that the stored version is still 10. If another run already changed it, the first process must not overwrite the newer state.
+
+This is an optimistic concurrency-control idea.
+
+## 24.3 Why a unique run ID is not enough
+
+A run ID identifies executions. It does not prevent two executions from processing the same source range. An explicit concurrency policy is required.
+
+# 25. Retry budget and total elapsed time
+
+A policy with three retries may still exceed the job deadline if each attempt waits a long time.
+
+Define maximum attempts, connection/read timeout, delay between attempts, maximum total elapsed time and overall pipeline deadline.
+
+## 25.1 Retry budget example
+
+Suppose one request timeout is 10 seconds, three attempts are allowed, and waits are 2 and 4 seconds.
+
+The approximate worst-case time is 36 seconds, excluding overhead:
+- attempt 1: 10 seconds;
+- wait: 2 seconds;
+- attempt 2: 10 seconds;
+- wait: 4 seconds;
+- attempt 3: 10 seconds.
+
+The exact duration depends on timeout behavior and execution overhead.
+
+## 25.2 Why total time matters
+
+A retry policy should not cause a 07:00 report to remain blocked until 10:00. Define when to stop retrying and escalate.
+
+# 26. Recovery after destination commit but before acknowledgment
+
+A common distributed failure:
+1. destination write commits;
+2. process crashes before recording success;
+3. scheduler retries the same batch.
+
+The pipeline cannot assume the write failed merely because it did not receive a success acknowledgment.
+
+Recovery steps:
+- identify the batch with a stable batch ID;
+- use destination unique keys or idempotent writes;
+- check destination state;
+- replay safely;
+- verify counts and keys;
+- advance checkpoint only when the result is confirmed.
+
+This is one of the main reasons idempotency matters.
+
+# 27. Separate record failure from infrastructure failure
+
+Record-level examples include invalid amount, missing required key and unsupported status.
+
+Infrastructure-level examples include destination database unavailable, disk full, network outage, permission revoked and object storage unavailable.
+
+A record-level failure may be quarantined while the batch continues if the contract permits it. An infrastructure failure usually means the batch cannot be declared complete.
+
+Do not catch an infrastructure exception and label it as a rejected record.
+
+# 28. Recovery decision table
+
+| Failure | Retry? | Advance checkpoint? | Typical action |
+|---|---|---|---|
+| Temporary network timeout | Bounded retry | Only after verified write | Retry and reconcile |
+| Invalid credential | No blind retry | No | Correct secret/permission |
+| Invalid record | Usually not as-is | Depends on rejection contract | Quarantine |
+| Missing required column | No | No | Stop batch and contact producer |
+| Destination disk full | After recovery | No | Restore capacity, replay safely |
+| Output committed, acknowledgment lost | Reconcile/idempotent replay | Only after confirmation | Check target and replay safely |
+| Checkpoint store unavailable | Retry state write | Do not claim completion | Verify output and recover state |
+
+# 29. Failure simulation checklist
+
+For a pipeline, deliberately test:
+- fail before extraction;
+- fail after extraction but before transformation;
+- fail halfway through a batch;
+- fail during destination write;
+- fail after destination commit;
+- fail before checkpoint save;
+- fail after checkpoint save;
+- rerun the same batch;
+- start two runs concurrently;
+- send the same event twice.
+
+The expected final state should be documented for each test. A test is not complete just because an exception was raised. Verify destination and checkpoint state after the failure.
+
+# 30. Review your recovery design
+
+Before deployment, answer:
+1. Which errors are retryable?
+2. What is the maximum attempt count?
+3. What is the total retry budget?
+4. Which operations are idempotent?
+5. What happens after a partial file write?
+6. What happens after destination commit but before acknowledgment?
+7. Can two runs overlap?
+8. How is the checkpoint protected from races?
+9. How are record errors separated from infrastructure errors?
+10. What evidence proves recovery is complete?
+
+**End of expanded Day 38 teaching notes.**
