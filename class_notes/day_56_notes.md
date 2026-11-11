@@ -1634,3 +1634,16 @@ Without looking at the notes, explain:
 If you can complete the notebook and explain each output, you are ready for Day 57.
 
 **Next lesson — Day 57: Spark Joins and Partitioning.** You will join orders, customers and products, understand join types, inspect unmatched records, and learn repartition and coalesce.
+
+---
+
+## Visual Learning Diagrams
+
+### Spark lazy evaluation
+![Day 56 - Spark lazy evaluation](images/day_56_spark_lazy_evaluation.svg)
+
+### Transformations vs actions
+![Day 56 - Transformations vs actions](images/day_56_spark_transform_action.svg)
+
+### Spark transformation chain
+![Day 56 - Spark transformation chain](images/day_56_spark_pipeline_chain.svg)
