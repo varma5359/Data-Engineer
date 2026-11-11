@@ -382,3 +382,16 @@ This is a classroom calculation. Production monitoring should use consistent tim
 - [ ] Avoid sensitive data in logs.
 
 **Next lesson — Day 65: Data Pipeline Security.** You will manage credentials, environment variables, Airflow Connections, IAM roles, secure database access and least privilege.
+
+---
+
+## Visual Learning Diagrams
+
+### Monitoring vs observability
+![Day 64 - Monitoring vs observability](images/day_64_monitoring_observability.svg)
+
+### Pipeline alert flow
+![Day 64 - Pipeline alert flow](images/day_64_pipeline_alert_flow.svg)
+
+### SLA and SLO
+![Day 64 - SLA and SLO](images/day_64_pipeline_slo_sla.svg)
