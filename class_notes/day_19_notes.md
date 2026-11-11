@@ -460,6 +460,8 @@ Ask these questions:
 
 ## 10. What is a key in a database?
 
+![Primary key and foreign key](images/day_19_primary_foreign_keys.svg)
+
 A **key** is one or more columns used to identify records or establish relationships.
 
 Keys help answer two important questions:
@@ -669,6 +671,8 @@ A surrogate key can provide a stable internal identifier even when customer attr
 ---
 
 ## 14. Relationships between tables
+
+![Database relationship types](images/day_19_database_relationships.svg)
 
 Relational databases connect tables through relationships.
 
@@ -929,6 +933,8 @@ A database design should represent the business entities and rules, not just one
 ---
 
 ## 18. Read a simple Entity Relationship Diagram (ERD)
+
+![Relational database ERD](images/day_19_relational_database_erd.svg)
 
 An **Entity Relationship Diagram (ERD)** is a visual representation of entities, their attributes and their relationships.
 
