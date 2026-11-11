@@ -11,7 +11,7 @@ The course is being rebuilt phase by phase to one consistent beginner-first teac
 | Phase 1 — Data Engineering Foundations | 1–5 | Complete | 5/5 days rebuilt and verified |
 | Phase 2 — Python for Data Engineering | 6–18 | Complete | 13/13 days rebuilt and verified |
 | Phase 3 — SQL and Database Engineering | 19–29 | Rebuilt; final technical review | 9/11 days rebuilt and verified; Days 19–20 retained for cross-check |
-| Phase 4 — Data Processing and Pipelines | 30–39 | **Rebuild required** | Existing drafts are not student-ready; re-authoring from teaching standard |
+| Phase 4 — Data Processing and Pipelines | 30–39 | Rebuilt draft; execution review pending | Days 30–39 have class notes, project workbooks and interview guides; verify examples in the learner environment before classroom-verified status |
 | Phase 5 — Data Warehousing and Modeling | 40–49 | Authored; runtime validation pending | 10/10 lesson sets prepared |
 | Phase 6 — Cloud and Distributed Processing | 50–59 | Authored; runtime validation pending | 10/10 lesson sets prepared |
 | Phase 7 — Orchestration, Quality and Monitoring | 60–67 | Authored; runtime validation pending | 8/8 lesson sets prepared |
@@ -151,13 +151,13 @@ The course is being rebuilt phase by phase to one consistent beginner-first teac
 | 32 | API-Based Data Ingestion | API Ingestion Pipeline | [Notes](day_32_notes.md) | [Interview](day_32_interview.md) |
 | 33 | Database Ingestion | Database Extractor | [Notes](day_33_notes.md) | [Interview](day_33_interview.md) |
 | 34 | Data Transformation and Business Rules | Transformation Pipeline | [Notes](day_34_notes.md) | [Interview](day_34_interview.md) |
-| 35 | Data Cleaning and Schema Evolution | Data Cleaning Framework | [Notes](day_35_notes.md) | [Interview](day_35_interview.md) |
-| 36 | Batch Processing and Partitioning | Partitioned Batch Processor | [Notes](day_36_notes.md) | [Interview](day_36_interview.md) |
-| 37 | Incremental Loading and Upserts | Incremental Data Loader | [Notes](day_37_notes.md) | [Interview](day_37_interview.md) |
-| 38 | Pipeline Reliability and Failure Handling | Reliable Pipeline Simulator | [Notes](day_38_notes.md) | [Interview](day_38_interview.md) |
-| 39 | Pipeline Logging and Observability | Pipeline Observability Tool | [Notes](day_39_notes.md) | [Interview](day_39_interview.md) |
+| 35 | Data Cleaning and Schema Evolution | Data Cleaning Framework | [Notes](day_35_notes.md) | [Project Workbook](day_35_project_workbook.md) | [Interview](day_35_interview.md) |
+| 36 | Batch Processing and Partitioning | Partitioned Batch Processor | [Notes](day_36_notes.md) | [Project Workbook](day_36_project_workbook.md) | [Interview](day_36_interview.md) |
+| 37 | Incremental Loading and Upserts | Incremental Data Loader | [Notes](day_37_notes.md) | [Project Workbook](day_37_project_workbook.md) | [Interview](day_37_interview.md) |
+| 38 | Pipeline Reliability and Failure Handling | Reliable Pipeline Simulator | [Notes](day_38_notes.md) | [Project Workbook](day_38_project_workbook.md) | [Interview](day_38_interview.md) |
+| 39 | Pipeline Logging and Observability | Pipeline Observability Tool | [Notes](day_39_notes.md) | [Project Workbook](day_39_project_workbook.md) | [Interview](day_39_interview.md) |
 
-**Phase 4 content status:** Days 32–39 class notes and interview guides included. Each lesson includes a beginner explanation, sample code/output, progressive workflow, common mistakes, debugging, project acceptance checks, exercises and production context. Interview guides contain model answers, scenarios and project defence. Execute examples in the course environment before labelling them runtime-tested.
+**Phase 4 content status:** Days 30–39 include class notes, separate project workbooks and interview guides. Days 35–39 project workbooks have been expanded with setup, fixtures, runnable steps, expected results, explanations, failure drills, troubleshooting and acceptance checklists. Runtime validation in the supported TechPhile environment remains pending.
 
 ---
 
