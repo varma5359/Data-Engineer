@@ -91,6 +91,8 @@ True
 
 ## 4. Understand file paths
 
+![Basic file operations flow](images/day_08_file_operations_flow.svg)
+
 ### 4.1 Current working directory
 
 ```python
