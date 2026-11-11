@@ -152,6 +152,8 @@ Common examples:
 
 ## 4. What is a pipeline lifecycle?
 
+![Data pipeline lifecycle](images/day_05_data_pipeline_lifecycle.svg)
+
 A lifecycle is the sequence of stages through which a pipeline is planned, built, released and operated.
 
 A Data Engineer should not begin by immediately writing code. First, the engineer must understand the business requirement.
