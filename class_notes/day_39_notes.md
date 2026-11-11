@@ -1073,3 +1073,16 @@ The Phase 4 learning sequence now covers:
 This list describes the course sequence, not a claim that every file has been runtime-tested.
 
 **End of Day 39 class notes.**
+
+---
+
+## Visual Learning Diagrams
+
+### Logging severity levels
+![Day 39 - Logging severity levels](images/day_39_logging_levels.svg)
+
+### Logs, metrics and alerts
+![Day 39 - Logs, metrics and alerts](images/day_39_run_metrics_observability.svg)
+
+### Quarantine and replay
+![Day 39 - Quarantine and replay](images/day_39_dead_letter_quarantine.svg)
