@@ -36,6 +36,8 @@ SQL remains essential for querying and transforming relational data. Python and 
 
 ## 3. Understand the development environment
 
+![How a Python program runs](images/day_06_python_execution_environment.svg)
+
 | Term | Simple meaning | Example |
 |---|---|---|
 | Python interpreter | Program that executes Python instructions | CPython |
