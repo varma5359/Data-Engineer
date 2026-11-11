@@ -194,3 +194,11 @@ The course is being rebuilt phase by phase to one consistent beginner-first teac
 - [Day 33 Interview Guide](day_33_interview.md) — full model answers, limitations and project defence.
 
 **Status:** Rebuilt under independent-learning standard. Execute with TechStore schema and verify driver/cursor behavior in the learner environment.
+
+## Day 34 — Data Transformation and Business Rules (rebuild artifacts)
+
+- [Day 34 Class Notebook](day_34_notes.md) — 547 lines; raw/curated, profiling, parsing, Decimal, mapping, derived values, cross-field rules and reconciliation.
+- [Day 34 Project Workbook](day_34_project_workbook.md) — guided transformation fixture, expected outputs, accepted/rejected data and validation.
+- [Day 34 Interview Guide](day_34_interview.md) — complete model answers and project defence.
+
+**Status:** Rebuilt under independent-learning standard. Confirm all business rules with the dataset/owner; examples are explicitly teaching rules.
