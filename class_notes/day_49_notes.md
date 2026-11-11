@@ -1512,3 +1512,16 @@ Without looking at the notes, explain:
 If you can answer these questions and perform a basic before-and-after investigation, you have completed the Phase 5 performance fundamentals.
 
 **Phase 5 completion:** You have studied warehouse architecture, dimensional modeling, SCD history, key management, data marts, data quality, reconciliation, metadata, loading strategies and performance fundamentals. The next phase begins with cloud data engineering fundamentals.
+
+---
+
+## Visual Learning Diagrams
+
+### Warehouse access control
+![Day 49 - Warehouse access control](images/day_49_warehouse_security.svg)
+
+### Protect sensitive data
+![Day 49 - Protect sensitive data](images/day_49_pii_protection.svg)
+
+### Data lineage
+![Day 49 - Data lineage](images/day_49_data_lineage.svg)
