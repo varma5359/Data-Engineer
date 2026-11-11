@@ -1026,3 +1026,723 @@ Does the local Day 59 exercise prove S3 integration?
 **Phase 6 complete:** You have moved from cloud fundamentals to object storage, managed databases, distributed computing, Spark processing and end-to-end pipeline design.
 
 **Next phase — Phase 7: Orchestration, Quality and Monitoring (Days 60–67).** You will learn how to schedule, coordinate, monitor and secure production data pipelines using workflow orchestration and operational practices.
+
+
+---
+
+# Part 26 — Define the batch contract before implementation
+
+A reliable pipeline starts with an agreed input and output contract. It should not begin by opening Spark and guessing what the columns mean.
+
+## 58. Write the business requirement
+
+TechStore needs a daily sales summary by order date.
+
+The output must:
+- include records that pass the agreed validity rules;
+- use the approved sales amount;
+- be ready by 07:00;
+- preserve the original source delivery;
+- identify rejected records;
+- support safe reruns;
+- publish only after validation.
+
+For this teaching scenario, all valid order statuses are included in the daily amount. A real business may require PAID-only sales or another approved metric. Confirm that definition with the business owner.
+
+## 59. Define the source contract
+
+| Contract item | Training definition |
+|---|---|
+| Dataset | Orders |
+| Grain | One row per order |
+| Required fields | order_id, customer_id, order_date, amount, status |
+| order_id | Unique, required identifier |
+| customer_id | Required customer reference |
+| order_date | Business order date |
+| amount | Decimal amount in INR |
+| Delivery | One complete file per daily batch |
+| Duplicate delivery | Same batch ID must not be loaded twice |
+| Invalid row | Quarantine with reason |
+| Owner | Order application team |
+
+The contract is illustrative. Confirm real source semantics with the business and source owners.
+
+## 60. Define the output contract
+
+| Property | Training definition |
+|---|---|
+| Dataset | Daily sales summary |
+| Grain | One row per order_date |
+| Columns | order_date, order_count, total_sales |
+| Date role | Order date |
+| Currency | INR |
+| Refresh | Daily |
+| Quality | No null date, totals reconcile |
+| Consumer | Reporting team |
+
+A clear grain prevents a consumer from interpreting one row as one order when it represents one day.
+
+## 61. Separate batch ID and run ID
+
+- Batch ID identifies a source delivery or logical input interval.
+- Run ID identifies a particular pipeline execution.
+- Attempt number identifies a retry or repeated attempt.
+
+Example:
+
+~~~text
+batch_id = orders_20261111
+run_id = orders_daily_20261111_run_001
+attempt = 2
+~~~
+
+A retry should remain traceable to the original source batch. Do not invent a new source batch identity just because a compute task restarted.
+
+---
+
+# Part 27 — Define the run lifecycle and run ledger
+
+## 62. Use explicit pipeline states
+
+A run may move through these states:
+
+| State | Meaning |
+|---|---|
+| RECEIVED | Source delivery detected |
+| LANDED | Original data stored in raw |
+| VALIDATING | Structural and content checks running |
+| VALIDATED | Required checks passed |
+| PROCESSING | Spark transformation running |
+| OUTPUT_WRITTEN | Temporary output created |
+| RECONCILED | Counts and totals passed |
+| PUBLISHED | Approved output made visible |
+| SUCCESS | Run completed |
+| FAILED | Run stopped and requires investigation |
+
+A real implementation may use different state names. The important point is that state transitions and success criteria are explicit.
+
+## 63. Why distinguish output written from output published?
+
+A file may exist in a temporary output folder even though validation has not passed.
+
+If downstream users can read that folder, they may consume incomplete or incorrect data.
+
+Use a controlled publish boundary. The publication mechanism must match the storage and table technology.
+
+## 64. Example run ledger table
+
+~~~sql
+CREATE TABLE pipeline_run_ledger (
+    run_id VARCHAR(100) PRIMARY KEY,
+    batch_id VARCHAR(100) NOT NULL,
+    pipeline_name VARCHAR(100) NOT NULL,
+    status VARCHAR(30) NOT NULL,
+    input_rows BIGINT,
+    accepted_rows BIGINT,
+    rejected_rows BIGINT,
+    output_location TEXT,
+    started_at TIMESTAMP,
+    completed_at TIMESTAMP,
+    error_summary TEXT
+);
+~~~
+
+This is a teaching schema. Production designs may add attempt number, source watermark, code version, schema version, checksums and owner details.
+
+Do not store credentials or sensitive row contents in the ledger.
+
+## 65. What should a run ledger help answer?
+
+- Which batch was processed?
+- Which execution handled it?
+- Did validation pass?
+- How many records were accepted?
+- How many were rejected?
+- Where was output written?
+- Was the output published?
+- When did the run finish?
+- What was the safe failure summary?
+
+A run ledger is operational metadata. It is not a replacement for source data or a complete audit system.
+
+## 66. Example state transition rules
+
+A run should not move directly from RECEIVED to SUCCESS.
+
+A possible sequence is:
+
+~~~text
+RECEIVED
+   |
+   v
+LANDED
+   |
+   v
+VALIDATING
+   |
+   v
+VALIDATED
+   |
+   v
+PROCESSING
+   |
+   v
+OUTPUT_WRITTEN
+   |
+   v
+RECONCILED
+   |
+   v
+PUBLISHED
+   |
+   v
+SUCCESS
+~~~
+
+If validation fails, mark the run FAILED or REJECTED according to the operating model. Do not continue publishing merely because Spark can still process the file.
+
+---
+
+# Part 28 — Improve the local pipeline with a manifest and rejection reasons
+
+The earlier Day 59 lab saved raw, processed and curated output. This section adds traceability so an engineer can answer which file was used and why a record was rejected.
+
+## 67. What is a manifest?
+
+A manifest is a small record describing a batch or its files.
+
+It may include:
+- batch ID;
+- source name;
+- file name or object key;
+- file size;
+- checksum;
+- expected record count;
+- ingestion timestamp;
+- schema version.
+
+A manifest is useful when one batch contains multiple files.
+
+## 68. Example manifest
+
+~~~text
+batch_id: orders_20261111
+source_name: order_application
+file_name: orders.csv
+expected_format: CSV
+expected_columns: order_id, customer_id, order_date, amount, status
+schema_version: 1
+expected_rows: 5
+~~~
+
+The values are training examples. In a real pipeline, manifest values must come from the source contract or actual delivery metadata.
+
+## 69. Add a rejection reason to invalid records
+
+Assume the DataFrame typed_orders and the validity conditions from the previous lab already exist.
+
+~~~python
+from pyspark.sql.functions import when, col
+
+orders_with_reason = typed_orders.withColumn(
+    "rejection_reason",
+    when(col("order_id").isNull(), "MISSING_ORDER_ID")
+    .when(col("customer_id").isNull(), "MISSING_CUSTOMER_ID")
+    .when(col("order_date").isNull(), "INVALID_ORDER_DATE")
+    .when(col("amount").isNull(), "INVALID_AMOUNT")
+    .when(col("amount") < 0, "NEGATIVE_AMOUNT")
+    .when(col("status").isNull(), "MISSING_STATUS")
+    .otherwise(None)
+)
+
+orders_with_reason.select(
+    "order_id",
+    "amount",
+    "rejection_reason"
+).show()
+~~~
+
+For the supplied training file, order 105 should have rejection reason NEGATIVE_AMOUNT. Valid rows should have a null rejection_reason.
+
+The order of the when conditions matters: the first matching condition is returned. A production rule set may record multiple failed checks rather than only the first one.
+
+## 70. Split accepted and rejected rows with reason
+
+~~~python
+accepted_with_reason = orders_with_reason.filter(
+    col("rejection_reason").isNull()
+)
+
+rejected_with_reason = orders_with_reason.filter(
+    col("rejection_reason").isNotNull()
+)
+
+print("Accepted:", accepted_with_reason.count())
+print("Rejected:", rejected_with_reason.count())
+~~~
+
+Expected counts: four accepted and one rejected.
+
+## 71. Save rejection evidence
+
+~~~python
+rejected_with_reason.write.mode("overwrite").parquet(
+    "quarantine/orders_with_reasons"
+)
+
+rejected_with_reason.select(
+    "order_id",
+    "amount",
+    "rejection_reason"
+).show()
+~~~
+
+Expected rejected record:
+
+| order_id | amount | rejection_reason |
+|---:|---:|---|
+| 105 | -50.00 | NEGATIVE_AMOUNT |
+
+Do not log sensitive row contents unnecessarily. Store the minimum evidence required by the approved data governance policy.
+
+---
+
+# Part 29 — Make batch publishing safer
+
+## 72. Temporary output is not automatically atomic
+
+Writing files to a temporary path prevents consumers from reading the candidate output if they are configured to read only the curated location.
+
+However, copying multiple files into a consumer-visible folder can still expose partial state depending on the storage and publication design.
+
+A plain folder copy is not a universal atomic transaction.
+
+## 73. Common publication patterns
+
+Depending on the platform, teams may use:
+- immutable run-specific output paths;
+- a manifest that points to the completed version;
+- a table format with transactional commits;
+- a catalog/table metadata update;
+- a controlled partition replacement;
+- a pointer or metadata record switched after validation.
+
+Choose a method supported by the actual storage and table technology.
+
+## 74. Example immutable output design
+
+~~~text
+curated/daily_sales/
+    run_id=run_001/
+        part-000.parquet
+        manifest.json
+    run_id=run_002/
+        part-000.parquet
+        manifest.json
+~~~
+
+A separate approved metadata record can identify which run is current.
+
+This avoids overwriting the previous result while the new one is being prepared.
+
+## 75. Publication checklist
+
+Before making a run visible:
+1. all expected tasks completed;
+2. all output files are present;
+3. output schema is correct;
+4. accepted/rejected accounting passes;
+5. business totals reconcile;
+6. output freshness is correct;
+7. manifest or commit metadata is complete;
+8. the previous valid output can be recovered if required;
+9. the publish operation is recorded;
+10. the run ledger is updated.
+
+---
+
+# Part 30 — Understand Kafka consumer behavior more deeply
+
+## 76. Event record anatomy
+
+A Kafka record commonly includes:
+- topic;
+- partition;
+- offset;
+- key;
+- value;
+- timestamp;
+- headers, where used.
+
+The key can help determine partition placement. The value contains the event payload.
+
+Example conceptual record:
+
+~~~text
+topic: orders
+key: order_id=1001
+value: {"order_id":1001,"status":"CREATED"}
+partition: 2
+offset: 18450
+~~~
+
+This is an illustrative record, not a real Kafka message.
+
+## 77. Why use a message key?
+
+Suppose events for order 1001 are:
+- CREATED;
+- PAID;
+- SHIPPED.
+
+If the producer consistently uses order_id as the key and the partitioning configuration is stable, these events can be routed to the same partition.
+
+Kafka preserves ordering within a partition. This can help consumers process the order's events in sequence.
+
+Do not assume ordering across partitions.
+
+## 78. Understand a consumer group
+
+Imagine a topic has four partitions.
+
+A consumer group has two consumers. Kafka can assign two partitions to each consumer under an appropriate assignment.
+
+If the group has six consumers, only four can receive one partition each for that topic at a time. The remaining consumers may be idle for that topic.
+
+Actual assignment and rebalancing behavior depends on the group protocol and configuration.
+
+## 79. What is a rebalance?
+
+A rebalance occurs when partition assignments are redistributed among consumers in a group.
+
+It may happen when:
+- a consumer joins;
+- a consumer leaves;
+- a consumer fails;
+- topic partition count changes;
+- group membership or assignment changes.
+
+Rebalances can temporarily affect consumption progress. Frequent rebalances can reduce throughput.
+
+## 80. Understand offset commit timing
+
+A consumer processes records and periodically commits its progress.
+
+If offsets are committed before the sink write is durable, a failure can cause records to be skipped.
+
+If the sink write completes but the offset is not committed, a retry can process the same records again.
+
+This is why sink idempotency and offset coordination matter.
+
+## 81. A safe conceptual processing sequence
+
+~~~text
+Read event batch
+      |
+      v
+Validate and transform
+      |
+      v
+Write to sink safely
+      |
+      v
+Confirm sink result
+      |
+      v
+Commit progress/offset
+~~~
+
+The actual guarantees depend on the consumer API, processing engine, checkpointing and sink transaction behavior. Do not assume this diagram alone creates exactly-once processing.
+
+---
+
+# Part 31 — Event time, late data and windows
+
+## 82. Event time
+
+Event time is when the event occurred in the business system.
+
+## 83. Processing time
+
+Processing time is when the processing application handles the event.
+
+Example:
+- event occurred at 10:00;
+- network delivered it at 10:04;
+- Spark processed it at 10:05.
+
+The event time is 10:00; processing time is 10:05.
+
+## 84. What is a late event?
+
+A late event arrives after the processing system has already processed a later time period.
+
+Example:
+A payment event for 10:00 arrives at 10:20.
+
+If the dashboard already published the 10:00–10:05 window, the late event may require an update to that window.
+
+## 85. What is a time window?
+
+A window groups events by a time interval.
+
+Examples:
+- five-minute order count;
+- hourly payment total;
+- daily delivery count.
+
+A streaming system needs a policy for:
+- window start and end;
+- event-time field;
+- allowed lateness;
+- state retention;
+- late-event handling;
+- correction or retraction behavior.
+
+## 86. Why event-time policy is a business decision
+
+A real-time dashboard may accept a small correction delay. A financial report may require a controlled reconciliation and finalization period.
+
+Do not assume every event should be discarded as soon as its window closes. Confirm the business's late-arrival and correction requirements.
+
+---
+
+# Part 32 — Compare batch and streaming through scenarios
+
+| Scenario | Likely starting design | Reason |
+|---|---|---|
+| Daily finance report | Batch | Bounded daily output |
+| Website click dashboard updated every few seconds | Streaming or micro-batch | Low latency requirement |
+| Monthly customer file | Batch | Periodic file delivery |
+| Fraud signal within seconds | Streaming | Time-sensitive response |
+| Reprocess two years of history | Batch/backfill | Bounded historical range |
+| IoT sensor alert | Streaming | Continuous event arrival |
+
+The word "real-time" should be translated into a measurable latency requirement. Seconds, minutes and next-day delivery are different engineering problems.
+
+---
+
+# Part 33 — Failure scenarios across the integrated pipeline
+
+## 87. Source file arrives late
+
+Response:
+1. keep the prior curated output available;
+2. mark the expected batch as delayed;
+3. alert the source owner;
+4. do not fabricate an empty successful batch;
+5. process when the complete source arrives;
+6. record actual freshness.
+
+## 88. Spark task fails
+
+Response:
+1. inspect failed stage and task;
+2. check executor and input errors;
+3. determine whether task retry is safe;
+4. preserve batch identity;
+5. retry according to policy;
+6. validate output after completion.
+
+## 89. S3 write fails
+
+Response:
+1. inspect the exact destination key;
+2. check identity and object-write permissions;
+3. check KMS permission if applicable;
+4. check network and service response;
+5. identify partial or incomplete output;
+6. retry safely and verify object metadata.
+
+## 90. Database source is unavailable
+
+Response:
+1. confirm whether the raw extract already exists;
+2. avoid repeatedly overwhelming the database with retries;
+3. alert the database owner;
+4. resume from a safe extraction boundary;
+5. validate the batch when the source becomes available.
+
+## 91. Kafka consumer lag grows
+
+Response:
+1. identify affected topic and partitions;
+2. compare producer rate and consumer throughput;
+3. inspect slow processing and sink latency;
+4. inspect errors and retries;
+5. check partition and consumer capacity;
+6. scale or optimize only after finding the bottleneck.
+
+---
+
+# Part 34 — Phase 6 integration review
+
+## 92. Explain the complete platform
+
+~~~text
+Business sources
+      |
+      v
+Ingestion and batch identity
+      |
+      v
+Raw object storage
+      |
+      v
+Spark validation and processing
+      |
+      v
+Processed data
+      |
+      v
+Reconciliation and quality gate
+      |
+      v
+Curated output publication
+      |
+      v
+Warehouse / BI consumers
+~~~
+
+Cross-cutting controls:
+- IAM and least privilege;
+- encryption and secrets;
+- run ledger and checkpoints;
+- logging, metrics and alerts;
+- cost and retention;
+- ownership and support.
+
+A streaming path may begin with Kafka instead of a bounded file delivery, but it still needs schema, quality, state, sink, monitoring and recovery design.
+
+## 93. Explain the engineering trade-offs
+
+A junior Data Engineer should be able to explain:
+- why the team chose batch or streaming;
+- why raw data is retained;
+- why Spark is appropriate for the data volume;
+- how joins are validated;
+- how output is published safely;
+- how a retry avoids duplicate effects;
+- how access is restricted;
+- how freshness and cost are monitored.
+
+Tool names alone do not demonstrate engineering understanding.
+
+---
+
+# Part 35 — Additional practice exercises with worked answers
+
+## Exercise 11 — Source contract
+
+The source adds a new optional column called sales_channel. What should the pipeline owner do?
+
+**Worked answer:** Review the schema contract, determine whether the field is optional, test old and new file versions, update mapping and documentation, and check downstream consumers.
+
+## Exercise 12 — Run ID
+
+A Spark executor retries one failed task within the same job. Should the source batch ID change?
+
+**Worked answer:** No. It is still the same source batch. Task retry metadata may change, but batch identity should remain stable.
+
+## Exercise 13 — Publish boundary
+
+A job wrote all output files but the reconciliation check failed. Should the output be published?
+
+**Worked answer:** No. Keep the candidate output isolated, investigate the mismatch and publish only after the required quality gate passes or an approved exception is recorded.
+
+## Exercise 14 — Consumer offset
+
+A consumer writes an event to a database and crashes before committing its offset. What can happen?
+
+**Worked answer:** The event may be read again. The sink should support idempotency or deduplication so a retry does not create a duplicate business effect.
+
+## Exercise 15 — Event key
+
+A consumer needs order events to be processed in order. What key can help?
+
+**Worked answer:** Use order_id as the Kafka message key so related events are consistently routed to a partition, subject to producer partitioning configuration.
+
+## Exercise 16 — Late event
+
+A payment event arrives after its five-minute dashboard window was published. What should be defined?
+
+**Worked answer:** A late-event policy: allowed lateness, whether the window is updated, whether a correction is emitted, and when the result is finalized.
+
+## Exercise 17 — Batch versus streaming
+
+A company needs a daily report by 07:00. Is streaming automatically the better design?
+
+**Worked answer:** No. A scheduled batch pipeline may meet the freshness requirement with less complexity and lower operational overhead.
+
+## Exercise 18 — Local integration
+
+The local Spark pipeline completes and its totals match. Can the team claim the cloud pipeline is production-ready?
+
+**Worked answer:** No. Cloud identity, network, S3 connector, managed database access, deployment, monitoring, cost, recovery and production-scale testing remain.
+
+---
+
+# Part 36 — Day 59 practical completion checklist
+
+### Architecture and contracts
+- [ ] Draw source-to-raw-to-processed-to-curated flow.
+- [ ] Explain each component's responsibility.
+- [ ] Define source and output contracts.
+- [ ] Distinguish batch ID, run ID and attempt.
+- [ ] Explain run states and ledger metadata.
+- [ ] Explain why temporary output is separate from published output.
+
+### Batch pipeline
+- [ ] Read source data with Spark.
+- [ ] Preserve original input.
+- [ ] Validate schema and business values.
+- [ ] Add rejection reasons and quarantine invalid records.
+- [ ] Create curated aggregates.
+- [ ] Reconcile accepted and rejected counts.
+- [ ] Reconcile monetary totals.
+- [ ] Write temporary output and publish after validation.
+- [ ] Read output back and verify it.
+- [ ] Explain safe rerun and backfill behavior.
+
+### Streaming and Kafka
+- [ ] Compare batch, micro-batch and streaming.
+- [ ] Explain broker, topic, partition and record.
+- [ ] Explain producer and consumer.
+- [ ] Explain consumer group and offset.
+- [ ] Explain partition ordering and message keys.
+- [ ] Explain consumer lag and rebalancing.
+- [ ] Explain event time, processing time and late events.
+- [ ] Compare at-most-once, at-least-once and exactly-once at a high level.
+- [ ] Explain why external sinks need idempotency.
+
+### Operations and engineering
+- [ ] Explain S3/Spark/warehouse integration requirements.
+- [ ] Explain security and least privilege across components.
+- [ ] Identify monitoring signals for ingestion, Spark, quality and Kafka.
+- [ ] Define ownership and escalation.
+- [ ] Explain recovery from source, Spark, S3 and consumer failures.
+- [ ] Explain cost and retention controls.
+- [ ] Distinguish local simulation from real cloud integration.
+
+## Final self-assessment
+
+Without looking at the notes, explain:
+
+1. How do S3, Spark and a warehouse fit together?
+2. Why should raw data be preserved?
+3. What is the difference between a batch ID and a run ID?
+4. Why should output be written temporarily before publication?
+5. How do you prove accepted and rejected records account for the source?
+6. Why is idempotency required for safe retries?
+7. When is batch processing better than streaming?
+8. What are Kafka topics, partitions, message keys and offsets?
+9. Why can consumer lag increase?
+10. What is the difference between event time and processing time?
+11. Why does a local Spark lab not prove cloud integration?
+12. Which security, monitoring and recovery controls must be present?
+
+If you can explain the architecture and complete the local pipeline simulation, you have completed the Phase 6 learning outcomes.
+
+**Phase 6 complete:** Cloud fundamentals, object storage, S3, managed databases, distributed computing, Spark DataFrames, transformations, joins, partitioning, performance and pipeline integration.
+
+**Next phase — Phase 7: Orchestration, Quality and Monitoring (Days 60–67).** Day 60 begins with workflow orchestration fundamentals: why scheduling alone is not enough, what a DAG is, how task dependencies work and where Apache Airflow fits.
