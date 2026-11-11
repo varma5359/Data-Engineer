@@ -785,3 +785,840 @@ Why might a read replica return older data?
 - [ ] Troubleshoot timeout, authentication and permission errors.
 
 **Next lesson — Day 54: Distributed Computing.** You will learn why one machine is sometimes not enough, how parallel work is divided, what partitions and workers mean, and what trade-offs distributed systems introduce.
+
+
+---
+
+# Part 12 — Understand the connection before writing Python
+
+A common beginner mistake is to debug Python before checking whether the database can be reached.
+
+~~~text
+Python program
+    -> Read connection configuration
+    -> Resolve endpoint hostname
+    -> Reach host and port through the network
+    -> Complete TLS negotiation if required
+    -> Authenticate database user
+    -> Check SQL permissions
+    -> Execute query
+~~~
+
+## 42. Separate the connection layers
+
+| Layer | Question | Example failure |
+|---|---|---|
+| Configuration | Did Python read the right host and port? | Empty DB_HOST |
+| DNS | Can endpoint name be resolved? | Hostname not found |
+| Network | Can traffic reach the endpoint and port? | Timeout |
+| TLS | Can the client establish trusted encryption? | Certificate verification failure |
+| Authentication | Is the database identity valid? | Password authentication failed |
+| Authorization | Can this user run this SQL? | Permission denied for table |
+
+**Checkpoint:** Python reports permission denied for table orders. Did DNS and network connectivity probably work?
+
+**Answer:** Yes. The client reached the database and authenticated sufficiently to receive a table-permission error. Investigate database grants, not the VPC route first.
+
+---
+
+# Part 13 — Inspect the cloud database design before connecting
+
+## 43. What should the database owner provide?
+
+| Required detail | Who/where confirms it |
+|---|---|
+| Cloud account/environment | Cloud platform owner |
+| Database engine and version | Database owner |
+| Endpoint | Managed database configuration |
+| Port | Database configuration |
+| Database name | Database owner |
+| Username or workload identity | Database/security owner |
+| Secret retrieval method | Security/platform team |
+| Network source | Pipeline/platform owner |
+| TLS certificate requirements | Security/database owner |
+| Required schema/table access | Data owner/database owner |
+
+Do not guess an endpoint or copy a production hostname from an unrelated environment.
+
+## 44. Read an example connection record
+
+~~~text
+Environment: development
+Engine: PostgreSQL
+Endpoint: dev-orders.example.internal
+Port: 5432
+Database: orders
+User: pipeline_reader
+Network: approved private route
+TLS: certificate verification required
+Access: SELECT on approved extraction schema
+~~~
+
+All values are illustrative. They are not real credentials or a real endpoint.
+
+## 45. Endpoint versus database name
+
+Imagine one managed PostgreSQL server hosts two databases:
+
+~~~text
+Endpoint: db-dev.example.internal
+Port: 5432
+
+Databases:
+    orders
+    reporting
+~~~
+
+The endpoint and port identify where the database service listens. The database name selects the logical database after the client reaches that service.
+
+Connecting to the correct endpoint but the wrong database can produce a successful network connection and missing-table errors.
+
+---
+
+# Part 14 — Test DNS and network access before Python
+
+These tests are useful when an organization has provided an approved endpoint. They do not require printing or sharing a password.
+
+## 46. Check the hostname
+
+In Windows CMD:
+
+~~~bat
+nslookup dev-orders.example.internal
+~~~
+
+The example hostname is a placeholder.
+
+The command asks DNS to resolve the name. If it cannot be resolved, check:
+- spelling;
+- VPN or private DNS connection;
+- DNS resolver configuration;
+- whether the endpoint is private and only resolvable inside the approved network.
+
+A private endpoint may not resolve from a home network without the organization's VPN or private connectivity.
+
+## 47. Check the TCP port
+
+Open PowerShell:
+
+~~~powershell
+Test-NetConnection dev-orders.example.internal -Port 5432
+~~~
+
+Inspect the TcpTestSucceeded field.
+
+- True means a TCP connection to that host and port succeeded from this machine.
+- False means the connection test did not succeed.
+
+This does not prove database authentication or SQL permissions. It only tests TCP connectivity.
+
+## 48. Interpret network test outcomes
+
+| Result | What it suggests | Next check |
+|---|---|---|
+| DNS name not found | Hostname cannot be resolved | Endpoint spelling, VPN, DNS |
+| TCP test succeeds | Network path accepts the connection | Continue to TLS and authentication |
+| TCP timeout | Traffic may be blocked or route unavailable | VPN, route, security group, firewall |
+| Connection refused | Host reachable but service may not listen | Database state and configured port |
+
+Do not change a password to solve a DNS failure.
+
+## 49. Why a laptop may not reach a private RDS endpoint
+
+A database can be private inside a VPC. Your laptop may be outside that network.
+
+Approved connection paths may include:
+- corporate VPN;
+- managed development environment inside the VPC;
+- controlled bastion/access host;
+- private connectivity approved by the organization.
+
+Do not make the database public simply to make a classroom connection test easier.
+
+---
+
+# Part 15 — Create a local PostgreSQL practice environment
+
+If you do not have an approved cloud database, practice the Python driver and SQL workflow against local PostgreSQL.
+
+This teaches client/database interaction. It does not teach cloud networking, RDS failover or cloud security groups.
+
+## 50. Confirm PostgreSQL is available
+
+Open CMD:
+
+~~~bat
+psql --version
+~~~
+
+If Windows reports that psql is not recognized, PostgreSQL command-line tools may not be installed or their folder may not be in PATH.
+
+## 51. Create a training database
+
+In your local PostgreSQL SQL editor, run:
+
+~~~sql
+CREATE DATABASE techstore_cloud_practice;
+~~~
+
+Expected result:
+
+~~~text
+CREATE DATABASE
+~~~
+
+This is local practice, not an AWS resource.
+
+If the database already exists, use it rather than deleting it.
+
+## 52. Connect to the training database
+
+General psql pattern:
+
+~~~bat
+psql -h localhost -p 5432 -U postgres -d techstore_cloud_practice
+~~~
+
+The command may prompt for your local database user's password. Use the password configured on your own machine. Do not share it.
+
+## 53. Create a small orders table
+
+Run inside the techstore_cloud_practice database:
+
+~~~sql
+CREATE TABLE orders (
+    order_id INTEGER PRIMARY KEY,
+    customer_id VARCHAR(20) NOT NULL,
+    order_date DATE NOT NULL,
+    amount NUMERIC(12, 2) NOT NULL,
+    status VARCHAR(20) NOT NULL
+);
+~~~
+
+Expected result:
+
+~~~text
+CREATE TABLE
+~~~
+
+Understand the definition:
+- CREATE TABLE creates a database table.
+- order_id INTEGER stores a whole-number identifier.
+- PRIMARY KEY makes the key unique and not NULL.
+- VARCHAR(20) stores short text.
+- NOT NULL requires a value.
+- DATE stores a calendar date.
+- NUMERIC(12, 2) stores a decimal value with two fractional digits.
+
+## 54. Insert sample rows
+
+~~~sql
+INSERT INTO orders VALUES
+(501, 'C001', DATE '2026-11-10', 250.00, 'PAID'),
+(502, 'C002', DATE '2026-11-10', 499.00, 'PAID'),
+(503, 'C001', DATE '2026-11-11', 100.00, 'PENDING');
+~~~
+
+Expected result:
+
+~~~text
+INSERT 0 3
+~~~
+
+These are synthetic training records.
+
+## 55. Check the data
+
+~~~sql
+SELECT *
+FROM orders
+ORDER BY order_id;
+~~~
+
+Expected result:
+
+| order_id | customer_id | order_date | amount | status |
+|---:|---|---|---:|---|
+| 501 | C001 | 2026-11-10 | 250.00 | PAID |
+| 502 | C002 | 2026-11-10 | 499.00 | PAID |
+| 503 | C001 | 2026-11-11 | 100.00 | PENDING |
+
+If the result differs, inspect the database name and SQL statements you executed.
+
+---
+
+# Part 16 — Connect Python to local PostgreSQL
+
+The following cells use local PostgreSQL. Do not substitute a production endpoint.
+
+## 56. Install the driver
+
+In the terminal for the Python environment used by Jupyter:
+
+~~~bat
+python -m pip install "psycopg[binary]"
+~~~
+
+Expected behavior: pip installs the package or reports that it is already installed.
+
+If the notebook reports ModuleNotFoundError, confirm that the terminal and notebook use the same Python environment.
+
+## 57. Set practice configuration in CMD
+
+For a local-only exercise, set these values in CMD:
+
+~~~bat
+set DB_HOST=localhost
+set DB_PORT=5432
+set DB_NAME=techstore_cloud_practice
+set DB_USER=postgres
+set DB_PASSWORD=your-local-postgres-password
+~~~
+
+Replace the final value with your local password. These variables apply to processes launched from that CMD session. An already-running Jupyter process may not inherit variables added afterward.
+
+Do not save a real production password in a public script or notebook.
+
+If you launch Jupyter from this same CMD window after setting the variables, it can inherit them.
+
+## 58. Cell 1 — Confirm configuration without revealing secrets
+
+~~~python
+import os
+
+print("DB_HOST:", os.getenv("DB_HOST"))
+print("DB_PORT:", os.getenv("DB_PORT"))
+print("DB_NAME configured:", bool(os.getenv("DB_NAME")))
+print("DB_USER configured:", bool(os.getenv("DB_USER")))
+print("DB_PASSWORD configured:", bool(os.getenv("DB_PASSWORD")))
+~~~
+
+Expected output for the local configuration:
+
+~~~text
+DB_HOST: localhost
+DB_PORT: 5432
+DB_NAME configured: True
+DB_USER configured: True
+DB_PASSWORD configured: True
+~~~
+
+The password is never printed.
+
+## 59. Cell 2 — Open the connection
+
+~~~python
+import os
+import psycopg
+
+connection = psycopg.connect(
+    host=os.environ["DB_HOST"],
+    port=os.environ.get("DB_PORT", "5432"),
+    dbname=os.environ["DB_NAME"],
+    user=os.environ["DB_USER"],
+    password=os.environ["DB_PASSWORD"],
+    connect_timeout=10
+)
+
+print("Connected to the training database")
+~~~
+
+Expected output if PostgreSQL is running and credentials are correct:
+
+~~~text
+Connected to the training database
+~~~
+
+If this fails, read the exact exception. Do not change several settings at once.
+
+## 60. Cell 3 — Read the order count
+
+~~~python
+cursor = connection.cursor()
+
+cursor.execute("SELECT COUNT(*) FROM orders")
+
+result = cursor.fetchone()
+
+print("Order count:", result[0])
+~~~
+
+Expected output:
+
+~~~text
+Order count: 3
+~~~
+
+Explanation:
+- connection.cursor() creates a cursor;
+- execute() sends SQL to PostgreSQL;
+- COUNT(*) counts rows;
+- fetchone() retrieves one result row;
+- result[0] reads its first value.
+
+## 61. Cell 4 — Read selected columns
+
+~~~python
+cursor.execute(
+    "SELECT order_id, amount, status FROM orders ORDER BY order_id"
+)
+
+rows = cursor.fetchall()
+
+for row in rows:
+    print(row)
+~~~
+
+Expected output:
+
+~~~text
+(501, Decimal('250.00'), 'PAID')
+(502, Decimal('499.00'), 'PAID')
+(503, Decimal('100.00'), 'PENDING')
+~~~
+
+The amount is commonly returned as Decimal because the SQL column is NUMERIC. Decimal is useful for financial values.
+
+## 62. Cell 5 — Use a parameterized query
+
+~~~python
+selected_status = "PAID"
+
+cursor.execute(
+    "SELECT order_id, amount FROM orders WHERE status = %s ORDER BY order_id",
+    (selected_status,)
+)
+
+paid_rows = cursor.fetchall()
+
+print(paid_rows)
+~~~
+
+Expected output:
+
+~~~text
+[(501, Decimal('250.00')), (502, Decimal('499.00'))]
+~~~
+
+The %s is a psycopg parameter placeholder. The tuple supplies the value separately.
+
+The comma in (selected_status,) makes a one-item tuple. Without the comma, Python treats parentheses around one value as grouping.
+
+## 63. Cell 6 — Close resources
+
+~~~python
+cursor.close()
+connection.close()
+
+print("Database resources closed")
+~~~
+
+Expected output:
+
+~~~text
+Database resources closed
+~~~
+
+Closing resources matters because database servers have finite connection capacity.
+
+---
+
+# Part 17 — Understand TLS configuration
+
+## 64. Why TLS is needed
+
+TLS protects information while the client communicates with the database.
+
+Depending on organizational policy, a managed database may require encrypted connections and certificate validation.
+
+Encryption without server identity verification may not prove that the client reached the intended server.
+
+## 65. Common PostgreSQL SSL modes
+
+| Mode | General behavior |
+|---|---|
+| disable | Do not use TLS |
+| require | Require encrypted connection |
+| verify-ca | Require encryption and verify certificate chain |
+| verify-full | Also verify that certificate identity matches the host |
+
+Exact behavior can depend on the client and driver. Follow the cloud/database owner's required mode.
+
+For production, use the approved certificate-validation configuration and trusted CA certificate.
+
+## 66. Example psycopg TLS configuration
+
+~~~python
+import os
+import psycopg
+
+connection = psycopg.connect(
+    host=os.environ["DB_HOST"],
+    port=os.environ.get("DB_PORT", "5432"),
+    dbname=os.environ["DB_NAME"],
+    user=os.environ["DB_USER"],
+    password=os.environ["DB_PASSWORD"],
+    sslmode="verify-full",
+    sslrootcert=os.environ["DB_SSL_ROOT_CERT"],
+    connect_timeout=10
+)
+
+print("TLS-verified database connection opened")
+~~~
+
+This requires a valid CA certificate file and a hostname matching the certificate. Obtain the current certificate bundle from the official provider/database documentation or your organization.
+
+Do not disable certificate verification just to make a connection work.
+
+## 67. Inspect TLS from PostgreSQL
+
+~~~sql
+SELECT
+    ssl,
+    version,
+    cipher
+FROM pg_stat_ssl
+WHERE pid = pg_backend_pid();
+~~~
+
+This reports TLS details for the current PostgreSQL backend when the view is available and permissions permit access.
+
+A true SSL value indicates that the current connection uses SSL/TLS. Exact version and cipher depend on the environment.
+
+---
+
+# Part 18 — Understand database privileges
+
+## 68. Connection access is not table access
+
+A user may be allowed to connect to a database but not read every schema or table.
+
+~~~text
+Can reach endpoint
+      |
+      v
+Can connect to database
+      |
+      v
+Can use schema
+      |
+      v
+Can select required table
+~~~
+
+Each step can have separate controls.
+
+## 69. Inspect a table permission
+
+In PostgreSQL:
+
+~~~sql
+SELECT
+    has_table_privilege(
+        current_user,
+        'public.orders',
+        'SELECT'
+    ) AS can_select_orders;
+~~~
+
+Expected result for a user with SELECT permission:
+
+| can_select_orders |
+|---|
+| true |
+
+The result depends on the connected user and grants.
+
+## 70. Read-only pipeline identity
+
+A pipeline that only extracts source data should normally use a read-only database role.
+
+It should not need:
+- table deletion;
+- schema alteration;
+- user administration;
+- superuser privileges;
+- access to unrelated sensitive tables.
+
+Ask the database owner for the minimum required grants.
+
+---
+
+# Part 19 — Connection pooling and extraction design
+
+## 71. Why too many connections are a problem
+
+A database has finite memory and connection capacity.
+
+If a pipeline starts 100 workers and each opens 10 connections, it may attempt 1,000 simultaneous connections. This can overwhelm the database.
+
+## 72. What does a connection pool do?
+
+A connection pool manages a bounded set of reusable connections.
+
+A pipeline requests a connection, uses it and returns it to the pool. This reduces repeated setup and limits concurrency.
+
+Pool size should reflect:
+- database connection limit;
+- other application workloads;
+- query duration;
+- worker count;
+- expected concurrency;
+- available database capacity.
+
+Do not set pool size to an arbitrarily large number.
+
+## 73. Batch extraction
+
+For a small result, fetchall() may be acceptable.
+
+For a large source table, consider:
+- filtering by incremental watermark;
+- selecting only required columns;
+- pagination with a stable ordering key;
+- server-side cursors or streaming;
+- database-native export;
+- bounded batches.
+
+A query that reads the entire table every day may waste database resources and network bandwidth.
+
+## 74. Example incremental extraction query
+
+~~~sql
+SELECT
+    order_id,
+    customer_id,
+    amount,
+    updated_at
+FROM orders
+WHERE updated_at > TIMESTAMP '2026-11-10 00:00:00'
+ORDER BY updated_at, order_id;
+~~~
+
+This is a teaching query. A production design must define inclusive/exclusive boundaries, equal timestamps, late updates, precision, timezone, tie-breakers and checkpoint commit order.
+
+---
+
+# Part 20 — Database recovery and operational decisions
+
+## 75. Backup versus high availability
+
+A backup supports recovery of data. High availability aims to reduce service interruption. A read replica may support read scaling or another replication use case. They are not interchangeable.
+
+## 76. What is RPO?
+
+Recovery Point Objective describes the maximum acceptable amount of data loss measured in time.
+
+Example: an RPO of 15 minutes means the business expects a recovery event to lose no more than approximately 15 minutes of committed data, subject to the chosen recovery mechanism.
+
+## 77. What is RTO?
+
+Recovery Time Objective describes the target time to restore service after disruption.
+
+Example: an RTO of two hours means the business aims to restore service within two hours.
+
+RPO and RTO are business requirements. A Data Engineer should not invent them.
+
+## 78. Read replicas and lag
+
+A read replica is a copy used for read workloads, depending on engine and service behavior.
+
+Replication lag means changes committed on the primary have not yet appeared on the replica.
+
+A report requiring the newest transactions may be stale if it reads from a lagging replica. Match the source to the report's freshness and consistency requirement.
+
+## 79. Recovery test
+
+A controlled recovery test should:
+1. select an approved test environment;
+2. identify a known backup or snapshot;
+3. restore into an isolated target;
+4. confirm the database becomes available;
+5. validate schema and row counts;
+6. run critical queries;
+7. measure recovery time;
+8. record the data-loss window;
+9. document corrective actions.
+
+Do not test recovery by deleting a production database.
+
+---
+
+# Part 21 — Connection troubleshooting decision tree
+
+~~~text
+Python cannot connect
+       |
+       v
+Can hostname resolve?
+   | No -> Check endpoint, DNS and VPN
+   |
+   Yes
+       |
+       v
+Can TCP port be reached?
+   | No -> Check route, security group and service
+   |
+   Yes
+       |
+       v
+Does TLS verification pass?
+   | No -> Check CA file, hostname and TLS policy
+   |
+   Yes
+       |
+       v
+Does database authentication pass?
+   | No -> Check username and secret rotation
+   |
+   Yes
+       |
+       v
+Does SQL permission pass?
+   | No -> Check database/schema/table grants
+   |
+   Yes
+       |
+       v
+Investigate SQL, schema, data and capacity
+~~~
+
+## 80. Incident example
+
+A daily extractor fails with:
+
+~~~text
+permission denied for table orders
+~~~
+
+Correct investigation:
+1. Confirm endpoint and database.
+2. Confirm the job's database user.
+3. Confirm the connection succeeded.
+4. Check whether SELECT is granted on the required table.
+5. Ask the database owner for the minimum required permission.
+6. Retry the same extraction batch.
+7. Compare row count and watermark before marking success.
+
+Incorrect response:
+- open the database to the internet;
+- grant superuser;
+- disable TLS;
+- rotate unrelated cloud credentials;
+- mark the run successful without extraction evidence.
+
+---
+
+# Part 22 — Additional practice exercises with worked answers
+
+## Exercise 9 — Endpoint versus database
+
+The endpoint is correct, but Python reports that database sales_archive does not exist. What should you inspect?
+
+**Worked answer:** Confirm the intended database name and environment. Endpoint reachability may be fine; the logical database selection may be wrong.
+
+## Exercise 10 — DNS failure
+
+The database is private and the laptop is not connected to the corporate VPN. The hostname does not resolve. What is a likely cause?
+
+**Worked answer:** The endpoint may use private DNS available only inside the approved network. Follow the approved VPN or managed development environment path.
+
+## Exercise 11 — TCP success
+
+PowerShell reports TcpTestSucceeded: True. Does this prove the password is correct?
+
+**Worked answer:** No. It proves TCP connectivity to the host and port. Database authentication happens later.
+
+## Exercise 12 — Authentication success
+
+A user can connect but receives permission denied for one table. What should change?
+
+**Worked answer:** The database owner should grant the minimum required schema/table permission. Network rules do not fix SQL authorization.
+
+## Exercise 13 — TLS error
+
+A certificate verification error occurs. Should the developer disable SSL?
+
+**Worked answer:** No. Verify endpoint hostname, trusted CA certificate and required TLS configuration. Do not disable certificate validation to bypass the error.
+
+## Exercise 14 — Connection storm
+
+A distributed job starts 300 tasks, and each task opens a new database connection. What risk exists?
+
+**Worked answer:** The database may be overwhelmed by connections and concurrent queries. Limit concurrency, use bounded pools or extract through a suitable bulk mechanism.
+
+## Exercise 15 — Replica lag
+
+A report must include transactions committed seconds ago, but it reads from a replica that is behind. What is the risk?
+
+**Worked answer:** The report can be stale. Use a source that meets the required freshness or account for lag explicitly.
+
+## Exercise 16 — Backup confidence
+
+A team has automated backups but has never restored one. Is recovery proven?
+
+**Worked answer:** No. Run a controlled restore test and validate data, schema and recovery time.
+
+## Exercise 17 — Parameterized SQL
+
+A customer ID comes from an API request. Why pass it as a SQL parameter?
+
+**Worked answer:** Parameterization keeps the value separate from SQL syntax and reduces SQL injection risk.
+
+---
+
+# Part 23 — Day 53 practical completion checklist
+
+### Cloud database concepts
+- [ ] Explain managed versus self-managed databases.
+- [ ] Recognize RDS and Aurora.
+- [ ] Distinguish endpoint, port and database name.
+- [ ] Explain cloud identity versus database identity.
+- [ ] Explain private database access.
+
+### Networking and security
+- [ ] Explain VPC, subnet and security group.
+- [ ] Test DNS resolution.
+- [ ] Test TCP reachability with an approved endpoint.
+- [ ] Explain why network success is not authentication success.
+- [ ] Explain TLS and certificate verification.
+- [ ] Explain database/schema/table privileges.
+- [ ] Explain why public access is not a beginner workaround.
+
+### Python connectivity
+- [ ] Install and import psycopg.
+- [ ] Read configuration from environment variables.
+- [ ] Connect to a local practice database.
+- [ ] Execute a SELECT query.
+- [ ] Retrieve one row and multiple rows.
+- [ ] Use parameterized SQL.
+- [ ] Close cursor and connection.
+- [ ] Explain why connection pools need limits.
+
+### Operations and reliability
+- [ ] Explain backup, high availability and read replicas.
+- [ ] Explain RPO and RTO.
+- [ ] Describe a restore test.
+- [ ] Troubleshoot DNS, timeout, TLS, authentication and permission failures.
+- [ ] Explain incremental extraction and watermark boundaries.
+
+## Final self-assessment
+
+Without looking at the notes, explain:
+
+1. What does a managed database service manage, and what remains the customer's responsibility?
+2. What is the difference between endpoint, port and database name?
+3. Why can a valid password still fail to connect?
+4. What does a security group control?
+5. Why are network access and database permissions separate?
+6. What does TLS certificate verification protect?
+7. Why should a pipeline use a read-only database identity when it only extracts data?
+8. Why should a large extraction avoid fetching every row into memory?
+9. What are connection pooling and connection limits?
+10. How are backup, high availability and read replicas different?
+11. What do RPO and RTO mean?
+12. How would you investigate a table permission error?
+
+If you can complete the local Python-to-PostgreSQL exercise and explain the cloud network path, you are ready for Day 54.
+
+**Next lesson — Day 54: Distributed Computing.** You will learn why one machine is sometimes not enough, how parallel work is divided, what partitions and workers mean, and what trade-offs distributed systems introduce.
