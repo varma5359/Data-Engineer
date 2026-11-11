@@ -1497,3 +1497,16 @@ Without looking at the notes, explain:
 If you can complete the three-dataset join lab, identify unmatched records and validate totals, you are ready for Day 58.
 
 **Next lesson — Day 58: Spark Performance Optimization.** You will inspect execution plans, understand shuffle and caching, learn partition pruning and data skew, and compare performance using a repeatable experiment.
+
+---
+
+## Visual Learning Diagrams
+
+### Spark join types
+![Day 57 - Spark join types](images/day_57_spark_join_types.svg)
+
+### Shuffle during join
+![Day 57 - Shuffle during join](images/day_57_spark_shuffle.svg)
+
+### Spark partition layout
+![Day 57 - Spark partition layout](images/day_57_spark_partitioning.svg)
