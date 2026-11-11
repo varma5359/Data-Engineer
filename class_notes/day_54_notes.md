@@ -825,3 +825,770 @@ Should a tiny CSV always be processed with a distributed cluster?
 - [ ] Run the local partition simulation and validate totals.
 
 **Next lesson — Day 55: Apache Spark Fundamentals.** You will learn Spark's driver, executors, cluster manager, SparkSession and DataFrames, then read a dataset and inspect its structure.
+
+
+---
+
+# Part 15 — Walk through a distributed sales job as an engineer
+
+The earlier sections introduced partitions and workers. Now follow a business request from requirements to validated output.
+
+## 44. Business request
+
+TechStore asks:
+
+"Calculate total paid sales by product category for yesterday. The result must be ready by 07:00."
+
+Before choosing a cluster, ask:
+- How many rows arrive each day?
+- What is the source format?
+- Where is the data stored?
+- How much data must be read?
+- Is the data already partitioned?
+- What is the definition of paid sales?
+- What is the required output format?
+- How much time is available?
+- What happens if the job fails?
+
+A distributed architecture is a response to a workload requirement, not a default starting point.
+
+## 45. Identify the grain and transformation
+
+Assume the input has one row per order line.
+
+| order_id | line_id | category | amount | status |
+|---:|---:|---|---:|---|
+| 501 | 1 | Computers | 1000 | PAID |
+| 501 | 2 | Accessories | 200 | PAID |
+| 502 | 1 | Computers | 1500 | PENDING |
+| 503 | 1 | Accessories | 300 | PAID |
+| 504 | 1 | Furniture | 900 | PAID |
+
+Business rule: include rows where status is PAID, then sum amount by category.
+
+Expected output:
+
+| category | paid_sales |
+|---|---:|
+| Accessories | 500 |
+| Computers | 1000 |
+| Furniture | 900 |
+
+The pending Computers row is excluded.
+
+## 46. Understand the single-machine plan
+
+One machine can perform the following steps:
+
+1. Read the input.
+2. Filter PAID records.
+3. Group by category.
+4. Sum amount.
+5. Write the result.
+
+For a small dataset, this is likely the simplest solution.
+
+## 47. Understand the distributed plan
+
+For a large dataset:
+
+1. Read source files in parallel where supported.
+2. Divide records into input partitions.
+3. Assign partition tasks to workers.
+4. Filter PAID rows on each worker.
+5. Calculate partial totals by category.
+6. Shuffle partial results so the same category is brought together.
+7. Add partial totals.
+8. Write validated output.
+
+The engine plans and schedules these operations. Engineers reason about data size, partitioning, shuffle, skew, and correctness.
+
+## 48. Visualize partial aggregation
+
+Imagine the input is split across two workers.
+
+Worker A sees:
+
+| Category | Paid amount |
+|---|---:|
+| Computers | 1000 |
+| Accessories | 200 |
+
+Worker B sees:
+
+| Category | Paid amount |
+|---|---:|
+| Accessories | 300 |
+| Furniture | 900 |
+
+After local aggregation, each worker sends only partial totals:
+
+| Category | Worker A partial | Worker B partial |
+|---|---:|---:|
+| Accessories | 200 | 300 |
+| Computers | 1000 | 0 |
+| Furniture | 0 | 900 |
+
+Final aggregation:
+
+| Category | Final paid sales |
+|---|---:|
+| Accessories | 500 |
+| Computers | 1000 |
+| Furniture | 900 |
+
+Partial aggregation can reduce the amount of data transferred during a shuffle. It is not possible or beneficial for every operation.
+
+## 49. Check correctness before publishing
+
+Compare:
+- input rows read;
+- eligible PAID rows;
+- rejected or excluded rows;
+- distinct categories;
+- total paid amount;
+- output row count;
+- duplicate category keys.
+
+For this example:
+- input rows = 5;
+- PAID rows = 4;
+- PENDING rows excluded = 1;
+- output categories = 3;
+- total paid sales = 2,400.
+
+If the final total is 2,700, inspect the status filter and source records. Do not publish based only on the job finishing.
+
+---
+
+# Part 16 — Understand MapReduce using a small example
+
+MapReduce is a programming model for processing data in distributed stages. The basic idea is to map input records into intermediate key/value pairs and reduce values for the same key.
+
+## 50. Input records
+
+Imagine these website event records:
+
+| event_id | event_type |
+|---:|---|
+| 1 | VIEW |
+| 2 | CLICK |
+| 3 | VIEW |
+| 4 | PURCHASE |
+| 5 | CLICK |
+| 6 | VIEW |
+
+Business question: count events by event_type.
+
+## 51. Map stage
+
+The mapper emits a key/value pair for each row:
+
+~~~text
+(VIEW, 1)
+(CLICK, 1)
+(VIEW, 1)
+(PURCHASE, 1)
+(CLICK, 1)
+(VIEW, 1)
+~~~
+
+The key is event_type. The value is 1.
+
+## 52. Shuffle and group stage
+
+The system groups values with the same key:
+
+~~~text
+VIEW     -> [1, 1, 1]
+CLICK    -> [1, 1]
+PURCHASE -> [1]
+~~~
+
+This grouping requires records with the same key to be brought together. That is the data movement concept introduced earlier.
+
+## 53. Reduce stage
+
+The reducer adds the values:
+
+| event_type | event_count |
+|---|---:|
+| VIEW | 3 |
+| CLICK | 2 |
+| PURCHASE | 1 |
+
+The same total can be calculated on one laptop for this tiny example. MapReduce explains how the work can be divided across a large input.
+
+## 54. Why use a key/value model?
+
+The key tells the system which records belong together. The value contains the information to combine.
+
+Examples:
+- customer_id -> order amount;
+- product_id -> quantity;
+- event_type -> 1;
+- date -> revenue.
+
+The operation must define how values are combined. Summation is only one possible aggregation.
+
+## 55. MapReduce limitations to understand
+
+The classic MapReduce model is useful for understanding distributed batch processing, but it can involve materializing intermediate data between stages.
+
+Modern engines such as Spark support richer execution plans and can optimize multiple transformations. Spark is the focus of the next lessons.
+
+---
+
+# Part 17 — Calculate why partition balance matters
+
+## 56. Balanced partitions
+
+Suppose 100 million records are divided into four partitions of 25 million records each.
+
+If each worker has similar resources and each record costs roughly the same to process, tasks may finish at similar times.
+
+This is an idealized example. Real records can have different processing costs.
+
+## 57. Uneven partitions
+
+Now imagine the partitions contain:
+
+| Partition | Records |
+|---|---:|
+| P1 | 10 million |
+| P2 | 10 million |
+| P3 | 10 million |
+| P4 | 70 million |
+
+Even with four workers, P4 may take much longer.
+
+Adding a fifth worker does not automatically split P4. The partitioning strategy or execution engine must create balanced work.
+
+## 58. Understand the straggler effect
+
+Imagine task durations:
+
+| Task | Duration |
+|---|---:|
+| P1 | 18 seconds |
+| P2 | 20 seconds |
+| P3 | 19 seconds |
+| P4 | 110 seconds |
+
+The stage cannot finish until its required tasks complete. P4 dominates the stage completion time.
+
+When investigating a slow distributed job, inspect the slowest tasks and their input sizes, not only total worker count.
+
+## 59. Sources of uneven work
+
+Uneven task duration can be caused by:
+- uneven record counts;
+- one key appearing far more often than others;
+- different record sizes;
+- complex parsing for some records;
+- remote storage delays;
+- a slow worker;
+- resource contention.
+
+Data skew is one possible cause, not the only cause of a straggler.
+
+---
+
+# Part 18 — Understand partition count and task overhead
+
+## 60. Too few partitions
+
+Suppose a cluster has 16 available worker slots but the input produces only two large partitions.
+
+At most two partition tasks may run at once in that stage. Many available slots can remain unused.
+
+Large partitions can also increase per-task memory and retry cost.
+
+## 61. Too many tiny partitions
+
+Suppose the same dataset is divided into one million tiny partitions.
+
+The engine may spend significant time:
+- scheduling tasks;
+- tracking metadata;
+- opening files;
+- setting up execution;
+- writing many small output files.
+
+The work per task may be too small to justify its overhead.
+
+## 62. Choose a partition count using evidence
+
+Consider:
+- total input size;
+- target task size for the chosen engine;
+- number of available cores/slots;
+- expected shuffle volume;
+- file count;
+- task duration;
+- memory per worker;
+- output file requirements.
+
+The correct number changes with the platform and workload. Do not memorize a universal partitions-per-core formula.
+
+## 63. Partition count is not worker count
+
+A cluster with four workers can process many more than four partitions over the life of a job. Each worker can process multiple tasks over time, subject to available execution slots.
+
+Similarly, a stage with only two partitions may leave most of a large cluster idle.
+
+---
+
+# Part 19 — Understand failure and retry with a timeline
+
+## 64. A worker fails during a task
+
+Imagine partition P3 is being processed by Worker B.
+
+~~~text
+Job starts
+   |
+P1 -> Worker A
+P2 -> Worker B
+P3 -> Worker C
+   |
+Worker C fails during P3
+   |
+Scheduler detects failed task
+   |
+P3 task is retried elsewhere
+   |
+Output is validated
+~~~
+
+A capable distributed engine can retry task work when the input and computation allow it.
+
+The exact recovery behavior depends on the engine, storage and job configuration.
+
+## 65. Why retries need deterministic input
+
+If a task reads a changing source, a retry may not see the same records as the first attempt.
+
+Use a stable input snapshot, immutable batch or explicit source boundary where required.
+
+This makes the retry more predictable.
+
+## 66. Why external side effects are dangerous
+
+Imagine a task sends a payment notification and then crashes before reporting success.
+
+The scheduler retries the task. The notification may be sent twice.
+
+For data engineering, similar duplicate effects can occur when a task:
+- appends output without a unique key;
+- increments an external counter;
+- sends an event;
+- writes to an external database without idempotency.
+
+Design side effects with stable identifiers, deduplication or transactional publication.
+
+## 67. Publish completed output only
+
+A safer output workflow can be:
+
+~~~text
+Write to temporary/run-specific path
+              |
+              v
+Validate schema, count and totals
+              |
+              v
+Confirm all tasks completed
+              |
+              v
+Publish/commit the completed result
+              |
+              v
+Mark batch successful
+~~~
+
+The publication mechanism depends on the storage and table format. A plain object-store folder does not automatically provide atomic table commits.
+
+---
+
+# Part 20 — Understand data locality and cloud storage
+
+## 68. Data and compute are separate resources
+
+In cloud data platforms, data may live in object storage while compute runs in a cluster.
+
+A worker reads data over the network, processes it and writes output back to storage.
+
+~~~text
+Object storage
+      |
+      | Network reads
+      v
+Compute workers
+      |
+      | Network writes
+      v
+Object storage
+~~~
+
+The architecture must account for network bandwidth, request volume, region placement and storage access permissions.
+
+## 69. Keep compute and data placement sensible
+
+When possible:
+- choose compatible regions;
+- avoid unnecessary cross-region transfers;
+- use efficient file formats;
+- avoid repeatedly reading the same large data;
+- select only required columns;
+- filter early when semantics allow;
+- monitor data transfer cost.
+
+Do not move sensitive data across regions without checking residency and governance requirements.
+
+## 70. Locality is not always physical proximity
+
+Some distributed engines schedule tasks near data when the storage architecture supports it.
+
+With remote object storage, the engine may not literally place a worker on the same disk. It can still optimize reads, caching and data transfer.
+
+Understand locality as reducing unnecessary movement, not as a guarantee that every dataset is physically beside a worker.
+
+---
+
+# Part 21 — Make a distributed-versus-local decision
+
+## 71. Scenario A: 5 MB lookup file
+
+One small reference file is read once per day and joined into a simple report.
+
+A local script or database query may be enough. A cluster can add unnecessary startup and management overhead.
+
+## 72. Scenario B: 2 TB historical event data
+
+The job must scan, filter and aggregate a large historical dataset within a defined processing window.
+
+A distributed engine may be appropriate. Measure the workload and consider partitioning, storage format, shuffle and cost.
+
+## 73. Scenario C: one slow external API
+
+A pipeline spends most of its runtime waiting for an API response.
+
+Adding more Spark workers may not help. The API rate limit or latency is the bottleneck.
+
+Investigate pagination, bounded concurrency, retries, caching and incremental extraction.
+
+## 74. Scenario D: one highly skewed customer key
+
+One customer produces 60% of all events.
+
+A key-based group or join can send a disproportionate amount of data to one partition. Investigate skew-aware strategies and whether partial aggregation is valid.
+
+## 75. Decision checklist
+
+Before choosing distributed processing:
+1. Can the data fit in memory or be streamed on one machine?
+2. Does local processing meet the runtime target?
+3. Is the workload parallelizable?
+4. Where is the data stored?
+5. How much data must move?
+6. What is the expected shuffle?
+7. Is the key distribution skewed?
+8. What are the cluster startup and runtime costs?
+9. How will failures and retries work?
+10. Can the result be validated against a trusted baseline?
+
+---
+
+# Part 22 — Extend the local Python partition simulation
+
+This is still a single-machine exercise. It helps you inspect partitions and aggregation before using Spark.
+
+## 76. Cell 1 — Create category sales records
+
+~~~python
+sales_records = [
+    ("Computers", 1000),
+    ("Accessories", 200),
+    ("Computers", 1500),
+    ("Accessories", 300),
+    ("Furniture", 900),
+    ("Computers", 500),
+    ("Furniture", 400),
+    ("Accessories", 100)
+]
+
+print("Input rows:", len(sales_records))
+~~~
+
+Expected output:
+
+~~~text
+Input rows: 8
+~~~
+
+## 77. Cell 2 — Split records into two partitions
+
+~~~python
+partition_a = sales_records[0:4]
+partition_b = sales_records[4:8]
+
+print("Partition A:", partition_a)
+print("Partition B:", partition_b)
+~~~
+
+Each partition contains four records. The slices do not overlap and together cover all eight input records.
+
+## 78. Cell 3 — Calculate partial totals
+
+~~~python
+a_computers = sum(row[1] for row in partition_a if row[0] == "Computers")
+a_accessories = sum(row[1] for row in partition_a if row[0] == "Accessories")
+a_furniture = sum(row[1] for row in partition_a if row[0] == "Furniture")
+
+b_computers = sum(row[1] for row in partition_b if row[0] == "Computers")
+b_accessories = sum(row[1] for row in partition_b if row[0] == "Accessories")
+b_furniture = sum(row[1] for row in partition_b if row[0] == "Furniture")
+
+print("Partition A:", a_computers, a_accessories, a_furniture)
+print("Partition B:", b_computers, b_accessories, b_furniture)
+~~~
+
+Expected output:
+
+~~~text
+Partition A: 2500 500 0
+Partition B: 500 100 1300
+~~~
+
+These are local partial aggregates. Each expression selects one category and sums its amounts.
+
+## 79. Cell 4 — Combine partial totals
+
+~~~python
+final_computers = a_computers + b_computers
+final_accessories = a_accessories + b_accessories
+final_furniture = a_furniture + b_furniture
+
+print("Computers:", final_computers)
+print("Accessories:", final_accessories)
+print("Furniture:", final_furniture)
+~~~
+
+Expected output:
+
+~~~text
+Computers: 3000
+Accessories: 600
+Furniture: 1300
+~~~
+
+## 80. Cell 5 — Validate against the direct calculation
+
+~~~python
+direct_computers = sum(row[1] for row in sales_records if row[0] == "Computers")
+direct_accessories = sum(row[1] for row in sales_records if row[0] == "Accessories")
+direct_furniture = sum(row[1] for row in sales_records if row[0] == "Furniture")
+
+print("Computers match:", final_computers == direct_computers)
+print("Accessories match:", final_accessories == direct_accessories)
+print("Furniture match:", final_furniture == direct_furniture)
+~~~
+
+Expected output:
+
+~~~text
+Computers match: True
+Accessories match: True
+Furniture match: True
+~~~
+
+The check compares the partitioned calculation with a direct calculation over the original records.
+
+## 81. Cell 6 — Validate total input and output amount
+
+~~~python
+input_amount = sum(row[1] for row in sales_records)
+
+output_amount = (
+    final_computers
+    + final_accessories
+    + final_furniture
+)
+
+print("Input amount:", input_amount)
+print("Output amount:", output_amount)
+print("Totals match:", input_amount == output_amount)
+~~~
+
+Expected output:
+
+~~~text
+Input amount: 4900
+Output amount: 4900
+Totals match: True
+~~~
+
+A matching grand total is useful but does not prove each category is correct. That is why the previous cell compares each category separately.
+
+## 82. Cell 7 — Inspect uneven partitions
+
+~~~python
+large_partition = [1] * 90
+small_partition = [1] * 10
+
+print("Large partition rows:", len(large_partition))
+print("Small partition rows:", len(small_partition))
+print("Large partition total:", sum(large_partition))
+print("Small partition total:", sum(small_partition))
+~~~
+
+Expected output:
+
+~~~text
+Large partition rows: 90
+Small partition rows: 10
+Large partition total: 90
+Small partition total: 10
+~~~
+
+One partition contains nine times as many rows as the other. In a real workload, the time difference may be even larger if those records also require more complex processing.
+
+## 83. Cell 8 — Compare the work imbalance
+
+~~~python
+largest_partition_rows = max(
+    len(large_partition),
+    len(small_partition)
+)
+
+smallest_partition_rows = min(
+    len(large_partition),
+    len(small_partition)
+)
+
+print("Largest partition:", largest_partition_rows)
+print("Smallest partition:", smallest_partition_rows)
+print("Row-count imbalance:", largest_partition_rows / smallest_partition_rows)
+~~~
+
+Expected output:
+
+~~~text
+Largest partition: 90
+Smallest partition: 10
+Row-count imbalance: 9.0
+~~~
+
+This ratio compares row counts only. It is not a precise runtime prediction because records may have different processing costs.
+
+---
+
+# Part 23 — Additional practice exercises with worked answers
+
+## Exercise 9 — Parallel versus distributed
+
+A laptop uses eight CPU cores to process eight file chunks. Is this necessarily distributed computing?
+
+**Worked answer:** No. Parallel work can happen on one machine. Distributed computing involves multiple connected machines or workers coordinating work.
+
+## Exercise 10 — Too many workers
+
+A job reads a slow API with a strict request limit. The team doubles worker count and the job starts failing more often. Why?
+
+**Worked answer:** More workers can create more concurrent requests and trigger rate limits. The bottleneck is the external API, not necessarily compute capacity.
+
+## Exercise 11 — Shuffle
+
+A group-by customer_id runs across multiple input partitions. Why may records move between workers?
+
+**Worked answer:** Records for the same customer must be brought together so their values can be combined. That redistribution is shuffle.
+
+## Exercise 12 — Skew
+
+One partition contains 80% of all records. What may happen?
+
+**Worked answer:** That partition can take much longer than the others. The job waits for its slow task, creating a straggler.
+
+## Exercise 13 — Retry safety
+
+A task appends the same output rows every time it runs. The scheduler retries a failed task. What risk exists?
+
+**Worked answer:** Duplicate output rows may be written. Use stable keys, idempotent writes, deduplication or a safe commit mechanism.
+
+## Exercise 14 — Partial output
+
+A job writes half of its output and fails. Why should downstream consumers not read the output folder immediately?
+
+**Worked answer:** They may consume incomplete data. Write to a temporary location and publish only after validation and successful completion.
+
+## Exercise 15 — Too many partitions
+
+A small dataset is divided into 100,000 tiny partitions. What overhead can occur?
+
+**Worked answer:** Task scheduling, metadata, file opening and output-file overhead may exceed the useful processing work.
+
+## Exercise 16 — Local simulation
+
+The local partition totals match the original total. Does that prove the code ran on a distributed cluster?
+
+**Worked answer:** No. It proves only that the local simulation divided and recombined the values correctly. No distributed cluster was used.
+
+## Exercise 17 — Data locality
+
+A cloud processing job repeatedly transfers large data between regions. What should be investigated?
+
+**Worked answer:** Region placement, data residency, network transfer, storage location and whether the workload can process data closer to its source.
+
+---
+
+# Part 24 — Day 54 practical completion checklist
+
+### Concepts
+- [ ] Explain sequential, parallel and distributed processing.
+- [ ] Explain node, worker, cluster, job, stage and task.
+- [ ] Compare vertical and horizontal scaling.
+- [ ] Explain why more workers do not guarantee faster execution.
+- [ ] Explain data partitioning and partition count.
+
+### Distributed execution
+- [ ] Explain map, shuffle/group and reduce.
+- [ ] Explain why group-by and joins may move data.
+- [ ] Explain data locality and network overhead.
+- [ ] Explain data skew and stragglers.
+- [ ] Explain why partial aggregation can reduce data movement.
+
+### Reliability
+- [ ] Explain fault tolerance and task retry.
+- [ ] Explain idempotency and duplicate side effects.
+- [ ] Explain why incomplete output should not be published.
+- [ ] Explain stable input snapshots and checkpoint boundaries.
+- [ ] Explain why exactly-once needs an end-to-end definition.
+
+### Practical work
+- [ ] Split a local dataset into partitions.
+- [ ] Calculate partial totals.
+- [ ] Combine partial results.
+- [ ] Compare the result with a direct calculation.
+- [ ] Detect a partitioning mistake.
+- [ ] Inspect an intentionally uneven partition example.
+- [ ] Explain why the local simulation is not a real cluster.
+
+## Final self-assessment
+
+Without looking at the notes, explain:
+
+1. What is distributed computing, and how is it different from parallel processing?
+2. What is the difference between a node, worker, cluster, job and task?
+3. Why can a cluster with many workers still be slow?
+4. What is partitioning, and how can poor partition boundaries lose records?
+5. What is shuffle, and why can it be expensive?
+6. What is data skew, and how does it create stragglers?
+7. Why must retries be safe for external side effects?
+8. Why should incomplete output not be published?
+9. When is a local Python or SQL process better than a distributed cluster?
+10. What validation proves that partial results combine into the intended business result?
+
+If you can explain the distributed sales workflow and reproduce the local partition experiment, you are ready for Day 55.
+
+**Next lesson — Day 55: Apache Spark Fundamentals.** We will install or access a suitable Spark environment, understand the driver and executors, create a SparkSession, load a dataset into a DataFrame, inspect its schema and rows, and understand what happens when a Spark action runs.
