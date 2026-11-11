@@ -319,3 +319,174 @@ Never skip: unique record identity; what success guarantees; replay behavior; in
 - [ ] I can defend the project.
 
 **Complete the day when you can explain, run, interpret, test failure and prove the result—not merely read the notes.**
+
+
+# 11. Mentor-led deep dive — DB
+
+This section expands the earlier example into decisions a junior Data Engineer should make. Read each scenario slowly: identify the input, risk, control and proof.
+
+## 11.1 Why source extraction needs care
+
+Operational systems serve customer transactions. Large scans, long snapshots or expensive joins can slow checkout/booking. Discuss extraction windows, read replicas, source-side filters and DBA approval.
+
+**Student checkpoint:** Explain this in your own words, then name one test that would prove it.
+
+## 11.2 Connection setup
+
+Install the matching driver, use connection settings from environment/config, open a connection, create cursor, execute a query, fetch rows and close resources. Explain each object before adding pipeline logic.
+
+**Student checkpoint:** Explain this in your own words, then name one test that would prove it.
+
+## 11.3 Parameterized SQL walkthrough
+
+SQL text contains placeholders; values are passed as a separate tuple/list. Placeholder syntax depends on driver. Parameters are values—not table/column names—so dynamic identifiers require safe allow-list handling.
+
+**Student checkpoint:** Explain this in your own words, then name one test that would prove it.
+
+## 11.4 Batch fetch
+
+Fetch 500 rows, process/write them, then fetch next batch. Do not accumulate every batch into one giant list. Track count and last key; test interruption between batches.
+
+**Student checkpoint:** Explain this in your own words, then name one test that would prove it.
+
+## 11.5 Keyset pagination
+
+For append-only ID: WHERE id > last_id AND id <= upper_id ORDER BY id LIMIT batch_size. Capture upper_id at start to bound the run. Explain why updates/deletes still need CDC or another method.
+
+**Student checkpoint:** Explain this in your own words, then name one test that would prove it.
+
+## 11.6 Timestamp compound cursor
+
+Use WHERE updated_at > last_time OR (updated_at = last_time AND id > last_id), ordered by updated_at,id. Explain how this resolves timestamp ties and why updates that move timestamps matter.
+
+**Student checkpoint:** Explain this in your own words, then name one test that would prove it.
+
+## 11.7 Source snapshot
+
+If records change while extraction runs, a query may observe different moments. Snapshot isolation/consistent snapshot/CDC strategies depend on database and operational constraints; don't claim a plain SELECT is always consistent.
+
+**Student checkpoint:** Explain this in your own words, then name one test that would prove it.
+
+## 11.8 Read replica lag
+
+Replica can be behind primary. A watermark taken from primary then queried on lagging replica can skip rows unless overlap/replication position is considered.
+
+**Student checkpoint:** Explain this in your own words, then name one test that would prove it.
+
+## 11.9 Data type mapping
+
+SQL DECIMAL may become Decimal in Python; timestamp may become datetime; NULL becomes None. Explain these conversions and avoid float for money.
+
+**Student checkpoint:** Explain this in your own words, then name one test that would prove it.
+
+## 11.10 Large-table extraction
+
+Select only required columns, filter in SQL, use bounded batches and index-friendly predicates. Monitor duration, rows, source load and query plan.
+
+**Student checkpoint:** Explain this in your own words, then name one test that would prove it.
+
+## 11.11 Connection failure
+
+If connection drops, identify last durable target batch. Reconnect and replay from checkpoint; target writes must be idempotent. Do not assume in-memory last row is durable progress.
+
+**Student checkpoint:** Explain this in your own words, then name one test that would prove it.
+
+## 11.12 Delete capture
+
+Hard-deleted rows vanish from SELECT. Use WAL/binlog CDC, soft-delete flag, tombstone table or periodic reconciliation.
+
+**Student checkpoint:** Explain this in your own words, then name one test that would prove it.
+
+## 11.13 Project test matrix
+
+Test empty table, one row, duplicate key, NULL timestamp, timestamp tie, update old ID, deleted source row, timeout and restart.
+
+**Student checkpoint:** Explain this in your own words, then name one test that would prove it.
+
+# 12. Guided lab checkpoints
+
+## Lab checkpoint 1
+
+- **Predict:** Before running anything, write what you expect to happen.
+- **Execute:** Run only this stage with a small input.
+- **Observe:** Record the actual output, row count and error (if any).
+- **Explain:** Why did the output occur? Which input or rule produced it?
+- **Verify:** Compare it with the expected result and contract.
+- **Recover:** If it failed, reproduce with the smallest input and correct the cause.
+
+## Lab checkpoint 2
+
+- **Predict:** Before running anything, write what you expect to happen.
+- **Execute:** Run only this stage with a small input.
+- **Observe:** Record the actual output, row count and error (if any).
+- **Explain:** Why did the output occur? Which input or rule produced it?
+- **Verify:** Compare it with the expected result and contract.
+- **Recover:** If it failed, reproduce with the smallest input and correct the cause.
+
+## Lab checkpoint 3
+
+- **Predict:** Before running anything, write what you expect to happen.
+- **Execute:** Run only this stage with a small input.
+- **Observe:** Record the actual output, row count and error (if any).
+- **Explain:** Why did the output occur? Which input or rule produced it?
+- **Verify:** Compare it with the expected result and contract.
+- **Recover:** If it failed, reproduce with the smallest input and correct the cause.
+
+## Lab checkpoint 4
+
+- **Predict:** Before running anything, write what you expect to happen.
+- **Execute:** Run only this stage with a small input.
+- **Observe:** Record the actual output, row count and error (if any).
+- **Explain:** Why did the output occur? Which input or rule produced it?
+- **Verify:** Compare it with the expected result and contract.
+- **Recover:** If it failed, reproduce with the smallest input and correct the cause.
+
+## Lab checkpoint 5
+
+- **Predict:** Before running anything, write what you expect to happen.
+- **Execute:** Run only this stage with a small input.
+- **Observe:** Record the actual output, row count and error (if any).
+- **Explain:** Why did the output occur? Which input or rule produced it?
+- **Verify:** Compare it with the expected result and contract.
+- **Recover:** If it failed, reproduce with the smallest input and correct the cause.
+
+## Lab checkpoint 6
+
+- **Predict:** Before running anything, write what you expect to happen.
+- **Execute:** Run only this stage with a small input.
+- **Observe:** Record the actual output, row count and error (if any).
+- **Explain:** Why did the output occur? Which input or rule produced it?
+- **Verify:** Compare it with the expected result and contract.
+- **Recover:** If it failed, reproduce with the smallest input and correct the cause.
+
+## Lab checkpoint 7
+
+- **Predict:** Before running anything, write what you expect to happen.
+- **Execute:** Run only this stage with a small input.
+- **Observe:** Record the actual output, row count and error (if any).
+- **Explain:** Why did the output occur? Which input or rule produced it?
+- **Verify:** Compare it with the expected result and contract.
+- **Recover:** If it failed, reproduce with the smallest input and correct the cause.
+
+## Lab checkpoint 8
+
+- **Predict:** Before running anything, write what you expect to happen.
+- **Execute:** Run only this stage with a small input.
+- **Observe:** Record the actual output, row count and error (if any).
+- **Explain:** Why did the output occur? Which input or rule produced it?
+- **Verify:** Compare it with the expected result and contract.
+- **Recover:** If it failed, reproduce with the smallest input and correct the cause.
+
+
+# 13. Instructor review rubric
+
+| Skill | Beginner evidence |
+|---|---|
+| Concept | Explains what/why in plain language |
+| Code | Can read and explain each line, not copy blindly |
+| Output | Can derive output from input and rule |
+| Quality | Identifies invalid, duplicate and boundary cases |
+| Reliability | Explains retry, replay and checkpoint |
+| Verification | Uses counts/keys/totals/quality checks |
+| Interview | Gives decision, reason, failure mode and proof |
+
