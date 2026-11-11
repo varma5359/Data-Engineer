@@ -527,3 +527,89 @@ Reconciliation: compare target key set, source/target count, amount totals and s
 | Reconciliation | Counts, keys, totals or quality checks |
 | Project defence | Explain decision, risk, control and proof |
 
+
+
+---
+
+# Guided execution lab — Incremental Data Loader (runnable fixture)
+
+This worked lab makes the watermark idea concrete. It uses an in-memory target to keep setup beginner-friendly; a production version persists target and checkpoint in a database transaction.
+
+## Cell 1 — Create source changes
+
+```python
+import pandas as pd
+
+source = pd.DataFrame({
+    "order_id": [101, 102, 103, 102],
+    "customer_id": ["C1", "C2", "C3", "C2"],
+    "amount": [100, 200, 150, 225],
+    "updated_at": ["2026-01-01 09:00:00", "2026-01-01 10:00:00",
+                   "2026-01-01 11:00:00", "2026-01-02 08:00:00"]
+})
+source["updated_at"] = pd.to_datetime(source["updated_at"])
+source
+```
+
+The last row is a later update to order 102, not a new order. This is why an incremental load needs a stable key and update timestamp.
+
+## Cell 2 — Initial target and watermark
+
+```python
+target = pd.DataFrame(columns=["order_id", "customer_id", "amount", "updated_at"])
+watermark = pd.Timestamp("1900-01-01")
+```
+
+The watermark means: records at or before this point have been considered. In a real system it must be stored durably with the run state.
+
+## Cell 3 — Select changes after the watermark
+
+```python
+changes = source[source["updated_at"] > watermark].copy()
+print("Changes found:", len(changes))
+```
+
+Expected: `Changes found: 4`. The first run sees all four source events.
+
+## Cell 4 — Keep the latest version per business key
+
+```python
+changes = changes.sort_values("updated_at")
+latest = changes.drop_duplicates("order_id", keep="last")
+latest
+```
+
+Expected latest keys: 101, 103, 102. Order 102 has amount 225. This example assumes the source provides a trustworthy update timestamp and later timestamp wins. If timestamps tie, add a deterministic source sequence/version.
+
+## Cell 5 — Upsert into target (teaching implementation)
+
+```python
+combined = pd.concat([target, latest], ignore_index=True)
+target = combined.sort_values("updated_at").drop_duplicates("order_id", keep="last")
+target = target.sort_values("order_id").reset_index(drop=True)
+target
+```
+
+Expected target has three rows: 101=100, 102=225, 103=150. This pandas demonstration is not an atomic database MERGE. A real database upsert uses a unique constraint and a transaction.
+
+## Cell 6 — Advance watermark only after target verification
+
+```python
+new_watermark = changes["updated_at"].max()
+print("Target rows:", len(target))
+print("New watermark:", new_watermark)
+```
+
+Expected: 3 target rows; watermark 2026-01-02 08:00:00. Production order: write/commit target, verify success, then commit checkpoint. Never move checkpoint ahead of durable target data.
+
+## Boundary warning: equal timestamps and late arrivals
+
+A strict `>` filter can miss a second record with the same timestamp as the saved watermark. Common solutions include a composite cursor (timestamp + unique ID), overlap window plus deduplication, or source change sequence. A late-arriving record with an old timestamp requires a source contract or lookback/reconciliation strategy.
+
+## Lab checks
+
+- [ ] order 102 is updated, not duplicated;
+- [ ] target contains one row per order ID;
+- [ ] watermark advances only after target success;
+- [ ] rerun does not create another target row;
+- [ ] explain what happens when two changes share a timestamp.

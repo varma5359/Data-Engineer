@@ -210,3 +210,23 @@ The course is being rebuilt phase by phase to one consistent beginner-first teac
 - [Day 34 Interview Guide](day_34_interview.md) — complete model answers and project defence.
 
 **Status:** Rebuilt under independent-learning standard. Confirm all business rules with the dataset/owner; examples are explicitly teaching rules.
+
+
+## Phase 4 — Data Processing and Pipelines (Days 30–39)
+
+Each day has a class notebook, a guided project workbook and an interview guide. Complete the artifacts in order and retain your own execution evidence.
+
+| Day | Topic | Class notes | Project workbook | Interview |
+|---|---|---|---|---|
+| 30 | ETL and Data Extraction | [Notes](day_30_notes.md) | [Workbook](day_30_project_workbook.md) | [Guide](day_30_interview.md) |
+| 31 | File-Based Data Ingestion | [Notes](day_31_notes.md) | [Workbook](day_31_project_workbook.md) | [Guide](day_31_interview.md) |
+| 32 | API-Based Data Ingestion | [Notes](day_32_notes.md) | [Workbook](day_32_project_workbook.md) | [Guide](day_32_interview.md) |
+| 33 | Database Ingestion | [Notes](day_33_notes.md) | [Workbook](day_33_project_workbook.md) | [Guide](day_33_interview.md) |
+| 34 | Data Transformation and Business Rules | [Notes](day_34_notes.md) | [Workbook](day_34_project_workbook.md) | [Guide](day_34_interview.md) |
+| 35 | Data Cleaning and Schema Evolution | [Notes](day_35_notes.md) | [Workbook](day_35_project_workbook.md) | [Guide](day_35_interview.md) |
+| 36 | Batch Processing and Partitioning | [Notes](day_36_notes.md) | [Workbook](day_36_project_workbook.md) | [Guide](day_36_interview.md) |
+| 37 | Incremental Loading and Upserts | [Notes](day_37_notes.md) | [Workbook](day_37_project_workbook.md) | [Guide](day_37_interview.md) |
+| 38 | Pipeline Reliability and Failure Handling | [Notes](day_38_notes.md) | [Workbook](day_38_project_workbook.md) | [Guide](day_38_interview.md) |
+| 39 | Pipeline Logging and Observability | [Notes](day_39_notes.md) | [Workbook](day_39_project_workbook.md) | [Guide](day_39_interview.md) |
+
+**Teaching-quality status:** content rebuild and artifact indexing completed for the phase. Runtime validation still belongs to the student environment/CI: execute every workbook, verify installed dependencies, compare outputs, and record environment-specific differences before marking classroom delivery fully validated.

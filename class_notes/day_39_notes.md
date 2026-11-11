@@ -534,3 +534,104 @@ SLO example: 95% of daily runs complete by 07:00; measure over agreed window, al
 | Reconciliation | Counts, keys, totals or quality checks |
 | Project defence | Explain decision, risk, control and proof |
 
+
+
+---
+
+# Guided execution lab — Pipeline Observability Tool (runnable fixture)
+
+Observability means using logs, metrics and traces to understand what a pipeline did, how well it performed and why it failed.
+
+## Cell 1 — Create a run record
+
+```python
+from datetime import datetime, timezone
+
+run_id = "run-20260110-001"
+started_at = datetime.now(timezone.utc)
+metrics = {
+    "input_rows": 1000,
+    "accepted_rows": 970,
+    "rejected_rows": 30,
+    "written_rows": 970,
+    "retry_count": 1,
+    "status": "SUCCESS"
+}
+```
+
+A run ID correlates messages from the same execution. Use UTC timestamps in shared systems to avoid timezone ambiguity.
+
+## Cell 2 — Validate operational invariants
+
+```python
+assert metrics["input_rows"] == metrics["accepted_rows"] + metrics["rejected_rows"]
+assert metrics["accepted_rows"] == metrics["written_rows"]
+print("Reconciliation checks passed")
+```
+
+Expected: `Reconciliation checks passed`. These are correctness metrics, not just performance metrics.
+
+## Cell 3 — Structured log event
+
+```python
+import json
+
+log_event = {
+    "timestamp": started_at.isoformat(),
+    "level": "INFO",
+    "run_id": run_id,
+    "stage": "write_curated",
+    "status": metrics["status"],
+    "input_rows": metrics["input_rows"],
+    "accepted_rows": metrics["accepted_rows"],
+    "rejected_rows": metrics["rejected_rows"],
+    "written_rows": metrics["written_rows"],
+    "retry_count": metrics["retry_count"]
+}
+print(json.dumps(log_event, indent=2))
+```
+
+Expected: a JSON object with named fields. The timestamp varies each run. Never put passwords, tokens, full connection strings or sensitive personal data in logs.
+
+## Cell 4 — Calculate a rejection rate
+
+```python
+rejection_rate = metrics["rejected_rows"] / metrics["input_rows"]
+print("Rejection rate:", round(rejection_rate * 100, 2), "%")
+```
+
+Expected: `Rejection rate: 3.0 %`. This metric becomes useful when compared with a baseline and agreed threshold.
+
+## Cell 5 — Simulate a failed run and classify it
+
+```python
+failure = {
+    "run_id": "run-20260110-002",
+    "stage": "read_source",
+    "error_type": "TimeoutError",
+    "retryable": True,
+    "attempt": 1
+}
+print(failure)
+```
+
+A timeout may be transient and retryable. A schema validation failure is normally permanent until the source or contract is corrected. Alert based on impact and policy, not every harmless warning.
+
+## Metrics to publish
+
+- run success/failure;
+- duration and stage duration;
+- input, accepted, rejected and written row counts;
+- rejection rate;
+- retry count;
+- data freshness/lag;
+- last successful watermark/checkpoint;
+- per-partition status.
+
+## Alert design
+
+An alert should answer: what failed, which run, what impact, when it started, whether retry is happening, where to investigate and who owns it. Avoid alerting on every log line; use thresholds, persistence and severity.
+
+## Lab submission
+
+Save one successful and one failed run record, structured log examples, reconciliation result, rejection-rate calculation, alert rule and a short incident explanation.

@@ -535,3 +535,79 @@ Recovery runbook: identify failed run and safe cursor; inspect partial destinati
 | Reconciliation | Counts, keys, totals or quality checks |
 | Project defence | Explain decision, risk, control and proof |
 
+
+
+---
+
+# Guided execution lab — Reliable Pipeline Simulator (runnable fixture)
+
+This is a deterministic simulation of a retry-safe load. It demonstrates the key design: stable record identity, idempotent writes, bounded retry, and checkpoint only after success.
+
+## Cell 1 — Source batch
+
+```python
+source_batch = [
+    {"event_id": "E1", "order_id": 501, "amount": 100},
+    {"event_id": "E2", "order_id": 502, "amount": 200},
+    {"event_id": "E3", "order_id": 503, "amount": 300}
+]
+target_by_event = {}
+checkpoint = 0
+```
+
+`event_id` identifies an event uniquely. `target_by_event` acts like a destination table with a unique key.
+
+## Cell 2 — Idempotent write
+
+```python
+for event in source_batch:
+    target_by_event[event["event_id"]] = event
+print("Rows in target:", len(target_by_event))
+```
+
+Expected: 3. A dictionary assignment by stable key replaces the same event rather than adding a duplicate.
+
+## Cell 3 — Replay the same batch
+
+```python
+for event in source_batch:
+    target_by_event[event["event_id"]] = event
+print("Rows after replay:", len(target_by_event))
+```
+
+Expected: still 3. This illustrates idempotent effect for this key/value operation. It does not prove every external side effect is idempotent.
+
+## Cell 4 — Simulate failure before checkpoint
+
+```python
+checkpoint = 0
+print("Target persisted rows:", len(target_by_event))
+print("Checkpoint:", checkpoint)
+```
+
+The target has data but checkpoint has not advanced. On restart, the batch is replayed. Because writes use stable event IDs, replay does not duplicate the target records.
+
+## Cell 5 — Verify then checkpoint
+
+```python
+expected_ids = {event["event_id"] for event in source_batch}
+actual_ids = set(target_by_event.keys())
+assert expected_ids.issubset(actual_ids)
+checkpoint = 3
+print("Verified:", True)
+print("Checkpoint:", checkpoint)
+```
+
+Expected: Verified True; Checkpoint 3. In production, checkpoint and target commit should be coordinated transactionally where possible; otherwise use an outbox/manifest/recovery protocol.
+
+## Cell 6 — Bounded retry policy
+
+A retry should be limited and only used for transient failures (temporary network error, throttling, service unavailable). Do not retry permanent errors such as invalid schema forever. Use exponential backoff with jitter, a maximum attempt count, timeout and dead-letter/quarantine path.
+
+## Failure drill
+
+1. Fail before any target write: replay the full batch.
+2. Fail after E1 and E2: replay all; stable keys prevent duplicates.
+3. Change E2 amount and same event ID: decide whether events are immutable or versioned. Do not silently overwrite immutable event history.
+4. Make a malformed record: route to reject/quarantine, don't retry a permanent validation failure.
+5. Confirm checkpoint never indicates progress beyond durable target data.
