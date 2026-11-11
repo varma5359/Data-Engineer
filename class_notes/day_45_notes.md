@@ -843,3 +843,816 @@ What should the engineer do?
 - [ ] Explain why a successful pipeline is not proof of correct data.
 
 **Next lesson — Day 46: Data Reconciliation and Lineage.** We will trace source records to warehouse outputs, compare counts and totals, investigate mismatches and document where every important value came from.
+
+
+---
+
+# Part 18 — Your first complete quality-validation run
+
+The earlier sections introduced individual checks. In this section, combine them into a small workflow similar to the quality gate used before a warehouse table is published.
+
+A Data Engineer must combine checks, interpret their results and make a release decision—not merely write separate SELECT statements.
+
+## 18.1 Understand the job before writing SQL
+
+Imagine TechStore receives order records every morning. Before publishing its sales dashboard, the Data Engineer must confirm:
+
+1. Every order has an order ID.
+2. An order ID appears only once in this order-header dataset.
+3. Every paid order has a customer ID.
+4. Every paid order has an amount greater than zero.
+5. Status is one of the approved values.
+6. The data is not unexpectedly empty.
+
+For today's training fixture, approved statuses are PAID, PENDING and CANCELLED. The training policy says missing IDs, duplicate order IDs, missing customer IDs on paid orders, invalid paid amounts and unknown statuses are blocking issues. A real company must approve its own rules.
+
+## 18.2 Where should you run this lesson?
+
+Use either pgAdmin (open Query Tool for your PostgreSQL database) or psql (connect to your database through the command line).
+
+Run the statements in order and keep them in the same database session. Temporary tables are session-specific. If you disconnect, recreate them.
+
+Execution sequence:
+
+Connect -> Create training table -> Insert rows -> Run checks -> Review failures -> Decide whether to publish
+
+In pgAdmin, select the database, open Query Tool, paste one code block and click Execute. Read the result or Messages panel before moving to the next block.
+
+## 18.3 Confirm the input data
+
+~~~sql
+SELECT
+    COUNT(*) AS total_rows,
+    COUNT(DISTINCT order_id) AS distinct_order_ids
+FROM quality_orders;
+~~~
+
+Expected result:
+
+| total_rows | distinct_order_ids |
+|---:|---:|
+| 6 | 5 |
+
+Interpretation:
+- Six records are present.
+- Only five different non-null order IDs are present.
+- The difference suggests a repeated ID, but this query alone does not tell us which ID is repeated.
+- Run the duplicate-detail query from Part 6 to identify it.
+
+COUNT(DISTINCT column) ignores NULL. That is why a separate null check is required.
+
+## 18.4 Build a detailed exception list
+
+A quality exception is one specific record failing one specific rule. A record may fail more than one rule. Preserve each reason rather than stopping after the first failure.
+
+~~~sql
+CREATE TEMP TABLE quality_exceptions AS
+SELECT
+    order_id,
+    'ORDER_ID_MISSING'::VARCHAR(100) AS rule_id,
+    'order_id is required'::VARCHAR(250) AS reason
+FROM quality_orders
+WHERE order_id IS NULL
+
+UNION ALL
+
+SELECT
+    order_id,
+    'CUSTOMER_ID_MISSING_FOR_PAID_ORDER',
+    'Paid order must have a customer_id'
+FROM quality_orders
+WHERE status = 'PAID'
+  AND customer_id IS NULL
+
+UNION ALL
+
+SELECT
+    order_id,
+    'DUPLICATE_ORDER_ID',
+    'order_id appears more than once'
+FROM quality_orders
+WHERE order_id IN (
+    SELECT order_id
+    FROM quality_orders
+    WHERE order_id IS NOT NULL
+    GROUP BY order_id
+    HAVING COUNT(*) > 1
+)
+
+UNION ALL
+
+SELECT
+    order_id,
+    'INVALID_PAID_AMOUNT',
+    'Paid order amount must be greater than zero'
+FROM quality_orders
+WHERE status = 'PAID'
+  AND (amount IS NULL OR amount <= 0)
+
+UNION ALL
+
+SELECT
+    order_id,
+    'INVALID_STATUS',
+    'Status is not in the approved list'
+FROM quality_orders
+WHERE status IS NULL
+   OR status NOT IN ('PAID', 'PENDING', 'CANCELLED');
+~~~
+
+Expected command message:
+
+~~~text
+SELECT 4
+~~~
+
+The exact message can vary by PostgreSQL client. This fixture should create four exception rows:
+
+| order_id | rule_id | reason |
+|---:|---|---|
+| 1002 | CUSTOMER_ID_MISSING_FOR_PAID_ORDER | Paid order must have a customer_id |
+| 1002 | DUPLICATE_ORDER_ID | order_id appears more than once |
+| 1004 | INVALID_PAID_AMOUNT | Paid order amount must be greater than zero |
+| 1005 | INVALID_STATUS | Status is not in the approved list |
+
+There are four exceptions but only three affected business IDs:
+- Order 1002 fails two rules.
+- Order 1004 fails one rule.
+- Order 1005 fails one rule.
+
+Exception count means the number of rule failures. Affected-record count means the number of different records with at least one failure.
+
+Inspect the table:
+
+~~~sql
+SELECT *
+FROM quality_exceptions
+ORDER BY order_id, rule_id;
+~~~
+
+Expected result is the four-row table shown above.
+
+## 18.5 Count failures by rule
+
+~~~sql
+SELECT
+    rule_id,
+    COUNT(*) AS failed_records
+FROM quality_exceptions
+GROUP BY rule_id
+ORDER BY rule_id;
+~~~
+
+Expected result:
+
+| rule_id | failed_records |
+|---|---:|
+| CUSTOMER_ID_MISSING_FOR_PAID_ORDER | 1 |
+| DUPLICATE_ORDER_ID | 1 |
+| INVALID_PAID_AMOUNT | 1 |
+| INVALID_STATUS | 1 |
+
+A production report should also show total rows evaluated, run identifier, evaluation time and rule severity.
+
+## 18.6 Count distinct affected orders
+
+~~~sql
+SELECT COUNT(DISTINCT order_id) AS affected_orders
+FROM quality_exceptions;
+~~~
+
+Expected result:
+
+| affected_orders |
+|---:|
+| 3 |
+
+This counts distinct non-null order IDs. If a rule can fail for a row whose order_id is NULL, use a stable source-row identifier to count affected records accurately. A missing business key cannot uniquely identify its source row.
+
+## 18.7 Make a publish decision
+
+For this training policy, any exception is blocking.
+
+~~~sql
+SELECT
+    CASE
+        WHEN COUNT(*) = 0 THEN 'PASS'
+        ELSE 'BLOCK'
+    END AS quality_gate_status,
+    COUNT(*) AS exception_count
+FROM quality_exceptions;
+~~~
+
+Expected result:
+
+| quality_gate_status | exception_count |
+|---|---:|
+| BLOCK | 4 |
+
+The correct decision is BLOCK. The sales mart must not be published from this training dataset yet.
+
+Do not confuse this with a database error. PostgreSQL successfully executed the SQL. The data quality decision is what failed.
+
+## 18.8 A quality check can pass while another fails
+
+Suppose the order table has six rows and the required source file arrived. Those checks may pass. However, duplicate-key and invalid-amount checks still fail.
+
+A quality report should show each rule separately. Avoid a single green status that hides a critical failure.
+
+| Status | Meaning | Example action |
+|---|---|---|
+| PASS | Rule evaluated and no failures found | Continue |
+| FAIL | Rule evaluated and failures found | Apply severity policy |
+| ERROR | Rule could not be evaluated | Investigate test or environment |
+| SKIPPED | Rule intentionally not evaluated | Record why it was skipped |
+
+A test that did not run is not a passing test.
+
+---
+
+# Part 19 — Understand NULL correctly in SQL quality checks
+
+NULL is one of the most important beginner concepts in data validation.
+
+## 19.1 NULL does not mean zero
+
+| Value | Meaning |
+|---|---|
+| NULL | Value is missing or unknown |
+| 0 | A known numeric value equal to zero |
+| Empty text | A text value containing no characters |
+| Space text | Text containing whitespace |
+
+A quantity of zero may mean no units were sold. A NULL quantity may mean the source did not provide the quantity. Do not replace missing data with zero unless the business meaning explicitly allows it.
+
+## 19.2 Why = NULL is incorrect
+
+Do not write:
+
+~~~sql
+SELECT *
+FROM quality_orders
+WHERE customer_id = NULL;
+~~~
+
+This does not find NULL values. SQL uses three-valued logic: a comparison with NULL produces UNKNOWN, not TRUE.
+
+Use:
+
+~~~sql
+SELECT *
+FROM quality_orders
+WHERE customer_id IS NULL;
+~~~
+
+To find values that are present:
+
+~~~sql
+SELECT *
+FROM quality_orders
+WHERE customer_id IS NOT NULL;
+~~~
+
+## 19.3 Why NOT IN needs NULL handling
+
+This query:
+
+~~~sql
+SELECT *
+FROM quality_orders
+WHERE status NOT IN ('PAID', 'PENDING', 'CANCELLED');
+~~~
+
+does not return a row whose status is NULL. The comparison result is UNKNOWN.
+
+If NULL is also invalid, write:
+
+~~~sql
+SELECT *
+FROM quality_orders
+WHERE status IS NULL
+   OR status NOT IN ('PAID', 'PENDING', 'CANCELLED');
+~~~
+
+Validation rules must explicitly define how NULL should behave.
+
+## 19.4 Test zero separately from missing
+
+~~~sql
+SELECT
+    SUM(CASE WHEN amount IS NULL THEN 1 ELSE 0 END) AS missing_amounts,
+    SUM(CASE WHEN amount = 0 THEN 1 ELSE 0 END) AS zero_amounts,
+    SUM(CASE WHEN amount < 0 THEN 1 ELSE 0 END) AS negative_amounts
+FROM quality_orders;
+~~~
+
+Expected result:
+
+| missing_amounts | zero_amounts | negative_amounts |
+|---:|---:|---:|
+| 0 | 1 | 1 |
+
+The fixture contains one zero amount and one negative amount. Neither is NULL.
+
+---
+
+# Part 20 — Measure quality with percentages and thresholds
+
+A count alone may be misleading when dataset sizes differ. Four rejected rows out of ten is very different from four out of ten million.
+
+## 20.1 Calculate a failure percentage
+
+~~~sql
+SELECT
+    COUNT(*) AS total_rows,
+    SUM(CASE WHEN customer_id IS NULL THEN 1 ELSE 0 END) AS missing_customer_rows,
+    ROUND(
+        100.0 * SUM(CASE WHEN customer_id IS NULL THEN 1 ELSE 0 END)
+        / NULLIF(COUNT(*), 0),
+        2
+    ) AS missing_customer_percent
+FROM quality_orders;
+~~~
+
+Expected result:
+
+| total_rows | missing_customer_rows | missing_customer_percent |
+|---:|---:|---:|
+| 6 | 1 | 16.67 |
+
+Understand each part:
+- COUNT(*) counts all rows.
+- SUM(CASE WHEN ... THEN 1 ELSE 0 END) counts matching rows.
+- 100.0 ensures decimal percentage calculation.
+- NULLIF(COUNT(*), 0) prevents division by zero.
+- ROUND(..., 2) keeps two decimal places.
+
+If the table is empty, the percentage becomes NULL rather than causing division by zero. An empty table should have its own blocking or warning rule.
+
+## 20.2 What is a threshold?
+
+A threshold is an agreed limit used to decide whether a result is acceptable.
+
+| Rule | Example threshold | Severity |
+|---|---|---|
+| Missing order ID | 0 allowed | Blocking |
+| Duplicate order ID | 0 allowed | Blocking |
+| Missing optional description | Up to 5% | Warning |
+| Late source feed | More than 30 minutes | Alert or block |
+| Failed reconciliation | Difference must be 0 | Blocking |
+
+Thresholds must be based on business impact, source behavior and service expectations. Do not choose a percentage just because it makes the test pass.
+
+## 20.3 Zero-row datasets
+
+A percentage test can be misleading if no rows arrived. Zero missing values out of zero rows does not prove completeness.
+
+Always check:
+- Was the source expected to deliver data?
+- Did extraction return any rows?
+- Is an empty result normal for this date?
+- Did a filter accidentally remove all records?
+
+An expected-empty business day may be valid. An unexpectedly empty feed is usually a source-delivery or pipeline issue.
+
+---
+
+# Part 21 — Rejected records and quarantine design
+
+The exception list tells us why records failed. A quarantine dataset preserves the original record for investigation.
+
+## 21.1 What should quarantine contain?
+
+A practical quarantine record may contain:
+- source record identifier;
+- source system or file name;
+- ingestion batch ID;
+- received timestamp;
+- original source values needed for investigation;
+- failed rule ID;
+- rejection reason;
+- processing status.
+
+Avoid copying unnecessary personal or sensitive fields into a quarantine table. Apply the same access controls and retention policy as the source data.
+
+## 21.2 Create a simple quarantine table
+
+For this exercise, preserve the original order fields and the reason.
+
+~~~sql
+CREATE TEMP TABLE quality_quarantine AS
+SELECT
+    q.order_id,
+    q.customer_id,
+    q.order_date,
+    q.amount,
+    q.status,
+    e.rule_id,
+    e.reason
+FROM quality_orders AS q
+JOIN quality_exceptions AS e
+    ON q.order_id = e.order_id;
+~~~
+
+Expected command message:
+
+~~~text
+SELECT 4
+~~~
+
+The query creates four rows because order 1002 appears twice in the exception list—once for each failed rule.
+
+Inspect:
+
+~~~sql
+SELECT *
+FROM quality_quarantine
+ORDER BY order_id, rule_id;
+~~~
+
+Do not assume one row in quarantine always equals one rejected source record. A record may have multiple failure reasons. In a production design, keep a stable source-row identifier and decide whether the quarantine model is one row per record or one row per record-rule pair.
+
+## 21.3 Why not silently delete bad rows?
+
+Deleting a bad row removes evidence. Later, a business user may ask:
+- Why is order 1004 missing from the dashboard?
+- Was it rejected or never received?
+- Which rule rejected it?
+- Has it been corrected and replayed?
+
+Quarantine helps answer these questions.
+
+## 21.4 Correct and replay safely
+
+A correction process should be controlled:
+
+1. Identify the source of truth.
+2. Confirm the correct value with the owner.
+3. Record who approved the correction and why.
+4. Correct the source or create an approved correction record.
+5. Reprocess the affected batch or record.
+6. Re-run the same quality checks.
+7. Confirm the record is accepted exactly once.
+8. Preserve the original failure and correction evidence.
+
+Never update a warehouse value just to make a quality test green.
+
+---
+
+# Part 22 — Test the quality rules with edge cases
+
+A validation rule should be tested with normal data and unusual but possible data.
+
+| Case | Example | Question to ask |
+|---|---|---|
+| Normal | PAID with positive amount | Does it pass? |
+| Missing | customer_id is NULL | Is it required for this order type? |
+| Duplicate | Same order_id twice | Is the table grain one row per order? |
+| Boundary | amount = 0 | Is zero allowed for this status? |
+| Negative | amount = -50 | Could this be a refund or correction? |
+| Unknown category | status = ON_HOLD | Is the new value approved? |
+| Empty text | status = '' | Should blank text be treated as missing? |
+| Whitespace | status = ' PAID ' | Should whitespace be normalized before testing? |
+| Empty batch | no rows received | Is an empty batch expected today? |
+| Late record | yesterday's order arrives today | Is late arrival allowed? |
+
+## 22.1 Test a boundary value
+
+The current rule says paid amount must be greater than zero.
+
+Therefore:
+- 100.00 passes;
+- 0.00 fails;
+- -1.00 fails;
+- NULL fails if amount is required.
+
+A boundary test checks the exact edge of the rule. It often catches mistakes that normal examples do not.
+
+## 22.2 Normalize only when the rule permits it
+
+The source may send a status with spaces and lowercase letters. A staging transformation may standardize it:
+
+~~~sql
+SELECT UPPER(TRIM(status)) AS standardized_status
+FROM quality_orders;
+~~~
+
+But normalization must not hide an unknown business value. After normalization, validate against the approved list.
+
+---
+
+# Part 23 — Operationalize the quality gate
+
+A SQL query is a check. A production quality process also needs ownership, history and a response.
+
+## 23.1 A simple quality run record
+
+A production design can store one row per rule per execution.
+
+| Column | Purpose |
+|---|---|
+| run_id | Identifies one pipeline execution |
+| dataset_name | Identifies the table or model |
+| rule_id | Identifies the quality rule |
+| evaluated_at | Time the rule ran |
+| total_rows | Number of rows evaluated |
+| failed_rows | Number of failures |
+| severity | BLOCKING or WARNING |
+| result_status | PASS, FAIL or ERROR |
+
+A separate exception table can store record-level details. Do not put every failed row into the summary table.
+
+## 23.2 Example quality result table
+
+~~~sql
+CREATE TEMP TABLE quality_rule_results (
+    run_id VARCHAR(40),
+    dataset_name VARCHAR(100),
+    rule_id VARCHAR(100),
+    evaluated_at TIMESTAMP,
+    total_rows INTEGER,
+    failed_rows INTEGER,
+    severity VARCHAR(20),
+    result_status VARCHAR(20)
+);
+~~~
+
+Expected output:
+
+~~~text
+CREATE TABLE
+~~~
+
+Insert a result for the duplicate check:
+
+~~~sql
+INSERT INTO quality_rule_results
+SELECT
+    'run-2026-01-06-001',
+    'quality_orders',
+    'DUPLICATE_ORDER_ID',
+    CURRENT_TIMESTAMP,
+    (SELECT COUNT(*) FROM quality_orders),
+    COUNT(*),
+    'BLOCKING',
+    CASE WHEN COUNT(*) = 0 THEN 'PASS' ELSE 'FAIL' END
+FROM (
+    SELECT order_id
+    FROM quality_orders
+    WHERE order_id IS NOT NULL
+    GROUP BY order_id
+    HAVING COUNT(*) > 1
+) AS duplicate_keys;
+~~~
+
+Expected command message:
+
+~~~text
+INSERT 0 1
+~~~
+
+Inspect:
+
+~~~sql
+SELECT
+    run_id,
+    dataset_name,
+    rule_id,
+    total_rows,
+    failed_rows,
+    severity,
+    result_status
+FROM quality_rule_results;
+~~~
+
+Expected result:
+
+| run_id | dataset_name | rule_id | total_rows | failed_rows | severity | result_status |
+|---|---|---|---:|---:|---|---|
+| run-2026-01-06-001 | quality_orders | DUPLICATE_ORDER_ID | 6 | 1 | BLOCKING | FAIL |
+
+The timestamp is generated at execution time, so its exact value depends on when you run the query.
+
+## 23.3 Understand PASS, FAIL and ERROR
+
+- PASS: the check ran and found no violations.
+- FAIL: the check ran and found violations.
+- ERROR: the check could not complete, for example because a required table or column was missing.
+- SKIPPED: the check was intentionally not run under an approved condition.
+
+Do not convert a technical test error into PASS. A missing table means the engineer has no evidence that the rule passed.
+
+## 23.4 Who responds to a failure?
+
+A quality rule should have an owner.
+
+| Failure | Possible owner |
+|---|---|
+| Source field suddenly becomes NULL | Source application/data owner |
+| Duplicate ingestion after retry | Data Engineering |
+| Unknown business status | Business operations/data owner |
+| Wrong dimension mapping | Warehouse/model owner |
+| Stale source feed | Source integration owner |
+| Dashboard uses wrong metric definition | Analytics/product owner |
+
+Ownership prevents every issue from becoming an unassigned engineering alert.
+
+---
+
+# Part 24 — How quality checks fit into a warehouse pipeline
+
+Consider this simplified warehouse flow:
+
+Source system -> Raw layer -> Staging layer -> Curated warehouse -> Data mart -> Dashboard
+
+Quality checks belong at more than one boundary.
+
+| Pipeline point | Example checks | Why here? |
+|---|---|---|
+| Ingestion | File exists, schema, row count, file not empty | Detect delivery problems early |
+| Raw to staging | Type conversion, required fields, duplicates | Check source data can be interpreted |
+| Staging to curated | Business rules, relationships, accepted values | Protect warehouse models |
+| Curated to mart | Grain, totals, metric definitions | Protect business reporting |
+| Dashboard publication | Freshness, expected data period, reconciliation | Confirm the consumer receives usable data |
+
+Do not wait until the dashboard stage to discover a malformed source file.
+
+A record passing staging checks does not mean it is correct for every downstream use. A sales mart may require rules that an operational raw table does not.
+
+## 24.1 Quality rules should follow the grain
+
+Grain means what one row represents.
+
+Examples:
+- one row per order;
+- one row per order line;
+- one row per payment event;
+- one row per customer per day.
+
+A uniqueness rule is meaningful only after grain is defined.
+
+For example:
+- order_id should be unique in an order-header table;
+- order_id can repeat in an order-line table;
+- (order_id, line_number) may be unique in an order-line table.
+
+Before writing a duplicate test, answer: What does one row represent in this table?
+
+---
+
+# Part 25 — A beginner's troubleshooting guide
+
+When a check fails, do not immediately change the SQL or delete the row.
+
+## 25.1 Step 1: Read the rule
+
+Ask:
+- What business expectation does the rule represent?
+- Is it approved?
+- Does it apply to every record or only a subset?
+- What is the table grain?
+
+## 25.2 Step 2: Inspect failed records
+
+Run a query that returns actual values, not only a count.
+
+~~~sql
+SELECT *
+FROM quality_orders
+WHERE status IS NULL
+   OR status NOT IN ('PAID', 'PENDING', 'CANCELLED');
+~~~
+
+This shows records violating the status rule.
+
+## 25.3 Step 3: Check the source
+
+Ask:
+- Did the source send this value?
+- Did ingestion change it?
+- Did a join create duplicates?
+- Did a cast or trim operation change the value?
+- Did a new source status appear?
+
+## 25.4 Step 4: Decide the correct action
+
+Possible outcomes:
+- correct a documented transformation;
+- request a source correction;
+- update an approved business rule;
+- quarantine the record;
+- block publication;
+- accept a documented exception with an owner and expiry.
+
+## 25.5 Step 5: Re-run and record evidence
+
+After correction:
+- run the same query again;
+- compare before and after counts;
+- verify affected business keys;
+- confirm no new duplicates were introduced;
+- record the run ID and resolution.
+
+A test passing after an undocumented rule change is not sufficient evidence.
+
+---
+
+# Part 26 — Additional practice with worked answers
+
+## Exercise 7 — Missing versus zero
+
+A source sends discount_amount = 0 for customers who did not receive a discount. Another record has discount_amount = NULL. Are they the same?
+
+**Worked answer:** No. Zero is a known value meaning no discount. NULL means the value is missing or unknown. Whether NULL is allowed depends on the source contract. Do not replace NULL with zero without an approved rule.
+
+## Exercise 8 — Duplicate key
+
+A table contains three rows with the same customer_id. Is it a duplicate defect?
+
+**Worked answer:** Not automatically. If the table contains one row per order, a customer can legitimately have multiple orders. If the table is a customer master intended to contain one current row per customer, repeated customer_id may be a defect. First define the grain.
+
+## Exercise 9 — Test error
+
+A scheduled quality query fails because the column order_status was renamed to status. Should the pipeline mark the quality test as PASS?
+
+**Worked answer:** No. The test did not evaluate the data. Mark it ERROR, investigate the schema change, update the test after approval and rerun it. A test error is not evidence of quality.
+
+## Exercise 10 — Small percentage, high impact
+
+Only 0.01% of payment records have a missing payment reference. Can the team ignore it?
+
+**Worked answer:** Not necessarily. If every payment reference is required for financial reconciliation, even one missing reference may be blocking. Thresholds must reflect business impact, not only percentage.
+
+## Exercise 11 — New source value
+
+The source starts sending RETURNED as an order status. The accepted list does not include it. What should the Data Engineer do?
+
+**Worked answer:** Confirm the meaning with the source and business owner. Determine whether it is a valid new status, update the data contract and downstream logic after approval, add tests and document the change. Do not automatically classify it as PAID or CANCELLED.
+
+## Exercise 12 — Empty input
+
+A daily source file contains zero rows. The pipeline completes successfully. Is the dataset fresh and complete?
+
+**Worked answer:** Not enough information. Check whether zero rows are expected for that business date, whether the file was delivered, whether extraction filters were correct and whether the source watermark advanced. A technically successful empty load may still be a business failure.
+
+## Exercise 13 — One row, two failures
+
+Order 2001 has a missing customer ID and an invalid status. How many failed rules and affected records are there?
+
+**Worked answer:** Two failed rules and one affected source record. Keep these counts separate in the quality report.
+
+## Exercise 14 — Equal totals
+
+Source total is 50,000 and target total is 50,000. Is the target proven correct?
+
+**Worked answer:** No. Different records or values can offset each other. Combine row counts, distinct keys, missing/extra key checks, grouped totals and field-level comparisons.
+
+---
+
+# Part 27 — Day 45 practical completion checklist
+
+Before considering today's lesson complete, make sure you can do the following without copying blindly.
+
+### Concepts
+- [ ] Explain data quality in your own words.
+- [ ] Explain accuracy, completeness, consistency, validity, uniqueness and freshness.
+- [ ] Explain why data quality depends on business use.
+- [ ] Define table grain before choosing a unique key.
+- [ ] Explain the difference between a warning and a blocking rule.
+- [ ] Explain why a test ERROR is not a PASS.
+
+### PostgreSQL practice
+- [ ] Create the temporary training table.
+- [ ] Insert and inspect the six training records.
+- [ ] Find NULL values using IS NULL.
+- [ ] Find duplicates using GROUP BY and HAVING.
+- [ ] Validate allowed values using IN and NOT IN.
+- [ ] Check a numeric business rule.
+- [ ] Calculate missing-value counts and percentages.
+- [ ] Build a multi-rule exception list.
+- [ ] Count failed rules and affected records separately.
+- [ ] Create a quarantine table.
+- [ ] Record a quality result for a run.
+
+### Engineering decisions
+- [ ] Explain which failures block the sales mart.
+- [ ] Identify who should own each failure.
+- [ ] Describe how to correct and replay a rejected record.
+- [ ] Explain where quality checks belong in a warehouse pipeline.
+- [ ] Describe the evidence needed before publishing a data mart.
+
+## Final self-assessment
+
+Try answering these questions without looking at the notes:
+
+1. Why can a pipeline succeed while its data is wrong?
+2. Why is COUNT(*) different from COUNT(customer_id)?
+3. Why can NOT IN miss NULL values?
+4. Why is DISTINCT not a safe way to hide duplicate business keys?
+5. Why should one record be allowed to have more than one exception reason?
+6. Why is a quality test that did not run an ERROR rather than a PASS?
+7. What evidence would you collect before allowing a sales mart to publish?
+
+If you cannot explain an answer, revisit the relevant part and run the SQL again. The goal is not to memorize query patterns; it is to understand what evidence each query provides and what decision that evidence supports.
+
+**Next lesson — Day 46: Data Reconciliation and Lineage.** We will trace source records to warehouse outputs, compare counts and totals, investigate mismatches and document where every important value came from.
