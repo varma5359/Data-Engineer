@@ -1,235 +1,67 @@
-# Day 32 Interview Preparation: API-Based Data Ingestion
+# Day 32 Interview Guide — API-Based Data Ingestion
 
-**Mini-project:** API Ingestion Pipeline  
-**Target:** Fresher / Junior Data Engineer  
-**Method:** Answer aloud first; compare with the model answer; then connect it to your project.
+# 1. What is an API?
+**Model answer:** An API is a defined interface through which software systems exchange information or invoke operations. An endpoint represents a resource or operation; request parameters, authentication and response structure are defined by its contract. A Data Engineer uses APIs to retrieve data from SaaS, marketplace, payment or logistics systems when direct database access or files are unavailable.
 
----
+# 2. Explain request and response.
+**Model answer:** A request includes method, URL, headers, optional query parameters/body and authentication. The response includes status code, headers and body. I inspect status and content type before parsing, then validate the body schema and business values. HTTP success alone does not prove data correctness.
 
-# 1. Core concepts — complete model answers
+# 3. What is pagination and why is it needed?
+**Model answer:** Providers limit records per response for performance and quota control. Pagination retrieves subsequent pages until the documented terminal condition. I track page count, stable IDs and cursor progress, and reconcile final records. A one-page request can silently produce an incomplete dataset.
 
-## 1. What is an API?
+# 4. Offset versus cursor pagination?
+**Model answer:** Offset pagination uses page/offset positions and can be simple, but changing source data between requests can shift rows and cause skips/duplicates. Cursor pagination uses a provider-issued continuation token and is often more stable. Cursor is opaque; I send it back exactly as provided and stop on the documented terminal marker.
 
-**Model answer:** An API is a documented interface through which systems request data or actions. For ingestion it defines endpoints, parameters, authentication, response structure and limits.
+# 5. How do you avoid an infinite pagination loop?
+**Model answer:** I detect repeated cursors, set a maximum page/run budget, monitor progress and alert if the provider returns the same continuation token unexpectedly. I do not rely only on record count because an empty page may be valid or the terminal marker may be separate.
 
-**Follow-up:** Give a concrete example from API Ingestion Pipeline; state what evidence proves your answer.
+# 6. Explain HTTP status handling.
+**Model answer:** 2xx generally indicates request success; 400 means request input needs correction; 401 authentication; 403 permission; 404 resource/endpoint; 429 rate limit; 5xx server issue. I classify errors and use bounded retries only for eligible transient failures. Provider documentation can add specific semantics.
 
-## 2. What is REST?
+# 7. How do you handle 429?
+**Model answer:** I stop immediate requests, read Retry-After if supplied, respect provider quota guidance and retry within a finite attempt/time budget. I record rate-limit events and tune request concurrency. A tight loop would worsen throttling.
 
-**Model answer:** REST is an architectural style commonly used for web APIs: resources are addressed by URLs and HTTP methods describe operations. REST does not require JSON.
+# 8. What is exponential backoff?
+**Model answer:** Retry waits increase after repeated transient failures, such as 1, 2, 4, 8 seconds, with a cap and random jitter. It reduces pressure on a recovering service and avoids synchronized clients. Backoff is not used to fix permanent 400/401/403 errors.
 
-**Follow-up:** Give a concrete example from API Ingestion Pipeline; state what evidence proves your answer.
+# 9. Why is timeout not the same as retry?
+**Model answer:** Timeout limits how long one request waits. Retry policy decides whether another attempt is appropriate, how many attempts, how long to wait and when to stop. Without a retry budget, a pipeline can run indefinitely.
 
-## 3. What is an endpoint?
+# 10. How do you secure API credentials?
+**Model answer:** Store credentials in environment variables or a secret manager, use least privilege and HTTPS, rotate credentials, redact authorization headers and never commit tokens or print them. If exposed, revoke/rotate immediately. The token should be scoped to the data and operation needed.
 
-**Model answer:** An endpoint is a specific API address for a resource/action, such as /orders.
+# 11. What does response.json() do?
+**Model answer:** It parses response body text into Python objects—JSON object becomes dict, array becomes list, strings become str and null becomes None. It can raise a decode error if body is not valid JSON. I check status/content type and then validate expected top-level type and required fields.
 
-**Follow-up:** Give a concrete example from API Ingestion Pipeline; state what evidence proves your answer.
+# 12. Is valid JSON enough?
+**Model answer:** No. JSON can parse but have missing fields, wrong types, duplicate IDs, unexpected nulls or invalid business values. I validate contract and record rules, and report rejected data or fail the page depending on impact.
 
-## 4. Explain GET and POST.
+# 13. How do you checkpoint API pagination?
+**Model answer:** Persist the last safe cursor/page boundary only after the records from that page are durably written. If checkpoint fails, replay should be safe using idempotent keys. If checkpoint is written before data, a crash can skip records. Store run/window, cursor, page status and destination evidence.
 
-**Model answer:** GET retrieves data and should not create side effects. POST commonly submits/creates. Do not retry POST blindly unless idempotency is supported.
+# 14. What if API data changes during pagination?
+**Model answer:** Offset pagination may shift. I prefer snapshot/cursor APIs if available, stable sorting and source versioning. Otherwise use overlap, dedup and reconciliation. I document consistency limitations and may need a follow-up query for late changes.
 
-**Follow-up:** Give a concrete example from API Ingestion Pipeline; state what evidence proves your answer.
+# 15. How do you design API extraction for large volume?
+**Model answer:** Use provider filters/date windows, pagination, bounded processing, controlled concurrency within quota, streaming/page persistence, retry/backoff, checkpoints and idempotent destination writes. Monitor lag, page counts, duplicates, rate limits and failures. Avoid accumulating an unbounded list in memory.
 
-## 5. What does HTTP 200 mean?
+# 16. How would you test without a real API?
+**Model answer:** Use mock response fixtures for success, empty page, malformed JSON, missing field, 429, timeout, 503, repeated cursor and terminal page. Assert number of requests, output IDs, retry count and checkpoint behavior. Unit tests should not depend on network availability.
 
-**Model answer:** HTTP 200 means request succeeded at HTTP level. Validate response schema and business values; 200 can still contain zero records or an application error.
+# 17. Explain your Day 32 project.
+**Model answer:** “I built an API extractor that sends a documented request, checks HTTP status and response type, validates required fields, follows provider-issued cursors until completion, and writes records to a JSON output. I track page/record counts, detect repeated cursors and use bounded retries for transient errors. I protect credentials and test failure cases with mock responses. I reconcile IDs and output count before success.”
 
-**Follow-up:** Give a concrete example from API Ingestion Pipeline; state what evidence proves your answer.
+# 18. Follow-up interview prompts
+- What if API returns 200 with an error object?
+- What if page 5 fails after pages 1–4 were saved?
+- What if next_cursor repeats?
+- What if Retry-After is missing?
+- How do you handle API version changes?
+- What if the API returns 10,000 records per page?
+- How do you detect missing data when counts are unknown?
+- How do you ingest deletes or updated old records?
+- What data do you avoid logging?
+- How do you prove a rerun is safe?
 
-## 6. Explain 401, 403 and 404.
-
-**Model answer:** 401 means authentication missing/invalid; 403 access refused; 404 resource/endpoint absent. Fix cause instead of infinite retries.
-
-**Follow-up:** Give a concrete example from API Ingestion Pipeline; state what evidence proves your answer.
-
-## 7. What is HTTP 429?
-
-**Model answer:** 429 means rate limit exceeded. Respect Retry-After, reduce frequency and retry with controlled delay.
-
-**Follow-up:** Give a concrete example from API Ingestion Pipeline; state what evidence proves your answer.
-
-## 8. What is pagination?
-
-**Model answer:** Pagination splits a large collection. Follow next-page/cursor until documented end and avoid skip/repeat.
-
-**Follow-up:** Give a concrete example from API Ingestion Pipeline; state what evidence proves your answer.
-
-## 9. Offset versus cursor pagination?
-
-**Model answer:** Offset uses skip/limit and can shift as data changes. Cursor pagination follows a provider token and is often more stable.
-
-**Follow-up:** Give a concrete example from API Ingestion Pipeline; state what evidence proves your answer.
-
-## 10. What is authentication?
-
-**Model answer:** Authentication proves caller identity using API key/OAuth/signed request. Store securely and never log it.
-
-**Follow-up:** Give a concrete example from API Ingestion Pipeline; state what evidence proves your answer.
-
-## 11. What is a rate limit?
-
-**Model answer:** A request quota. Throttle and back off to avoid violating provider policy or overloading service.
-
-**Follow-up:** Give a concrete example from API Ingestion Pipeline; state what evidence proves your answer.
-
-## 12. Why set a timeout?
-
-**Model answer:** Timeout bounds waiting; otherwise a stalled network call can block the pipeline indefinitely.
-
-**Follow-up:** Give a concrete example from API Ingestion Pipeline; state what evidence proves your answer.
-
-## 13. What should be retried?
-
-**Model answer:** Retry transient network errors, selected 5xx and 429. Invalid request/credentials usually require correction.
-
-**Follow-up:** Give a concrete example from API Ingestion Pipeline; state what evidence proves your answer.
-
-## 14. What is exponential backoff?
-
-**Model answer:** Wait grows after failures, reducing pressure. Cap delay and add jitter.
-
-**Follow-up:** Give a concrete example from API Ingestion Pipeline; state what evidence proves your answer.
-
-## 15. What is an API checkpoint?
-
-**Model answer:** Saved progress such as cursor, page token, event ID or timestamp; save after returned data is durable.
-
-**Follow-up:** Give a concrete example from API Ingestion Pipeline; state what evidence proves your answer.
-
-## 16. How ingest API updates?
-
-**Model answer:** Use updated-since/change-feed/event endpoint; overlap recent window and reconcile when timestamp semantics are imperfect.
-
-**Follow-up:** Give a concrete example from API Ingestion Pipeline; state what evidence proves your answer.
-
-## 17. What is an idempotency key?
-
-**Model answer:** Unique request identifier recognized by provider to prevent duplicate effects on retry, if supported.
-
-**Follow-up:** Give a concrete example from API Ingestion Pipeline; state what evidence proves your answer.
-
-## 18. Why validate JSON?
-
-**Model answer:** JSON syntax parsing is not schema/business validation; check required keys, types, nulls, IDs and constraints.
-
-**Follow-up:** Give a concrete example from API Ingestion Pipeline; state what evidence proves your answer.
-
-## 19. Streaming versus pagination?
-
-**Model answer:** Pagination retrieves finite pages; streaming continuously delivers events and requires reconnect/replay/offset handling.
-
-**Follow-up:** Give a concrete example from API Ingestion Pipeline; state what evidence proves your answer.
-
-## 20. Design API ingestion.
-
-**Model answer:** Secure credentials, request with timeout, check status, validate payload, paginate/throttle/retry, write idempotently, checkpoint after durable write, log lag/counts and reconcile.
-
-**Follow-up:** Give a concrete example from API Ingestion Pipeline; state what evidence proves your answer.
-
-
----
-
-# 2. Scenario questions
-
-## 21. How handle changing page size?
-
-**Strong answer structure:** clarify requirement/source behavior; identify data-loss/duplicate/quality/security/performance risk; state exact control; explain failure/recovery; name verification metric. Do not say only “I will handle it”—describe the boundary, key, rule, retry/checkpoint and test.
-
-## 22. What if next_cursor is null?
-
-**Strong answer structure:** clarify requirement/source behavior; identify data-loss/duplicate/quality/security/performance risk; state exact control; explain failure/recovery; name verification metric. Do not say only “I will handle it”—describe the boundary, key, rule, retry/checkpoint and test.
-
-## 23. How protect token in Git?
-
-**Strong answer structure:** clarify requirement/source behavior; identify data-loss/duplicate/quality/security/performance risk; state exact control; explain failure/recovery; name verification metric. Do not say only “I will handle it”—describe the boundary, key, rule, retry/checkpoint and test.
-
-## 24. How backfill 90 days?
-
-**Strong answer structure:** clarify requirement/source behavior; identify data-loss/duplicate/quality/security/performance risk; state exact control; explain failure/recovery; name verification metric. Do not say only “I will handle it”—describe the boundary, key, rule, retry/checkpoint and test.
-
-## 25. How prevent duplicate pages?
-
-**Strong answer structure:** clarify requirement/source behavior; identify data-loss/duplicate/quality/security/performance risk; state exact control; explain failure/recovery; name verification metric. Do not say only “I will handle it”—describe the boundary, key, rule, retry/checkpoint and test.
-
-
----
-
-# 3. Project defence — API Ingestion Pipeline
-
-## 90-second project answer
-
-“My project is API Ingestion Pipeline. It solves this business problem: A marketplace API returns limited pages, may fail temporarily and requires credentials. Build a polite, restartable extractor. I define the source contract and record identity, read data in controlled units, validate structure/business rules, process valid records, isolate invalid data, persist safely and verify counts/keys/values. I record run metadata and progress only after durable success. I test duplicates, boundary cases and failures so reruns are safe. For production I would add managed secrets, least-privilege access, automated tests, scheduling, monitoring/alerts, scale tests and a runbook.”
-
-## 1. Why choose this project?
-
-**Answer:** It models a recurring Data Engineering responsibility and demonstrates more than a happy-path script.
-
-## 2. What is the source contract?
-
-**Answer:** Documented fields, types, required values, identity, delivery behavior and change expectations; I validate before processing.
-
-## 3. How prove output correctness?
-
-**Answer:** Reconcile counts, accepted/rejected totals, unique keys, business totals and source boundary.
-
-## 4. What if job fails halfway?
-
-**Answer:** Inspect last durable safe point, replay uncertain input idempotently, reconcile, then advance progress.
-
-## 5. How prevent duplicates?
-
-**Answer:** Stable business/event key, unique constraint or idempotency token and deterministic deduplication.
-
-## 6. Largest limitation?
-
-**Answer:** Classroom version uses small data and simplified infrastructure; production needs scale tests, secret management, concurrency and monitoring.
-
-## 7. First improvement?
-
-**Answer:** Automated boundary/failure tests, structured run metadata, alerting and repeatable deployment/runbook.
-
----
-
-# 4. Practical interview exercise
-
-- Draw source, validation, processing, destination, rejected path, checkpoint and monitoring. Label when progress becomes safe.
-- Job processed 800 records, persisted 700, then crashed. Explain state inspection, retry, duplicate prevention and success checks.
-- Compare classroom and production: scale, security, concurrency, retries, contract, observability and cost.
-- Identify in your code: validation, error handling, persistence, progress and correctness verification. If absent, state limitation and next step.
-
-# 5. Interview traps
-
-- “HTTP 200 means correct data.”
-- “I retry every error.”
-- “I use timestamp” without ties/late records/deletes.
-- “I remove duplicates” without identity key.
-- “Job succeeded” without counts/reconciliation.
-- “Exactly once” without mechanism/failure window.
-- “I log everything” including secrets/PII.
-- “Production-ready” based only on a local happy-path run.
-
-# 6. Short revision answers
-
-- **What is an API?** An API is a documented interface through which systems request data or actions. For ingestion it defines endpoints, parameters, authentication, response structure and limits.
-- **What is REST?** REST is an architectural style commonly used for web APIs: resources are addressed by URLs and HTTP methods describe operations. REST does not require JSON.
-- **What is an endpoint?** An endpoint is a specific API address for a resource/action, such as /orders.
-- **Explain GET and POST.** GET retrieves data and should not create side effects. POST commonly submits/creates. Do not retry POST blindly unless idempotency is supported.
-- **What does HTTP 200 mean?** HTTP 200 means request succeeded at HTTP level. Validate response schema and business values; 200 can still contain zero records or an application error.
-- **Explain 401, 403 and 404.** 401 means authentication missing/invalid; 403 access refused; 404 resource/endpoint absent. Fix cause instead of infinite retries.
-- **What is HTTP 429?** 429 means rate limit exceeded. Respect Retry-After, reduce frequency and retry with controlled delay.
-- **What is pagination?** Pagination splits a large collection. Follow next-page/cursor until documented end and avoid skip/repeat.
-
-# 7. Readiness checklist
-
-- [ ] Core answers explained without reading.
-- [ ] One business example connected.
-- [ ] End-to-end flow drawn.
-- [ ] Failure and recovery explained.
-- [ ] Key/checkpoint choice defended.
-- [ ] Correctness checks named.
-- [ ] Limitations stated honestly.
-- [ ] Production improvements discussed.
-
-**Interview goal:** explain decision + reason + failure mode + verification, not just tool name.
+# 19. Project defence framework
+Answer each design question using: business requirement -> API contract -> implementation -> risk -> validation evidence -> recovery. Include actual request/response and test results from your own run.
