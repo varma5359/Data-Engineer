@@ -1,541 +1,668 @@
-# Day 35: Data Cleaning and Schema Evolution
+# Day 35 — Data Cleaning and Schema Evolution
 
 **Phase:** 4 — Data Processing and Pipelines  
 **Syllabus topic:** Data Cleaning and Schema Evolution  
-**Mini-project:** Data Cleaning Framework  
-**Learning time:** 2–3 hours  
-**Level:** Complete beginner to junior Data Engineer  
+**Mini-project:** TechStore Data Cleaning Framework  
+**Audience:** Complete beginner / fresher  
+**Study time:** 2–3 hours (pause and run every cell)
 
----
+> **How to use this lesson:** Read one section, run its code in a notebook, compare your output, and explain it aloud. Do not skip directly to the final project. The project is assembled from the same small steps.
 
-# 1. What are we learning today?
+## 0. Today's learning contract
 
-A supplier renames customer_id to customerId and adds a field. Detect and manage schema changes rather than silently misinterpreting them.
+At the end, you should be able to:
+- explain dirty data, profiling, validation, cleaning, schema, schema drift and schema evolution in plain English;
+- distinguish a missing value from an invalid value and a duplicate;
+- choose a cleaning rule based on business meaning rather than guessing;
+- detect missing, extra and renamed columns;
+- classify schema changes as additive, compatible, breaking or unknown;
+- preserve rejected records and reasons;
+- build and test a small cleaning pipeline;
+- explain what the pipeline changed and prove that no records disappeared silently.
 
-## 1.1 Learning outcomes
+**You are not expected to memorize every pandas method today.** Understand the decisions first; methods are tools that implement those decisions.
 
-By the end of this lesson, you should be able to:
+## 1. The business problem: why cleaning exists
 
-1. Define required/optional fields and types.
-2. Check schema before volume processing.
-3. Profile null rates, distinct values and duplicate keys.
-4. Define dedup identity by business/event key.
-5. Classify changes as additive, rename, type change or removal.
-6. Version approved mappings and contracts.
-7. Quarantine breaking changes and alert owners.
-8. Test old/new schema and replay.
+Imagine TechStore receives an orders file from a partner every morning. Yesterday's file contained:
 
-## 1.2 Pipeline context
+| order_id | customer_id | amount | status |
+|---|---|---:|---|
+| O101 | C10 | 1200 | paid |
+| O102 | C11 | 800 | paid |
 
-```text
-Business source -> Data Cleaning and Schema Evolution -> Validate/process -> Staging/destination -> Reconcile -> Checkpoint + monitoring
-```
+Today's file contains:
 
-A pipeline is not merely a script that reads data. It is repeatable work with defined input, rules, output, progress, error path and evidence of correctness.
+| order_id | customerId | amount | status |
+|---|---|---|---|
+| O103 | C12 | 500 | PAID |
+| O104 | *(blank)* | 700 | paid |
+| O104 | *(blank)* | 700 | paid |
+| O105 | C13 | -90 | refund |
 
-# 2. Business scenario and vocabulary
+What changed?
+- The partner renamed `customer_id` to `customerId`.
+- A customer identifier is missing.
+- Order O104 appears twice.
+- Status casing is inconsistent (`PAID` vs `paid`).
+- A negative amount appears. It may be invalid—or it may represent a refund. Business meaning must be checked.
 
-A supplier renames customer_id to customerId and adds a field. Detect and manage schema changes rather than silently misinterpreting them.
+**Mentor point:** Cleaning is not “make every value look nice.” It is a controlled decision about which values can be corrected, accepted, rejected or investigated.
 
-| Term | Beginner meaning | Why it matters |
+## 2. Vocabulary from zero
+
+| Term | Simple meaning | TechStore example |
 |---|---|---|
-| **Schema** |  fields/types/constraints | Used to design and explain reliable pipelines. |
-| **drift** |  unexpected structure | Used to design and explain reliable pipelines. |
-| **evolution** |  controlled schema change | Used to design and explain reliable pipelines. |
-| **data contract** |  schema/meaning/quality agreement | Used to design and explain reliable pipelines. |
-| **duplicate** |  repeated business identity | Used to design and explain reliable pipelines. |
-| **missing** |  unavailable value | Used to design and explain reliable pipelines. |
-| **compatibility** |  old/new consumers can work | Used to design and explain reliable pipelines. |
-| **quarantine** |  isolate questionable data. | Used to design and explain reliable pipelines. |
+| Raw data | Data as received, unchanged | Partner's original CSV |
+| Dirty data | Data that violates a rule or is inconsistent | Blank required customer ID |
+| Profiling | Inspecting data before changing it | Count nulls and duplicate IDs |
+| Validation | Checking data against rules | Amount must be numeric |
+| Cleaning | Applying approved correction/removal rules | Trim spaces from status |
+| Schema | Column names, types and structure | order_id, amount, status |
+| Schema drift | Unexpected schema difference | customer_id suddenly becomes customerId |
+| Schema evolution | A controlled, approved schema change | Add optional currency column |
+| Data contract | Agreement about structure, meaning and quality | order_id is required and unique |
+| Quarantine | Keep problematic data separately for review | Row with missing customer ID |
+| Idempotent | Repeating the same run does not create extra effects | Re-run does not duplicate cleaned orders |
 
-## Before coding, answer five questions
-
-1. Where does data come from and who owns it?
-2. Which records/fields must be collected or changed?
-3. What can go wrong (missing values, duplicates, timeout, schema change, partial failure)?
-4. Where does the result go and what is its schema?
-5. How will correctness be proven (counts, keys, totals, status and run metadata)?
-
-# 3. Understand the concept before coding
-
-## 3.1 A small record example
-
-| ID | Value | Status |
-|---:|---:|---|
-| 1 | 100 | valid |
-| 2 | 200 | valid |
-| 3 | -5 | invalid |
-
-A reliable run accounts for all 3 input records: 2 accepted, 1 rejected with a reason, 2 output records. It must not silently discard record 3.
-
-## 3.2 Flow to remember
+## 3. The safe cleaning workflow
 
 ```text
-Receive -> Inspect -> Validate -> Process -> Persist -> Verify -> Record progress
-                    |                  |
-                    v                  v
-                Reject path       Retry/recovery path
+Receive raw data
+      ↓
+Preserve original (never overwrite it)
+      ↓
+Profile data (shape, types, nulls, duplicates, ranges)
+      ↓
+Check schema / contract
+      ↓
+Apply approved cleaning rules
+      ↓
+Validate cleaned data again
+      ↓
+Accepted records + rejected records + reasons
+      ↓
+Reconcile counts and publish
 ```
 
-- Receive: obtain source data.
-- Inspect: understand shape, size and metadata.
-- Validate: check rules before trusting it.
-- Process: apply topic-specific operation.
-- Persist: write durably.
-- Verify: compare expected and actual results.
-- Record progress: checkpoint only when safe.
+A beginner mistake is to clean immediately. First inspect what arrived. If you change values before profiling, you may destroy evidence of the source problem.
 
-# 4. First practical example
+## 4. Set up today's notebook
 
-## Task
-
-Demonstrate duplicates with one small operation before scaling it into a pipeline.
-
-## Code
+Use the Python environment from Phase 2. In a notebook, execute each code cell in order.
 
 ```python
-expected = {"order_id", "customer_id", "amount"}
-received = {"order_id", "customerId", "amount"}
-print("Missing:", expected - received)
-print("Extra:", received - expected)
+import pandas as pd
 ```
 
-## Expected output
+**What this line does:** `import` loads a library; `pandas` is the library used for tabular data; `pd` is the conventional short alias. If you see `ModuleNotFoundError: No module named 'pandas'`, install pandas in the same environment/kernel and restart if needed.
+
+## 5. Create a tiny dataset (understand every row first)
+
+```python
+orders = pd.DataFrame({
+    "order_id": ["O101", "O102", "O103", "O104", "O104", "O105"],
+    "customer_id": ["C10", "C11", "C12", None, None, "C13"],
+    "amount": ["1200", "800", "500", "700", "700", "-90"],
+    "status": [" paid ", "paid", "PAID", "paid", "paid", "refund"]
+})
+orders
+```
+
+Expected table:
+
+| index | order_id | customer_id | amount | status |
+|---:|---|---|---|---|
+| 0 | O101 | C10 | 1200 | ' paid ' |
+| 1 | O102 | C11 | 800 | paid |
+| 2 | O103 | C12 | 500 | PAID |
+| 3 | O104 | None | 700 | paid |
+| 4 | O104 | None | 700 | paid |
+| 5 | O105 | C13 | -90 | refund |
+
+**Read it carefully:** the amount column contains text strings, not numeric values. The two O104 rows share the same order ID. `None` represents a missing value in this sample.
+
+### 5.1 What is a DataFrame?
+
+A DataFrame is a table-like object with rows and columns. The `orders` variable points to the table we created. The index (0–5) is a row label—not the order ID and not a business key.
+
+## 6. Profile before cleaning
+
+### 6.1 Shape: how many rows and columns?
+
+```python
+orders.shape
+```
+
+Expected output:
+
+```text
+(6, 4)
+```
+
+Meaning: 6 rows and 4 columns. This is a baseline; later we compare it with accepted/rejected counts.
+
+### 6.2 Column names
+
+```python
+orders.columns
+```
+
+Expected output:
+
+```text
+Index(['order_id', 'customer_id', 'amount', 'status'], dtype='object')
+```
+
+This tells us the exact labels currently available. Column names are case-sensitive.
+
+### 6.3 Data types
+
+```python
+orders.dtypes
+```
+
+Expected output (format may vary slightly by pandas version):
+
+```text
+order_id       object
+customer_id    object
+amount         object
+status         object
+dtype: object
+```
+
+Why is amount `object`? We supplied strings such as `"1200"`. A string can contain non-numeric text, so pandas cannot safely assume it is a number.
+
+### 6.4 Missing values per column
+
+```python
+orders.isna().sum()
+```
+
+Expected output:
+
+```text
+order_id       0
+customer_id    2
+amount         0
+status         0
+dtype: int64
+```
+
+How to read it:
+- `isna()` checks each cell and returns True for missing values.
+- `sum()` counts True values column-wise.
+- Two customer IDs are missing. This is a finding—not permission to invent customer IDs.
+
+### 6.5 Duplicate order IDs
+
+```python
+orders["order_id"].duplicated().sum()
+```
+
+Expected output:
+
+```text
+1
+```
+
+The first O104 is treated as the original occurrence; the second is marked duplicated. This method only detects repeated values in the chosen column. It does not decide which record is correct.
+
+### 6.6 Inspect unique status values
+
+```python
+orders["status"].value_counts(dropna=False)
+```
+
+Expected counts:
+
+```text
+paid       3
+PAID       1
+refund     1
+ paid      1
+```
+
+We have three visual forms of paid. We can standardize case and surrounding spaces if the business contract says status values are case-insensitive.
+
+## 7. Cleaning rule 1 — Trim whitespace
+
+### Why?
+A value like `" paid "` looks like paid to a person, but exact comparisons may fail because spaces are part of the string.
+
+### Code
+
+```python
+orders["status"] = orders["status"].str.strip()
+orders["status"]
+```
+
+Expected values:
+
+```text
+0      paid
+1      paid
+2      PAID
+3      paid
+4      paid
+5    refund
+Name: status, dtype: object
+```
+
+**Breakdown**
+- `orders["status"]`: select the status column.
+- `.str`: access string operations for each value.
+- `.strip()`: remove whitespace at the beginning and end.
+- Assignment writes the cleaned values back into this working DataFrame.
+
+**Important:** this changes the working copy. In a production pipeline, retain the raw input separately so you can trace what the source sent.
+
+## 8. Cleaning rule 2 — Standardize case
+
+```python
+orders["status"] = orders["status"].str.lower()
+orders["status"].value_counts()
+```
+
+Expected output:
+
+```text
+paid      5
+refund    1
+Name: count, dtype: int64
+```
+
+Now `PAID` becomes `paid`. We used lower case because the example contract defines canonical status values in lowercase.
+
+**Do not lowercase every field automatically.** Names, codes and case-sensitive identifiers may require preserving case.
+
+## 9. Cleaning rule 3 — Convert amount safely
+
+### The problem
+A text value `"1200"` cannot be reliably summed as a number until it is converted. A bad value such as `"unknown"` should not crash the whole batch without an intentional policy.
+
+### First: safe conversion
+
+```python
+orders["amount_numeric"] = pd.to_numeric(orders["amount"], errors="coerce")
+orders[["amount", "amount_numeric"]]
+```
+
+Expected result:
+
+| amount | amount_numeric |
+|---|---:|
+| 1200 | 1200 |
+| 800 | 800 |
+| 500 | 500 |
+| 700 | 700 |
+| 700 | 700 |
+| -90 | -90 |
+
+`errors="coerce"` converts values that cannot be parsed into missing values (NaN). It does not mean the record is valid; we must detect conversion failures next.
+
+### Detect conversion failures
+
+```python
+bad_amount = orders["amount_numeric"].isna()
+orders.loc[bad_amount, ["order_id", "amount"]]
+```
+
+If a source amount were `"unknown"`, this would show its order ID and original value. In today's six rows there are no conversion failures.
+
+### Negative amount: don't guess
+
+A negative amount might mean:
+- invalid order amount;
+- refund/credit;
+- reversal or adjustment.
+
+Ask the business owner or inspect the source transaction type. For this lesson, our contract says **order amount must be zero or positive; refunds are represented in a separate refund feed**. Under that stated contract, -90 is rejected. In another system, the rule may differ.
+
+## 10. Cleaning rule 4 — Required fields
+
+A required field cannot be missing for a valid output record.
+
+```python
+missing_customer = orders["customer_id"].isna()
+orders.loc[missing_customer, ["order_id", "customer_id"]]
+```
+
+Expected output: rows O104 and O104 with missing customer ID.
+
+**What should we do?**
+- Do not fill with `"UNKNOWN"` unless the downstream contract explicitly allows that value.
+- Do not assign a random customer ID.
+- Keep the original record in rejected/quarantine output and record reason `missing_customer_id`.
+
+## 11. Cleaning rule 5 — Duplicate identity
+
+A duplicate is defined using a **business key**, not merely “all columns look alike.”
+
+For this order feed, the source contract says `order_id` uniquely identifies an order. Therefore repeated order IDs violate the contract.
+
+```python
+duplicate_order = orders["order_id"].duplicated(keep="first")
+orders.loc[duplicate_order]
+```
+
+Expected output: the second O104 row.
+
+`keep="first"` marks later occurrences as duplicates. This is only a detection demonstration. A production decision must consider:
+- Is the source file a full snapshot or a change feed?
+- Does the same order ID represent updates?
+- Is there an event ID or version?
+- Which record is authoritative (latest update, highest source version, etc.)?
+- Can legitimate multiple events share the same order ID?
+
+**Never delete duplicates blindly.** Deduplication policy must follow source semantics.
+
+## 12. Schema checks from zero
+
+A schema is the agreed structure of a dataset: names, types, required/optional status and sometimes constraints/meaning.
+
+### 12.1 Expected vs received columns
+
+```python
+expected_columns = {"order_id", "customer_id", "amount", "status"}
+received_columns = set(orders.columns)
+
+missing_columns = expected_columns - received_columns
+extra_columns = received_columns - expected_columns
+
+print("Missing:", missing_columns)
+print("Extra:", extra_columns)
+```
+
+Expected:
+
+```text
+Missing: set()
+Extra: set()
+```
+
+### 12.2 Simulate supplier rename
+
+```python
+partner_today = orders.rename(columns={"customer_id": "customerId"})
+received_columns = set(partner_today.columns)
+
+print("Missing:", expected_columns - received_columns)
+print("Extra:", received_columns - expected_columns)
+```
+
+Expected:
 
 ```text
 Missing: {'customer_id'}
 Extra: {'customerId'}
 ```
 
-> Sample output is for the stated sample values. API/database/file results may vary. Do not claim variable outputs are guaranteed or runtime-tested unless you executed them.
+**Interpretation:** a rename appears as one missing expected column plus one unexpected column. Do not silently assume the new name is correct.
 
-## Line-by-line explanation
+### 12.3 Approved rename mapping
 
-Set difference reveals absent required and unexpected fields. Do not assume customerId means customer_id without an approved mapping.
+If the supplier confirms that `customerId` has exactly the same meaning and semantics as `customer_id`, document and apply a mapping:
 
-### After running, answer
+```python
+partner_today = partner_today.rename(columns={"customerId": "customer_id"})
+```
 
-- What input did I provide?
-- Which operation ran?
-- Which object holds the result?
-- What does output prove?
-- What does output not prove?
+Then run the schema check again. A mapping is not just code: it is an approved contract change with owner, effective date and tests.
 
-A successful request/query/read does not automatically prove completeness, uniqueness, business validity or correctness.
+## 13. Schema evolution: classify before accepting
 
-# 5. Build the pipeline step by step
+| Change | Example | Typical impact | Safe response |
+|---|---|---|---|
+| Add optional field | add `currency` | Often compatible | Verify consumers ignore unknown fields or support it |
+| Add required field | new mandatory `country` | May break old producers | Version contract / coordinated rollout |
+| Rename field | `customer_id` → `customerId` | Usually breaking | Explicit mapping or new contract version |
+| Remove field | delete `status` | Breaking for consumers | Deprecate, migrate, then remove |
+| Type change | integer → string | Potentially breaking | Validate conversion and downstream impact |
+| Meaning change | amount now includes tax | Semantically breaking even if type unchanged | New definition/version and consumer review |
+| Reorder columns | same names, different order | Depends on positional consumers | Prefer name-based access; test positional systems |
 
-## Step 1 — Define the input contract
+### Backward compatibility
+A new producer version is backward-compatible when existing consumers can continue to work under the agreed contract. Adding an optional field is often compatible for name-based consumers, but not universally—for example, strict schema validators may reject unknown fields.
 
-Document source and owner, fields/types, required/optional values, unique identity, time/batch boundary, expected volume/frequency, permissions, and source limitations. If these are unknown, clarify before coding.
+### Forward compatibility
+An older consumer can handle data produced by a newer schema. This also depends on consumer design and contract rules; it is not guaranteed by adding a column.
 
-## Step 2 — Read a tiny sample
+## 14. Build a validation report (small, understandable)
 
-Start with 3–10 safe records. Inspect field names, types, nulls, duplicate keys, cursor/timestamp/version and whether the sample represents real edge cases. Never print credentials or sensitive data.
+```python
+report = {
+    "input_rows": len(orders),
+    "missing_customer_id": int(orders["customer_id"].isna().sum()),
+    "duplicate_order_id_rows": int(orders["order_id"].duplicated().sum()),
+    "amount_conversion_failures": int(orders["amount_numeric"].isna().sum()),
+    "negative_amount_rows": int((orders["amount_numeric"] < 0).sum())
+}
+report
+```
 
-## Step 3A — Validation is a decision
+Expected:
 
-| Rule | Example | Violation action |
+```text
+{'input_rows': 6, 'missing_customer_id': 2,
+ 'duplicate_order_id_rows': 1, 'amount_conversion_failures': 0,
+ 'negative_amount_rows': 1}
+```
+
+This is a **profile report**, not yet a final accepted/rejected report. A profile tells us what is present; a validation decision applies the rules.
+
+## 15. Mini-project: TechStore Data Cleaning Framework
+
+### Business requirement
+Partner order files must be cleaned before the analytics team uses them. We must:
+1. preserve raw records;
+2. normalize status whitespace/case;
+3. convert amount to numeric;
+4. require order ID and customer ID;
+5. reject negative amount under today's contract;
+6. detect duplicate order IDs;
+7. output accepted and rejected records with reasons;
+8. reconcile input = accepted + rejected.
+
+### 15.1 Start from a fresh raw dataset
+
+```python
+raw_orders = pd.DataFrame({
+    "order_id": ["O201", "O202", "O203", "O204", "O204", "O205", "O206"],
+    "customer_id": ["C21", "C22", "C23", None, None, "C25", "C26"],
+    "amount": ["1500", "900", "500", "700", "700", "-90", "bad-value"],
+    "status": [" PAID ", "paid", "PAID", "paid", "paid", "refund", "pending"]
+})
+```
+
+The raw dataset has seven records. Keep `raw_orders` unchanged as evidence.
+
+### 15.2 Create a working copy
+
+```python
+clean_orders = raw_orders.copy()
+```
+
+Why `.copy()`? It gives us a separate DataFrame to transform. We can compare it with the original later.
+
+### 15.3 Normalize status and convert amount
+
+```python
+clean_orders["status"] = clean_orders["status"].str.strip().str.lower()
+clean_orders["amount_numeric"] = pd.to_numeric(clean_orders["amount"], errors="coerce")
+```
+
+The chained string operations mean: strip outer whitespace first, then convert to lowercase.
+
+### 15.4 Build one reason per row (simple beginner approach)
+
+```python
+clean_orders["reject_reason"] = ""
+
+clean_orders.loc[clean_orders["order_id"].isna(), "reject_reason"] = "missing_order_id"
+clean_orders.loc[clean_orders["customer_id"].isna(), "reject_reason"] = "missing_customer_id"
+clean_orders.loc[clean_orders["amount_numeric"].isna(), "reject_reason"] = "invalid_amount"
+clean_orders.loc[clean_orders["amount_numeric"] < 0, "reject_reason"] = "negative_amount"
+```
+
+This simple version stores one reason. If a record violates multiple rules, later assignments overwrite earlier reasons. A production-quality framework should collect **all** reasons; the workbook demonstrates that improvement.
+
+### 15.5 Mark duplicates
+
+```python
+duplicate_mask = clean_orders["order_id"].duplicated(keep="first")
+clean_orders.loc[duplicate_mask, "reject_reason"] = "duplicate_order_id"
+```
+
+For this practice dataset, the second O204 is marked duplicate. If it already had another reason, this assignment would overwrite it; that is a known limitation we fix in the workbook's advanced exercise.
+
+### 15.6 Split accepted and rejected
+
+```python
+accepted = clean_orders[clean_orders["reject_reason"] == ""].copy()
+rejected = clean_orders[clean_orders["reject_reason"] != ""].copy()
+
+print("Input:", len(raw_orders))
+print("Accepted:", len(accepted))
+print("Rejected:", len(rejected))
+print("Reconciled:", len(accepted) + len(rejected) == len(raw_orders))
+```
+
+Expected output for the stated rules and sample:
+
+```text
+Input: 7
+Accepted: 3
+Rejected: 4
+Reconciled: True
+```
+
+Accepted orders: O201, O202, O203.  
+Rejected rows: missing customer (O204 first), duplicate O204, negative O205, invalid amount O206.
+
+### 15.7 Inspect rejected records
+
+```python
+rejected[["order_id", "customer_id", "amount", "reject_reason"]]
+```
+
+Expected reason categories:
+- O204 — missing_customer_id
+- O204 — duplicate_order_id
+- O205 — negative_amount
+- O206 — invalid_amount
+
+The rejected dataset is not trash. It is evidence for the source owner, audit, correction and controlled replay.
+
+### 15.8 Save outputs
+
+```python
+accepted.to_csv("accepted_orders.csv", index=False)
+rejected.to_csv("rejected_orders.csv", index=False)
+```
+
+- `to_csv` writes a CSV file.
+- `index=False` prevents pandas' row index from becoming an extra business column.
+- The files are created in the notebook's current working directory. Use a known project output folder in a real project.
+
+### 15.9 Verify files
+
+```python
+accepted_check = pd.read_csv("accepted_orders.csv")
+rejected_check = pd.read_csv("rejected_orders.csv")
+
+print("Accepted file rows:", len(accepted_check))
+print("Rejected file rows:", len(rejected_check))
+```
+
+Expected: 3 and 4. Reading the files back verifies that the outputs can be reopened; it does not prove every business rule is correct. Rule-level tests are also required.
+
+## 16. Common beginner errors and fixes
+
+| Mistake | Why it happens | Better approach |
 |---|---|---|
-| Required field | ID exists | Reject/quarantine |
-| Type | Amount numeric | Record conversion reason |
-| Range | Quantity positive | Reject or business review |
-| Identity | Key unique | Deduplicate or fail per contract |
-| Schema | Required columns exist | Stop batch and alert |
-| Completeness | All pages/partitions processed | Mark incomplete; don't checkpoint |
-
-## Step 4 — Process bounded units
-
-A unit can be a page, file, fetch batch, partition or record group. Bounded units control memory, reduce retry scope, provide progress points and isolate failures. Select the unit based on source/target capacity—not a tutorial's arbitrary number.
-
-## Step 5 — Persist safely
-
-Ask: did destination commit finish? Can the batch replay without duplicate effects? Is there a unique key/idempotency token? Can I trace output to source? What if process crashes now?
-
-## Step 6 — Verify
-
-Use at least two: input = accepted + rejected; key uniqueness; totals/ranges; boundary gap/overlap; schema; freshness; source/target reconciliation.
-
-# 6. Mistakes and corrections
-
-## Mistake 1: Deduplicate every column
-
-**Why dangerous:** Legitimate identical events may be lost.
-
-**Correct approach:** Use agreed identity key.
-
-## Mistake 2: Drop new columns silently
-
-**Why dangerous:** Can lose meaningful data.
-
-**Correct approach:** Capture extras and assess.
-
-## Mistake 3: Guess column rename
-
-**Why dangerous:** Similar names can mean different things.
-
-**Correct approach:** Approved explicit mapping.
-
-## Mistake 4: Replace NULL with empty string
-
-**Why dangerous:** Changes type/semantics.
-
-**Correct approach:** Preserve null policy.
-
-## Mistake 5: Alter target without migration
-
-**Why dangerous:** Downstream jobs break.
-
-**Correct approach:** Plan migration and compatibility.
-
-
-## Debugging checklist
-
-1. Confirm source exists and request/query is correct.
-2. Inspect exact raw input for a small failing case.
-3. Confirm schema and types.
-4. Check filters and boundaries (>, >=, dates, cursor).
-5. Check mapping/business rules.
-6. Check duplicate and unique-key behavior.
-7. Check destination write/transaction result.
-8. Inspect checkpoint and update timing.
-9. Reconcile input, accepted, rejected and output counts.
-10. Reproduce with controlled input before changing the full job.
-
-# 7. Mini-project — Data Cleaning Framework
-
-## Objective
-
-Build a beginner-readable pipeline demonstrating data cleaning and schema evolution with a happy path, invalid/failure path and verification step.
-
-## Requirements
-
-- Reproducible sample input and defined contract.
-- Predictable processing order and bounded units.
-- Required-field and identity validation.
-- Accepted/rejected outcomes separated.
-- Safe rerun without duplicate effects.
-- Run metadata: run ID, start/end, counts and status.
-- Progress/checkpoint behavior explained.
-- Output reconciled.
-
-## Sample business data
-
-| record_id | event_time | customer_id | amount | status |
-|---:|---|---:|---:|---|
-| 501 | 2026-11-10 09:00:00 | 11 | 1200.00 | PAID |
-| 502 | 2026-11-10 09:15:00 | 12 | 850.00 | PAID |
-| 503 | 2026-11-10 10:00:00 | 11 | 499.00 | PENDING |
-| 504 | 2026-11-10 10:30:00 | 13 | 0.00 | CANCELLED |
-
-These are teaching records. A zero amount or CANCELLED status is not automatically invalid; the business contract decides.
-
-## Part A — Design
-
-1. Name source/destination.
-2. Define unique key and required fields/types.
-3. Decide batch boundary and accepted/rejected rules.
-4. Define checkpoint and output schema.
-5. Define reconciliation checks.
-
-## Part B — Happy path
-
-1. Read a small batch.
-2. Count received records.
-3. Validate required fields.
-4. Process accepted records.
-5. Persist/display output.
-6. Verify counts and values.
-
-## Part C — Failure tests
-
-Test missing field, duplicate key and one transient error/malformed payload. Record expected behavior, actual behavior and correction. A happy-path-only script is not reliable yet.
-
-## Part D — Replay
-
-Run input twice; inspect duplicates; interrupt before checkpoint; restart from safe progress; reconcile final target.
-
-## Acceptance checklist
-
-- [ ] Input contract documented.
-- [ ] Small sample reproducible.
-- [ ] Code split into readable stages.
-- [ ] Outputs shown after important steps.
-- [ ] Invalid data has a reason.
-- [ ] Retry behavior bounded.
-- [ ] Rerun behavior safe.
-- [ ] Checkpoint order explained.
-- [ ] Counts and values reconciled.
-- [ ] Limitations and production improvements documented.
-
-# 8. Production thinking
-
-A classroom script runs on small data. Production additionally considers scale/memory, least-privilege security, secret management, concurrency, retries/checkpoints, source load, data contracts, monitoring/alerts/runbooks, schema changes, cost and auditability. A notebook is not production-ready merely because it executes successfully.
-
-# 9. Practice exercises
-
-## Exercise 1 — Explain
-
-Explain Schema to a beginner; give a business example; name a failure; explain detection and recovery.
-
-## Exercise 2 — Trace one record
-
-Trace record 502 from source through validation, processing, destination, checkpoint and verification.
-
-## Exercise 3 — Boundary test
-
-Create records immediately before, exactly at and after the boundary. Explain which are processed and why.
-
-## Exercise 4 — Failure test
-
-Interrupt after output persistence but before checkpoint. Restart and explain idempotency and duplicate checks.
-
-## Exercise 5 — Quality test
-
-Make one field invalid, one key duplicated and one record late. Decide action from contract and justify.
-
-## Exercise 6 — Interview practice
-
-Answer aloud: problem solved; end-to-end flow; failure behavior; completeness proof; production improvements.
-
-# 10. Day 35 revision sheet
-
-**Flow:** Define contract -> Read bounded input -> Validate -> Process -> Persist -> Verify -> Checkpoint -> Observe
-
-Never skip: unique record identity; what success guarantees; replay behavior; invalid versus transient error; evidence of destination correctness.
-
-## One-minute project defence
-
-“My Data Cleaning Framework receives data from a defined source. It validates the contract and identity, processes controlled units, handles invalid/transient cases explicitly, persists safely, records progress after durable success and reconciles counts/values. I can rerun it safely and diagnose failures from run metadata. Before production I would add automated tests, secret management, monitoring, access controls and scale testing.”
-
-## Self-assessment
-
-- [ ] I can define terms without memorizing.
-- [ ] I can explain code and output.
-- [ ] I can trace a record end-to-end.
-- [ ] I can reproduce/debug a failure.
-- [ ] I can explain checkpoint ordering and replay.
-- [ ] I can prove correctness with checks.
-- [ ] I can defend the project.
-
-**Complete the day when you can explain, run, interpret, test failure and prove the result—not merely read the notes.**
-
-
-# 11. Mentor-led deep dive — Schema evolution
-
-Read each scenario slowly. Identify input, risk, control and proof.
-
-## 11.1 Raw/curated distinction
-
-Contract example: order_id integer required/unique; customer_id integer required; amount decimal nonnegative; status accepted enum; created_at timestamp; discount optional. Add owner and compatibility policy.
-
-**Student checkpoint:** Explain this in your own words and name a test that proves it.
-
-## 11.2 Walkthrough
-
-Check schema before data: headers, required fields, extras, types, nullability. Stop before partial processing if incompatible.
-
-**Student checkpoint:** Explain this in your own words and name a test that proves it.
-
-## 11.3 Normalization policy
-
-Additive change: optional campaign_id may be accepted only if target/consumers support it; preserve or explicitly ignore with decision.
-
-**Student checkpoint:** Explain this in your own words and name a test that proves it.
-
-## 11.4 Mapping design
-
-Rename migration: accept old/new name during transition with explicit precedence/conflict check; version contract; update consumers; remove old after rollout.
-
-**Student checkpoint:** Explain this in your own words and name a test that proves it.
-
-## 11.5 Worked business example
-
-Type change integer->string can alter joins/sorting. Profile, define cast, test invalid/null and migrate downstream deliberately.
-
-**Student checkpoint:** Explain this in your own words and name a test that proves it.
-
-## 11.6 Filter semantics
-
-Duplicate identity: event_id/order_id+line_id. Same key may be replay/update/conflict; define deterministic winner and report conflicts.
-
-**Student checkpoint:** Explain this in your own words and name a test that proves it.
-
-## 11.7 Aggregation grain
-
-Missing policy: required missing rejects; optional missing null/default only by contract; analytic imputation is separate documented process.
-
-**Student checkpoint:** Explain this in your own words and name a test that proves it.
-
-## 11.8 Transformation order
-
-Profile null%, distinct, min/max, frequent values, duplicate counts; compare baseline for drift.
-
-**Student checkpoint:** Explain this in your own words and name a test that proves it.
-
-## 11.9 Reject evidence
-
-Version rollout: producer publishes version; consumers test; additive first; breaking changes migration/parallel version; monitor adoption.
-
-**Student checkpoint:** Explain this in your own words and name a test that proves it.
-
-## 11.10 Test design
-
-After mapping correction, replay raw under new transformation version and record replaced/rebuilt output.
-
-**Student checkpoint:** Explain this in your own words and name a test that proves it.
-
-# 12. Guided lab checkpoints
-
-## Lab checkpoint 1
-
-- Predict the result before running.
-- Execute this stage on a small input.
-- Record output, count and error (if any).
-- Explain which input/rule caused the result.
-- Compare actual result with contract and expected output.
-- Reproduce a failure with the smallest input and fix its cause.
-
-## Lab checkpoint 2
-
-- Predict the result before running.
-- Execute this stage on a small input.
-- Record output, count and error (if any).
-- Explain which input/rule caused the result.
-- Compare actual result with contract and expected output.
-- Reproduce a failure with the smallest input and fix its cause.
-
-## Lab checkpoint 3
-
-- Predict the result before running.
-- Execute this stage on a small input.
-- Record output, count and error (if any).
-- Explain which input/rule caused the result.
-- Compare actual result with contract and expected output.
-- Reproduce a failure with the smallest input and fix its cause.
-
-## Lab checkpoint 4
-
-- Predict the result before running.
-- Execute this stage on a small input.
-- Record output, count and error (if any).
-- Explain which input/rule caused the result.
-- Compare actual result with contract and expected output.
-- Reproduce a failure with the smallest input and fix its cause.
-
-## Lab checkpoint 5
-
-- Predict the result before running.
-- Execute this stage on a small input.
-- Record output, count and error (if any).
-- Explain which input/rule caused the result.
-- Compare actual result with contract and expected output.
-- Reproduce a failure with the smallest input and fix its cause.
-
-## Lab checkpoint 6
-
-- Predict the result before running.
-- Execute this stage on a small input.
-- Record output, count and error (if any).
-- Explain which input/rule caused the result.
-- Compare actual result with contract and expected output.
-- Reproduce a failure with the smallest input and fix its cause.
-
-## Lab checkpoint 7
-
-- Predict the result before running.
-- Execute this stage on a small input.
-- Record output, count and error (if any).
-- Explain which input/rule caused the result.
-- Compare actual result with contract and expected output.
-- Reproduce a failure with the smallest input and fix its cause.
-
-## Lab checkpoint 8
-
-- Predict the result before running.
-- Execute this stage on a small input.
-- Record output, count and error (if any).
-- Explain which input/rule caused the result.
-- Compare actual result with contract and expected output.
-- Reproduce a failure with the smallest input and fix its cause.
-
-
-# 13. Instructor review rubric
-
-| Skill | Beginner evidence |
-|---|---|
-| Concept | Explains what/why plainly |
-| Code | Reads/explains lines, not blindly copies |
-| Output | Derives output from input/rule |
-| Quality | Identifies invalid, duplicate and boundary cases |
-| Reliability | Explains retry, replay and checkpoint |
-| Verification | Uses counts/keys/totals/quality checks |
-| Interview | Gives decision, reason, failure mode and proof |
-
-
-
-# 14. Additional worked lab cells — Schema evolution
-
-Each cell is a separate experiment. Students should predict, execute, record output and explain the business meaning.
-
-## Lab cell 1
-
-Fixture A is original schema; fixture B adds optional campaign_code; fixture C renames customer_id; fixture D changes amount from decimal to text. Label additive, breaking or ambiguous.
-
-**Write in your notebook:** input; expected output; actual output; why it happened; validation evidence; what you would do if it failed.
-
-## Lab cell 2
-
-Compare required set, optional set and received set. Missing required field stops ingestion; unexpected additive field is captured and reviewed under policy.
-
-**Write in your notebook:** input; expected output; actual output; why it happened; validation evidence; what you would do if it failed.
-
-## Lab cell 3
-
-When old and new column names both appear, compare values. If they conflict, quarantine/report; never silently choose one.
-
-**Write in your notebook:** input; expected output; actual output; why it happened; validation evidence; what you would do if it failed.
-
-## Lab cell 4
-
-Validate types with sample and full data. '100' may parse; 'unknown' cannot. Report conversion counts and rejected examples without leaking sensitive data.
-
-**Write in your notebook:** input; expected output; actual output; why it happened; validation evidence; what you would do if it failed.
-
-## Lab cell 5
-
-Duplicate key examples: same event ID same payload (replay), same event ID different payload (conflict), different event IDs same payload (possibly valid). Define each action.
-
-**Write in your notebook:** input; expected output; actual output; why it happened; validation evidence; what you would do if it failed.
-
-## Lab cell 6
-
-Schema compatibility test: old consumer reading new optional column; new consumer reading old file with missing optional field. Set explicit default/null behavior.
-
-**Write in your notebook:** input; expected output; actual output; why it happened; validation evidence; what you would do if it failed.
-
-## Lab cell 7
-
-Version contract (v1/v2), migration notes, producer/consumer owner, rollout date and removal plan. Include rollback/replay strategy.
-
-**Write in your notebook:** input; expected output; actual output; why it happened; validation evidence; what you would do if it failed.
-
-## Lab cell 8
-
-After fix, replay original raw file with corrected mapping version; compare new output and record run lineage.
-
-**Write in your notebook:** input; expected output; actual output; why it happened; validation evidence; what you would do if it failed.
-
-# 15. Lab completion evidence
-
-| Evidence | Student submission |
-|---|---|
-| Input contract | Fields, types, keys, source behavior |
-| Happy-path run | Input and output counts |
-| Invalid case | Error/reject reason and handling |
-| Replay | Proof no duplicate side effect |
-| Boundary case | Proof no gap or unintended overlap |
-| Recovery | Last safe point and restart procedure |
-| Reconciliation | Counts, keys, totals or quality checks |
-| Project defence | Explain decision, risk, control and proof |
-
+| Replace every missing value with zero | Zero looks convenient | Decide field meaning; zero and unknown are different |
+| Drop duplicates on all columns | Confuses identical payload with business identity | Define event/order key and source semantics |
+| Rename columns silently | Assumes source change is harmless | Contract approval, mapping, tests and version |
+| Convert amount without checking failures | Invalid strings become NaN or raise errors | Count conversion failures and route them |
+| Remove negative amounts automatically | Assumes negatives are always wrong | Confirm refunds/reversals business meaning |
+| Overwrite raw file | Loses source evidence | Immutable raw layer and separate working copy |
+| Reject whole file for one bad row | No record-level policy | Decide batch-fatal vs row-reject rules |
+| Accept whole file despite missing required column | Code may continue with incomplete data | Schema check before processing |
+| Ignore rejected rows | Accepted output looks clean | Reconcile and publish reject reasons/counts |
+| Mark run successful before output is durable | Checkpoint moves too early | Persist, verify, then checkpoint |
+
+## 17. Debugging drills
+
+### Drill A: `KeyError: 'customer_id'`
+**Cause:** incoming file has `customerId`, not `customer_id`.  
+**Check:** print `df.columns`; compare received vs expected schema.  
+**Fix:** use an approved mapping; do not guess.
+
+### Drill B: `ValueError` while converting amount
+**Cause:** string contains non-numeric text.  
+**Fix:** use controlled conversion, capture failures, and reject/quarantine with original value.
+
+### Drill C: Output row count is smaller
+**Cause:** filtering, dropping duplicates, null removal or failed writes.  
+**Fix:** compare raw count, accepted count, rejected count and output count. Explain every difference.
+
+### Drill D: Rerun creates duplicate outputs
+**Cause:** append behavior without idempotency or output cleanup/versioning.  
+**Fix:** define run ID, output overwrite/merge policy, unique key and safe replay.
+
+## 18. Data quality dimensions
+
+| Dimension | Question | Example check |
+|---|---|---|
+| Completeness | Is required data present? | customer_id not null |
+| Uniqueness | Is identity unique? | order_id unique |
+| Validity | Does value follow allowed rules? | amount numeric and non-negative |
+| Consistency | Do related fields agree? | status and refund type align |
+| Accuracy | Does value reflect reality? | reconcile with source transaction |
+| Timeliness | Is data arriving when expected? | file received by deadline |
+
+A dataset can pass validity and still be inaccurate. A numeric amount may be the wrong amount. Quality checks are evidence, not a guarantee of truth.
+
+## 19. Production engineering considerations
+
+- **Raw retention:** keep original file/object and source metadata according to retention policy.
+- **Contract version:** record contract/schema version with each run.
+- **Observability:** record input/accepted/rejected counts, duration, failures and source file name.
+- **Security:** avoid exposing personal data in logs; restrict raw/rejected access.
+- **Scale:** profile bounded batches; avoid loading huge files entirely into memory.
+- **Idempotency:** reprocessing the same source should not duplicate target records.
+- **Ownership:** define who approves schema changes and who investigates rejects.
+- **Recovery:** keep enough metadata to replay corrected records safely.
+
+## 20. Exercises (attempt before reading workbook)
+
+1. Add a row with blank order ID. What should happen?
+2. Add amount `"1,200"`. Does `to_numeric` parse it directly? Test and design a locale-aware rule.
+3. Add a status `" Paid "`. Which normalization steps are needed?
+4. Add a new optional column `currency`. Is the change automatically safe?
+5. Rename `amount` to `total_amount`. What checks should fail?
+6. Create two rows with the same order ID but different amounts. Why is “keep first” insufficient?
+7. Make one row violate two rules. How can you retain both reasons?
+8. Prove `input = accepted + rejected` after every run.
+
+## 21. Day 35 revision checklist
+
+You are ready to move on when you can explain without looking:
+- [ ] profiling vs validation vs cleaning;
+- [ ] why raw data is preserved;
+- [ ] why a missing value is not automatically zero;
+- [ ] how to detect duplicate business keys;
+- [ ] how to detect schema drift;
+- [ ] why a rename/type/meaning change may break consumers;
+- [ ] how accepted and rejected rows are reconciled;
+- [ ] how to rerun safely and investigate failures.
+
+## 22. What comes next?
+
+Day 36 builds on cleaned data and teaches **Batch Processing and Partitioning**: how to process bounded chunks, divide large datasets into partitions, choose partition keys, handle skew and validate partition-level results.
+
+---
+
+**Student reminder:** If you cannot explain why a record was accepted or rejected, the pipeline is not finished.
