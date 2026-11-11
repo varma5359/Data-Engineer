@@ -787,3 +787,687 @@ Why avoid collect() on large datasets?
 - [ ] Troubleshoot basic Java and file path errors.
 
 **Next lesson — Day 56: Spark Transformations and Actions.** You will learn select, filter, withColumn, groupBy, aggregations and why transformations are lazy until an action executes the plan.
+
+
+---
+
+# Part 13 — Prepare the Windows practice environment carefully
+
+Spark setup is sometimes harder than the first DataFrame lesson. Separate the requirements and verify them one by one.
+
+## 44. Understand the three main components
+
+For local PySpark practice, you need:
+
+1. Python — runs your PySpark application code.
+2. PySpark — provides the Python API and Spark runtime components.
+3. A compatible Java runtime — Spark uses the Java Virtual Machine.
+
+Installing Python alone does not install Spark. Installing PySpark does not guarantee that Java is configured correctly.
+
+## 45. Check Python
+
+Open CMD:
+
+~~~bat
+python --version
+~~~
+
+Example output:
+
+~~~text
+Python 3.x.x
+~~~
+
+The exact version depends on your installation. Use a Python version supported by the Spark release you choose.
+
+If Python is not recognized, verify installation and PATH before continuing.
+
+## 46. Check pip
+
+~~~bat
+python -m pip --version
+~~~
+
+This checks pip through the Python interpreter selected by the command. Using python -m pip helps avoid installing a package into a different Python installation.
+
+## 47. Check Java
+
+~~~bat
+java -version
+~~~
+
+The command prints the active Java runtime version.
+
+If Java is not recognized:
+1. install a Java runtime supported by your chosen Spark release;
+2. follow the official installation instructions;
+3. configure PATH and JAVA_HOME if required;
+4. close and reopen CMD;
+5. run java -version again.
+
+Do not assume one Java version works with every Spark release. Check the official Spark compatibility documentation for the exact version you install.
+
+## 48. Install PySpark
+
+~~~bat
+python -m pip install pyspark
+~~~
+
+Expected behavior: pip downloads and installs PySpark and its dependencies, or reports that the package is already installed.
+
+Check the installed package:
+
+~~~bat
+python -m pip show pyspark
+~~~
+
+The output includes the installed version and package location.
+
+## 49. Confirm which Python is active
+
+~~~bat
+where python
+~~~
+
+Windows may show multiple Python executables. The first matching executable is commonly the one selected by CMD.
+
+If Jupyter uses a different kernel, it may not see the same PySpark installation. Check the notebook kernel's Python environment.
+
+## 50. Create the practice folder
+
+In CMD:
+
+~~~bat
+mkdir spark_day55
+cd spark_day55
+mkdir data
+~~~
+
+Create the file:
+
+~~~text
+spark_day55/
+    data/
+        orders.csv
+    day55_spark_practice.py
+~~~
+
+Save the notebook or Python file in the project folder. Keep the data file in the data folder.
+
+## 51. Create the CSV
+
+Create data/orders.csv with:
+
+~~~csv
+order_id,customer_id,city,amount
+101,C001,Hyderabad,250.00
+102,C002,Chennai,499.50
+103,C001,Hyderabad,100.00
+104,C003,Bengaluru,750.25
+105,C004,Chennai,300.00
+~~~
+
+Save and close the file.
+
+This dataset deliberately includes decimal amounts so the schema exercise can demonstrate money values.
+
+Check that the file exists:
+
+~~~bat
+dir data
+~~~
+
+If Windows saved it as orders.csv.txt, turn on file-name extensions in File Explorer and correct the name.
+
+---
+
+# Part 14 — Create your first Spark application step by step
+
+## 52. Cell 1 — Import SparkSession
+
+~~~python
+from pyspark.sql import SparkSession
+~~~
+
+**Goal:** Import the object used to create and manage a Spark application session.
+
+**Expected output:** No printed output. A successful import normally produces no message.
+
+If you see ModuleNotFoundError, check that PySpark is installed in the active Python environment.
+
+## 53. Cell 2 — Create the SparkSession
+
+~~~python
+spark = (
+    SparkSession.builder
+    .appName("TechStoreDay55")
+    .master("local[*]")
+    .getOrCreate()
+)
+
+print("Spark is ready")
+~~~
+
+Expected output:
+
+~~~text
+Spark is ready
+~~~
+
+Understand each line:
+- SparkSession.builder begins session configuration.
+- appName gives the application a recognizable name.
+- master("local[*]") requests local execution using available cores.
+- getOrCreate() reuses an existing session or creates one.
+- spark stores the session object.
+
+This is local mode. It is not a cloud cluster.
+
+## 54. Cell 3 — Inspect Spark version and application mode
+
+~~~python
+print("Spark version:", spark.version)
+print("Application name:", spark.sparkContext.appName)
+print("Master:", spark.sparkContext.master)
+~~~
+
+Example output:
+
+~~~text
+Spark version: 3.x.x
+Application name: TechStoreDay55
+Master: local[*]
+~~~
+
+The version number depends on your installation. The master value should show local execution for this exercise.
+
+## 55. Cell 4 — Check the working directory
+
+~~~python
+import os
+
+print(os.getcwd())
+~~~
+
+Expected output: the full folder path from which the Python process is running.
+
+Why does this matter? Relative paths are resolved from the current working directory. If Spark cannot find data/orders.csv, first confirm this location.
+
+## 56. Cell 5 — Read the CSV
+
+~~~python
+orders = spark.read.csv(
+    "data/orders.csv",
+    header=True,
+    inferSchema=True
+)
+
+print("CSV DataFrame created")
+~~~
+
+Expected output:
+
+~~~text
+CSV DataFrame created
+~~~
+
+The DataFrame variable now describes the input. Spark may defer some processing until an action is requested.
+
+## 57. Cell 6 — Display a small sample
+
+~~~python
+orders.show(5, truncate=False)
+~~~
+
+Expected rows:
+
+| order_id | customer_id | city | amount |
+|---:|---|---|---:|
+| 101 | C001 | Hyderabad | 250.00 |
+| 102 | C002 | Chennai | 499.50 |
+| 103 | C001 | Hyderabad | 100.00 |
+| 104 | C003 | Bengaluru | 750.25 |
+| 105 | C004 | Chennai | 300.00 |
+
+Spark's console table formatting may differ. The values should match the source CSV.
+
+The argument 5 asks Spark to display up to five rows. truncate=False prevents long values from being shortened.
+
+## 58. Cell 7 — Inspect the schema
+
+~~~python
+orders.printSchema()
+~~~
+
+Expected schema will include:
+- order_id as an integer;
+- customer_id as a string;
+- city as a string;
+- amount as a decimal or numeric type inferred from the file.
+
+Exact inferred types can vary with Spark version and data. Inspect your own output.
+
+## 59. Cell 8 — Inspect columns and data types
+
+~~~python
+print("Columns:", orders.columns)
+print("Data types:", orders.dtypes)
+~~~
+
+Expected column names:
+
+~~~text
+['order_id', 'customer_id', 'city', 'amount']
+~~~
+
+The data type list is produced from the schema. Do not assume the inferred type is the business-approved type.
+
+## 60. Cell 9 — Count rows
+
+~~~python
+row_count = orders.count()
+
+print("Rows:", row_count)
+~~~
+
+Expected output:
+
+~~~text
+Rows: 5
+~~~
+
+count() is an action. Spark must execute enough of the plan to calculate the row count.
+
+## 61. Cell 10 — Count columns
+
+~~~python
+column_count = len(orders.columns)
+
+print("Columns:", column_count)
+~~~
+
+Expected output:
+
+~~~text
+Columns: 4
+~~~
+
+The columns list is local metadata. This does not scan all data rows.
+
+## 62. Cell 11 — Inspect summary statistics
+
+~~~python
+orders.describe("amount").show()
+~~~
+
+Expected summary:
+- count = 5;
+- mean = 380.0;
+- minimum = 100.0;
+- maximum = 750.25.
+
+Standard deviation is calculated by Spark. Displayed decimal precision may vary.
+
+Check the mean manually:
+
+~~~text
+250.00 + 499.50 + 100.00 + 750.25 + 300.00 = 1899.75
+1899.75 / 5 = 379.95
+~~~
+
+Therefore the expected mean is 379.95, subject to display rounding. Use the actual output and this arithmetic to verify it.
+
+---
+
+# Part 15 — Use an explicit schema for predictable data types
+
+## 63. Why inference can be risky
+
+Imagine the first file contains only whole-number amounts. Spark may infer an integer type.
+
+A later file may contain 499.50. The schema can then differ or parsing may behave differently depending on how files are read.
+
+For money, define the intended decimal type explicitly.
+
+## 64. Import schema types
+
+~~~python
+from pyspark.sql.types import (
+    StructType,
+    StructField,
+    IntegerType,
+    StringType,
+    DecimalType
+)
+~~~
+
+This imports the schema building blocks.
+
+## 65. Define the expected schema
+
+~~~python
+orders_schema = StructType([
+    StructField("order_id", IntegerType(), False),
+    StructField("customer_id", StringType(), False),
+    StructField("city", StringType(), True),
+    StructField("amount", DecimalType(12, 2), False)
+])
+
+print(orders_schema)
+~~~
+
+Expected output: Spark displays a schema definition containing the four named fields and their types.
+
+Understand:
+- StructType describes the row;
+- StructField defines one column;
+- IntegerType is a whole-number type;
+- StringType stores text;
+- DecimalType(12, 2) supports up to 12 total digits with 2 decimal places;
+- False marks a field as not nullable in the declared schema;
+- True allows a null value in the declared schema.
+
+A declared non-nullable field does not remove the need to validate the input. Reader behavior for malformed records must be checked.
+
+## 66. Read using the schema
+
+~~~python
+orders_typed = spark.read.csv(
+    "data/orders.csv",
+    header=True,
+    schema=orders_schema
+)
+
+orders_typed.printSchema()
+orders_typed.show()
+~~~
+
+Expected schema includes:
+
+~~~text
+ |-- order_id: integer (nullable = true)
+ |-- customer_id: string (nullable = true)
+ |-- city: string (nullable = true)
+ |-- amount: decimal(12,2) (nullable = true)
+~~~
+
+CSV readers may represent parsed fields as nullable even when the supplied StructField was declared non-nullable. Verify actual behavior for your Spark version and reader options. Enforce business-required fields with explicit data-quality checks.
+
+## 67. Validate null values
+
+~~~python
+from pyspark.sql.functions import col
+
+orders_typed.select(
+    [
+        col(column).isNull().cast("int").sum().alias(column + "_nulls")
+        for column in orders_typed.columns
+    ]
+).show()
+~~~
+
+Expected output for the supplied training CSV: zero nulls for all four columns.
+
+Explanation:
+- col(column) refers to a DataFrame column;
+- isNull() identifies missing values;
+- cast("int") converts true/false to a numeric indicator;
+- sum() counts the missing indicators;
+- alias() names the result column;
+- select() creates the summary DataFrame;
+- show() executes and displays it.
+
+If the cell is unfamiliar, read it one expression at a time. You will learn transformations and functions in more detail in Day 56.
+
+## 68. Why schema validation is not just printSchema
+
+printSchema shows the current structure. It does not prove:
+- every required field is present in the source contract;
+- every row has a valid value;
+- order IDs are unique;
+- amounts are positive;
+- city values belong to an approved list.
+
+A production pipeline needs both structural checks and business-data checks.
+
+---
+
+# Part 16 — Understand Spark execution through actions
+
+## 69. A DataFrame is not simply a Python list
+
+When you write:
+
+~~~python
+paid_orders = orders.filter(orders.status == "PAID")
+~~~
+
+Spark builds a DataFrame transformation. It does not immediately return a Python list containing every matching row.
+
+The variable represents a distributed dataset and its planned operations.
+
+## 70. Trigger execution with an action
+
+~~~python
+paid_orders.show()
+~~~
+
+show() asks Spark to execute the necessary plan and display rows.
+
+Other common actions include:
+- count();
+- collect();
+- take();
+- first();
+- write operations.
+
+## 71. Inspect the execution plan
+
+~~~python
+orders.explain()
+~~~
+
+This displays a query plan for the DataFrame.
+
+The plan can show how Spark intends to read and process the data. It is not a timing benchmark by itself.
+
+You will learn how to read plans and optimize transformations in later Spark lessons.
+
+## 72. Understand the Spark UI
+
+When a local Spark application is running, Spark commonly exposes a web UI on a local port such as 4040, if that port is available and UI is enabled.
+
+The UI can show:
+- jobs;
+- stages;
+- tasks;
+- storage;
+- environment;
+- executors.
+
+The exact page and available information depend on Spark version and deployment mode.
+
+If the port is already in use, Spark may select another available port and print it in the application logs. Use the address reported by your running application.
+
+Do not expose a production Spark UI publicly. It can reveal application and execution details.
+
+---
+
+# Part 17 — Understand local mode and cluster deployment more deeply
+
+## 73. Local mode
+
+The setting:
+
+~~~python
+.master("local[*]")
+~~~
+
+runs Spark on the current machine and uses available local cores.
+
+It is appropriate for:
+- learning DataFrame syntax;
+- testing a small transformation;
+- validating a sample;
+- debugging file paths;
+- developing before cluster deployment.
+
+## 74. Cluster deployment
+
+In a cluster deployment:
+- a driver coordinates the application;
+- a cluster manager allocates resources;
+- executors run tasks;
+- tasks process data partitions;
+- results and status are coordinated.
+
+The driver may run on the submitting machine or in a cluster-managed location, depending on deploy mode and platform.
+
+Do not assume the driver always runs on your laptop.
+
+## 75. Why local and cluster results can differ operationally
+
+The business result should remain correct, but operational behavior can differ because:
+- local files may not exist on cluster workers;
+- cloud credentials may differ;
+- network access may differ;
+- available memory and cores differ;
+- file permissions differ;
+- dependency packages may differ;
+- partition counts and scheduling differ.
+
+A script that works locally still needs deployment testing.
+
+---
+
+# Part 18 — Common errors and how to investigate them
+
+| Error or symptom | Possible reason | First check |
+|---|---|---|
+| pyspark not found | Package installed in another Python environment | Check interpreter and pip location |
+| Java gateway exited | Java compatibility or environment issue | Verify supported Java and JAVA_HOME |
+| File not found | Wrong working directory or path | Print os.getcwd() and inspect file |
+| Cannot infer schema | Empty/malformed input or missing data | Inspect file and define schema |
+| Amount inferred as integer | Sample has only whole numbers | Use DecimalType |
+| Unexpected nulls | Parsing or source-quality issue | Inspect malformed records and schema |
+| Spark UI not opening | UI disabled, app stopped or port changed | Read application startup output |
+| Slow first action | Session startup and file scan | Separate startup from repeated query timing |
+| Driver out of memory | Too much data brought to driver | Avoid collect() on large data |
+| Permission denied on cloud file | Workload identity lacks storage access | Check approved cloud identity and resource policy |
+
+Do not solve every problem by reinstalling everything. Identify the layer that failed.
+
+---
+
+# Part 19 — Practice exercises with worked answers
+
+## Exercise 9 — SparkSession
+
+Why does a PySpark program create a SparkSession?
+
+**Worked answer:** It provides the main entry point for DataFrame and SQL operations and manages the Spark application session.
+
+## Exercise 10 — Local mode
+
+The code uses local[*]. Can the student claim that three cloud worker nodes processed the file?
+
+**Worked answer:** No. local[*] requests local execution on the current machine. It does not create cloud worker nodes.
+
+## Exercise 11 — Schema inference
+
+A sample file has amount values 100 and 200. A later file contains 200.75. Why can inference be risky?
+
+**Worked answer:** The first file may infer an integer type while the later data requires a decimal. Define and validate the intended type.
+
+## Exercise 12 — Count
+
+Why can count() take time even though it prints only one number?
+
+**Worked answer:** Spark may need to scan the input and execute the plan to count all rows.
+
+## Exercise 13 — collect
+
+A DataFrame contains 50 million rows. Should you call collect() to inspect it?
+
+**Worked answer:** No. It can transfer all rows to driver memory and cause an out-of-memory failure. Use show with a small limit or distributed summaries.
+
+## Exercise 14 — Missing file
+
+Spark cannot find data/orders.csv. What should you inspect first?
+
+**Worked answer:** Current working directory, file name, extension and relative path.
+
+## Exercise 15 — DataFrame
+
+Is a Spark DataFrame the same as a pandas DataFrame?
+
+**Worked answer:** No. Both organize data into columns, but Spark DataFrames use Spark's execution engine and are designed for distributed processing.
+
+## Exercise 16 — Spark UI
+
+Why might localhost:4040 not open?
+
+**Worked answer:** The application may have stopped, the UI may be disabled, or the port may have been occupied and Spark selected another port. Check startup output.
+
+## Exercise 17 — Local deployment
+
+A Spark script works on a laptop but fails on a cluster. Give two possible reasons.
+
+**Worked answer:** Cluster workers may not have the same file path or packages; the cluster may use a different identity or network route. Compare environment, dependencies, storage and permissions.
+
+---
+
+# Part 20 — Day 55 practical completion checklist
+
+### Environment
+- [ ] Check Python and pip versions.
+- [ ] Check Java runtime compatibility.
+- [ ] Install PySpark in the active environment.
+- [ ] Create the practice folder and CSV.
+- [ ] Confirm the current working directory.
+
+### Spark basics
+- [ ] Import SparkSession.
+- [ ] Create a local SparkSession.
+- [ ] Inspect Spark version, application name and master.
+- [ ] Explain driver, executor and cluster manager.
+- [ ] Explain local mode versus cluster mode.
+
+### DataFrame practice
+- [ ] Read a CSV file.
+- [ ] Display a limited number of rows.
+- [ ] Inspect schema, columns and data types.
+- [ ] Count rows and columns.
+- [ ] Describe a numeric field.
+- [ ] Define an explicit schema.
+- [ ] Check null values.
+- [ ] Explain why inferred schema may be unsafe.
+
+### Execution understanding
+- [ ] Explain transformations and actions at a high level.
+- [ ] Run explain() and recognize it as a plan.
+- [ ] Locate the Spark UI when available.
+- [ ] Explain why collect() can exhaust driver memory.
+- [ ] Explain why local success does not prove cluster readiness.
+
+## Final self-assessment
+
+Without looking at the notes, explain:
+
+1. What is Apache Spark, and what does PySpark provide?
+2. What is the role of the driver?
+3. What is the role of an executor?
+4. What does a cluster manager do?
+5. What is a SparkSession?
+6. What is a DataFrame schema?
+7. Why can inferSchema create inconsistent types?
+8. What is the difference between a transformation and an action?
+9. Why can count() trigger processing?
+10. Why is collect() risky for large datasets?
+11. What does local[*] mean?
+12. Why can a locally working job fail in a cluster?
+
+If you can create the Spark session, read the training CSV, inspect its schema and explain the execution model, you are ready for Day 56.
+
+**Next lesson — Day 56: Spark Transformations and Actions.** We will use select, filter, withColumn, when, groupBy, agg, orderBy and distinct, inspect the results after each step, and understand how actions trigger execution.
