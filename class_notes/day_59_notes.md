@@ -95,6 +95,10 @@ A batch pipeline may run on a schedule or after a file arrives.
 
 ## 5. Example cloud architecture
 
+![Data warehouse and ETL reference architecture](https://upload.wikimedia.org/wikipedia/commons/0/0b/Datawarehouse_reference_architecture.jpg)
+
+<sub>Image: DataZoomers, Wikimedia Commons, CC BY-SA 4.0. [Source](https://commons.wikimedia.org/wiki/File:Datawarehouse_reference_architecture.jpg) · [License](https://creativecommons.org/licenses/by-sa/4.0/).</sub>
+
 ~~~text
 Order application / API / Database
                 |
