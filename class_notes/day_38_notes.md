@@ -327,3 +327,144 @@ Never skip: unique record identity; what success guarantees; replay behavior; in
 - [ ] I can defend the project.
 
 **Complete the day when you can explain, run, interpret, test failure and prove the result—not merely read the notes.**
+
+
+# 11. Mentor-led deep dive — Reliability
+
+Read each scenario slowly. Identify input, risk, control and proof.
+
+## 11.1 Raw/curated distinction
+
+Failure map: before read, after read, transform, during write, after commit/before checkpoint, after checkpoint. For each identify durable state and restart action.
+
+**Student checkpoint:** Explain this in your own words and name a test that proves it.
+
+## 11.2 Walkthrough
+
+Retry table: timeout retry; 429 respect wait; 503 backoff; invalid schema quarantine/alert; auth stop and fix.
+
+**Student checkpoint:** Explain this in your own words and name a test that proves it.
+
+## 11.3 Normalization policy
+
+Backoff attempts 1/2/3 waits 2/4 seconds; cap and jitter to avoid synchronized retries.
+
+**Student checkpoint:** Explain this in your own words and name a test that proves it.
+
+## 11.4 Mapping design
+
+File output: temporary file -> close/validate -> atomic rename if filesystem supports; rerun checks source/run identity.
+
+**Student checkpoint:** Explain this in your own words and name a test that proves it.
+
+## 11.5 Worked business example
+
+Database output: unique key/upsert or transactionally deduplicated staging; replay must not add rows twice.
+
+**Student checkpoint:** Explain this in your own words and name a test that proves it.
+
+## 11.6 Filter semantics
+
+Poison row: isolate with reason/source offset if safe; systemic schema/logic errors should fail/alert, not be skipped.
+
+**Student checkpoint:** Explain this in your own words and name a test that proves it.
+
+## 11.7 Aggregation grain
+
+Exactly-once nuance: delivery may be at-least-once; idempotency/transaction makes effect effectively once. Explain boundaries.
+
+**Student checkpoint:** Explain this in your own words and name a test that proves it.
+
+## 11.8 Transformation order
+
+Runbook: detect -> inspect run/checkpoint -> inspect partial writes -> fix -> replay bounded input -> reconcile -> mark recovered/notify.
+
+**Student checkpoint:** Explain this in your own words and name a test that proves it.
+
+# 12. Guided lab checkpoints
+
+## Lab checkpoint 1
+
+- Predict the result before running.
+- Execute this stage on a small input.
+- Record output, count and error (if any).
+- Explain which input/rule caused the result.
+- Compare actual result with contract and expected output.
+- Reproduce a failure with the smallest input and fix its cause.
+
+## Lab checkpoint 2
+
+- Predict the result before running.
+- Execute this stage on a small input.
+- Record output, count and error (if any).
+- Explain which input/rule caused the result.
+- Compare actual result with contract and expected output.
+- Reproduce a failure with the smallest input and fix its cause.
+
+## Lab checkpoint 3
+
+- Predict the result before running.
+- Execute this stage on a small input.
+- Record output, count and error (if any).
+- Explain which input/rule caused the result.
+- Compare actual result with contract and expected output.
+- Reproduce a failure with the smallest input and fix its cause.
+
+## Lab checkpoint 4
+
+- Predict the result before running.
+- Execute this stage on a small input.
+- Record output, count and error (if any).
+- Explain which input/rule caused the result.
+- Compare actual result with contract and expected output.
+- Reproduce a failure with the smallest input and fix its cause.
+
+## Lab checkpoint 5
+
+- Predict the result before running.
+- Execute this stage on a small input.
+- Record output, count and error (if any).
+- Explain which input/rule caused the result.
+- Compare actual result with contract and expected output.
+- Reproduce a failure with the smallest input and fix its cause.
+
+## Lab checkpoint 6
+
+- Predict the result before running.
+- Execute this stage on a small input.
+- Record output, count and error (if any).
+- Explain which input/rule caused the result.
+- Compare actual result with contract and expected output.
+- Reproduce a failure with the smallest input and fix its cause.
+
+## Lab checkpoint 7
+
+- Predict the result before running.
+- Execute this stage on a small input.
+- Record output, count and error (if any).
+- Explain which input/rule caused the result.
+- Compare actual result with contract and expected output.
+- Reproduce a failure with the smallest input and fix its cause.
+
+## Lab checkpoint 8
+
+- Predict the result before running.
+- Execute this stage on a small input.
+- Record output, count and error (if any).
+- Explain which input/rule caused the result.
+- Compare actual result with contract and expected output.
+- Reproduce a failure with the smallest input and fix its cause.
+
+
+# 13. Instructor review rubric
+
+| Skill | Beginner evidence |
+|---|---|
+| Concept | Explains what/why plainly |
+| Code | Reads/explains lines, not blindly copies |
+| Output | Derives output from input/rule |
+| Quality | Identifies invalid, duplicate and boundary cases |
+| Reliability | Explains retry, replay and checkpoint |
+| Verification | Uses counts/keys/totals/quality checks |
+| Interview | Gives decision, reason, failure mode and proof |
+

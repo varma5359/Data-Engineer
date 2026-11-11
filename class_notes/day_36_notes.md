@@ -320,3 +320,144 @@ Never skip: unique record identity; what success guarantees; replay behavior; in
 - [ ] I can defend the project.
 
 **Complete the day when you can explain, run, interpret, test failure and prove the result—not merely read the notes.**
+
+
+# 11. Mentor-led deep dive — Batch/partition
+
+Read each scenario slowly. Identify input, risk, control and proof.
+
+## 11.1 Raw/curated distinction
+
+Batch thought experiment: 1,000,000 rows / 10,000 per batch = 100 batches. Smaller reduces memory/retry cost but increases overhead; tune measured throughput.
+
+**Student checkpoint:** Explain this in your own words and name a test that proves it.
+
+## 11.2 Walkthrough
+
+Date layout year=2026/month=11/day=11 enables day pruning. Month query may read all days; design for common query filters.
+
+**Student checkpoint:** Explain this in your own words and name a test that proves it.
+
+## 11.3 Normalization policy
+
+Columnar stores values by column; analytics selecting amount/date may read fewer columns and compress similar values efficiently.
+
+**Student checkpoint:** Explain this in your own words and name a test that proves it.
+
+## 11.4 Mapping design
+
+Pruning: filter event_date=2026-11-11; engine can skip other folders if layout/metadata supports it. Confirm with plan/scan metrics.
+
+**Student checkpoint:** Explain this in your own words and name a test that proves it.
+
+## 11.5 Worked business example
+
+Small files: thousands of 5KB files incur listing/open/metadata tasks. Compact within partition; avoid one oversized file.
+
+**Student checkpoint:** Explain this in your own words and name a test that proves it.
+
+## 11.6 Filter semantics
+
+Skew: one partition has 90% rows and delays job. Inspect distribution; repartition/salt carefully because it changes aggregation/layout.
+
+**Student checkpoint:** Explain this in your own words and name a test that proves it.
+
+## 11.7 Aggregation grain
+
+Late data for yesterday arrives today. Reprocess affected partition or define correction policy; date partition is not automatically immutable.
+
+**Student checkpoint:** Explain this in your own words and name a test that proves it.
+
+## 11.8 Transformation order
+
+Partition correctness needs stable date derivation, timezone, null/invalid date policy and idempotent overwrite/append; verify count and min/max event time.
+
+**Student checkpoint:** Explain this in your own words and name a test that proves it.
+
+# 12. Guided lab checkpoints
+
+## Lab checkpoint 1
+
+- Predict the result before running.
+- Execute this stage on a small input.
+- Record output, count and error (if any).
+- Explain which input/rule caused the result.
+- Compare actual result with contract and expected output.
+- Reproduce a failure with the smallest input and fix its cause.
+
+## Lab checkpoint 2
+
+- Predict the result before running.
+- Execute this stage on a small input.
+- Record output, count and error (if any).
+- Explain which input/rule caused the result.
+- Compare actual result with contract and expected output.
+- Reproduce a failure with the smallest input and fix its cause.
+
+## Lab checkpoint 3
+
+- Predict the result before running.
+- Execute this stage on a small input.
+- Record output, count and error (if any).
+- Explain which input/rule caused the result.
+- Compare actual result with contract and expected output.
+- Reproduce a failure with the smallest input and fix its cause.
+
+## Lab checkpoint 4
+
+- Predict the result before running.
+- Execute this stage on a small input.
+- Record output, count and error (if any).
+- Explain which input/rule caused the result.
+- Compare actual result with contract and expected output.
+- Reproduce a failure with the smallest input and fix its cause.
+
+## Lab checkpoint 5
+
+- Predict the result before running.
+- Execute this stage on a small input.
+- Record output, count and error (if any).
+- Explain which input/rule caused the result.
+- Compare actual result with contract and expected output.
+- Reproduce a failure with the smallest input and fix its cause.
+
+## Lab checkpoint 6
+
+- Predict the result before running.
+- Execute this stage on a small input.
+- Record output, count and error (if any).
+- Explain which input/rule caused the result.
+- Compare actual result with contract and expected output.
+- Reproduce a failure with the smallest input and fix its cause.
+
+## Lab checkpoint 7
+
+- Predict the result before running.
+- Execute this stage on a small input.
+- Record output, count and error (if any).
+- Explain which input/rule caused the result.
+- Compare actual result with contract and expected output.
+- Reproduce a failure with the smallest input and fix its cause.
+
+## Lab checkpoint 8
+
+- Predict the result before running.
+- Execute this stage on a small input.
+- Record output, count and error (if any).
+- Explain which input/rule caused the result.
+- Compare actual result with contract and expected output.
+- Reproduce a failure with the smallest input and fix its cause.
+
+
+# 13. Instructor review rubric
+
+| Skill | Beginner evidence |
+|---|---|
+| Concept | Explains what/why plainly |
+| Code | Reads/explains lines, not blindly copies |
+| Output | Derives output from input/rule |
+| Quality | Identifies invalid, duplicate and boundary cases |
+| Reliability | Explains retry, replay and checkpoint |
+| Verification | Uses counts/keys/totals/quality checks |
+| Interview | Gives decision, reason, failure mode and proof |
+

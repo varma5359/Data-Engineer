@@ -322,3 +322,162 @@ Never skip: unique record identity; what success guarantees; replay behavior; in
 - [ ] I can defend the project.
 
 **Complete the day when you can explain, run, interpret, test failure and prove the result—not merely read the notes.**
+
+
+# 11. Mentor-led deep dive — Transformation
+
+Read each scenario slowly. Identify input, risk, control and proof.
+
+## 11.1 Raw/curated distinction
+
+Raw versus curated: preserve source representation and provenance in raw layer; apply documented rules in curated layer so replay remains possible.
+
+**Student checkpoint:** Explain this in your own words and name a test that proves it.
+
+## 11.2 Walkthrough
+
+Type conversion: parse CSV amount '1200.50' as Decimal, handle blank/invalid explicitly, validate range and write decimal target; don't let implicit conversion hide bad values.
+
+**Student checkpoint:** Explain this in your own words and name a test that proves it.
+
+## 11.3 Normalization policy
+
+Normalize whitespace/casing only where semantics are case-insensitive; preserve names/address source meaning.
+
+**Student checkpoint:** Explain this in your own words and name a test that proves it.
+
+## 11.4 Mapping design
+
+Mapping table: source_status,target_status,valid_from,valid_to,owner; unknown code becomes observable exception.
+
+**Student checkpoint:** Explain this in your own words and name a test that proves it.
+
+## 11.5 Worked business example
+
+Derived total: quantity 3 × unit_price 100.00 = gross 300.00; discount 10.00 => net 290.00. Explain units, precision and null behavior.
+
+**Student checkpoint:** Explain this in your own words and name a test that proves it.
+
+## 11.6 Filter semantics
+
+Filtering removes downstream records. Record why/count; SQL comparisons with NULL can evaluate unknown and exclude rows.
+
+**Student checkpoint:** Explain this in your own words and name a test that proves it.
+
+## 11.7 Aggregation grain
+
+Aggregate at intended grain (order/day/product); validate keys and dedup first to prevent inflated sums.
+
+**Student checkpoint:** Explain this in your own words and name a test that proves it.
+
+## 11.8 Transformation order
+
+Order: parse -> validate -> standardize -> map -> derive -> aggregate -> output; document exceptions.
+
+**Student checkpoint:** Explain this in your own words and name a test that proves it.
+
+## 11.9 Reject evidence
+
+Reject schema: source ID, original safe reference, run ID, rule, error and timestamp; avoid unnecessary sensitive values.
+
+**Student checkpoint:** Explain this in your own words and name a test that proves it.
+
+## 11.10 Test design
+
+Test normal, boundary, null, invalid, unknown mapping and duplicate; assert exact output/count invariant.
+
+**Student checkpoint:** Explain this in your own words and name a test that proves it.
+
+## 11.11 Reconciliation
+
+Reconcile raw = accepted + rejected; compare totals with documented exclusions; monitor unknown categories/null-rate shifts.
+
+**Student checkpoint:** Explain this in your own words and name a test that proves it.
+
+# 12. Guided lab checkpoints
+
+## Lab checkpoint 1
+
+- Predict the result before running.
+- Execute this stage on a small input.
+- Record output, count and error (if any).
+- Explain which input/rule caused the result.
+- Compare actual result with contract and expected output.
+- Reproduce a failure with the smallest input and fix its cause.
+
+## Lab checkpoint 2
+
+- Predict the result before running.
+- Execute this stage on a small input.
+- Record output, count and error (if any).
+- Explain which input/rule caused the result.
+- Compare actual result with contract and expected output.
+- Reproduce a failure with the smallest input and fix its cause.
+
+## Lab checkpoint 3
+
+- Predict the result before running.
+- Execute this stage on a small input.
+- Record output, count and error (if any).
+- Explain which input/rule caused the result.
+- Compare actual result with contract and expected output.
+- Reproduce a failure with the smallest input and fix its cause.
+
+## Lab checkpoint 4
+
+- Predict the result before running.
+- Execute this stage on a small input.
+- Record output, count and error (if any).
+- Explain which input/rule caused the result.
+- Compare actual result with contract and expected output.
+- Reproduce a failure with the smallest input and fix its cause.
+
+## Lab checkpoint 5
+
+- Predict the result before running.
+- Execute this stage on a small input.
+- Record output, count and error (if any).
+- Explain which input/rule caused the result.
+- Compare actual result with contract and expected output.
+- Reproduce a failure with the smallest input and fix its cause.
+
+## Lab checkpoint 6
+
+- Predict the result before running.
+- Execute this stage on a small input.
+- Record output, count and error (if any).
+- Explain which input/rule caused the result.
+- Compare actual result with contract and expected output.
+- Reproduce a failure with the smallest input and fix its cause.
+
+## Lab checkpoint 7
+
+- Predict the result before running.
+- Execute this stage on a small input.
+- Record output, count and error (if any).
+- Explain which input/rule caused the result.
+- Compare actual result with contract and expected output.
+- Reproduce a failure with the smallest input and fix its cause.
+
+## Lab checkpoint 8
+
+- Predict the result before running.
+- Execute this stage on a small input.
+- Record output, count and error (if any).
+- Explain which input/rule caused the result.
+- Compare actual result with contract and expected output.
+- Reproduce a failure with the smallest input and fix its cause.
+
+
+# 13. Instructor review rubric
+
+| Skill | Beginner evidence |
+|---|---|
+| Concept | Explains what/why plainly |
+| Code | Reads/explains lines, not blindly copies |
+| Output | Derives output from input/rule |
+| Quality | Identifies invalid, duplicate and boundary cases |
+| Reliability | Explains retry, replay and checkpoint |
+| Verification | Uses counts/keys/totals/quality checks |
+| Interview | Gives decision, reason, failure mode and proof |
+

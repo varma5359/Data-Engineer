@@ -319,3 +319,144 @@ Never skip: unique record identity; what success guarantees; replay behavior; in
 - [ ] I can defend the project.
 
 **Complete the day when you can explain, run, interpret, test failure and prove the result—not merely read the notes.**
+
+
+# 11. Mentor-led deep dive — Upsert
+
+Read each scenario slowly. Identify input, risk, control and proof.
+
+## 11.1 Raw/curated distinction
+
+Initial load + incremental: capture snapshot and change position without a gap; exact handoff depends on source/CDC implementation.
+
+**Student checkpoint:** Explain this in your own words and name a test that proves it.
+
+## 11.2 Walkthrough
+
+Target order_id must be unique. Without constraint, duplicate entities can be inserted; upsert relies on conflict enforcement.
+
+**Student checkpoint:** Explain this in your own words and name a test that proves it.
+
+## 11.3 Normalization policy
+
+Postgres ON CONFLICT: incoming EXCLUDED amount vs existing target; update only source-owned columns.
+
+**Student checkpoint:** Explain this in your own words and name a test that proves it.
+
+## 11.4 Mapping design
+
+Staging duplicate keys may cause ambiguity or DB error; resolve/deduplicate before merge with deterministic rule.
+
+**Student checkpoint:** Explain this in your own words and name a test that proves it.
+
+## 11.5 Worked business example
+
+Overlap rereads recent window; idempotent upsert updates same key. Measure overlap duplicates/source lag and tune window.
+
+**Student checkpoint:** Explain this in your own words and name a test that proves it.
+
+## 11.6 Filter semantics
+
+CDC delete operation can remove target or create tombstone/history based on analytics requirement.
+
+**Student checkpoint:** Explain this in your own words and name a test that proves it.
+
+## 11.7 Aggregation grain
+
+Order: target transaction commit -> checkpoint. Checkpoint failure means replay; idempotency safe. Checkpoint before target commit risks skipped data.
+
+**Student checkpoint:** Explain this in your own words and name a test that proves it.
+
+## 11.8 Transformation order
+
+Counts alone miss changed values; compare key sets, aggregates, sampled/full checksums or snapshots based on scale/cost.
+
+**Student checkpoint:** Explain this in your own words and name a test that proves it.
+
+# 12. Guided lab checkpoints
+
+## Lab checkpoint 1
+
+- Predict the result before running.
+- Execute this stage on a small input.
+- Record output, count and error (if any).
+- Explain which input/rule caused the result.
+- Compare actual result with contract and expected output.
+- Reproduce a failure with the smallest input and fix its cause.
+
+## Lab checkpoint 2
+
+- Predict the result before running.
+- Execute this stage on a small input.
+- Record output, count and error (if any).
+- Explain which input/rule caused the result.
+- Compare actual result with contract and expected output.
+- Reproduce a failure with the smallest input and fix its cause.
+
+## Lab checkpoint 3
+
+- Predict the result before running.
+- Execute this stage on a small input.
+- Record output, count and error (if any).
+- Explain which input/rule caused the result.
+- Compare actual result with contract and expected output.
+- Reproduce a failure with the smallest input and fix its cause.
+
+## Lab checkpoint 4
+
+- Predict the result before running.
+- Execute this stage on a small input.
+- Record output, count and error (if any).
+- Explain which input/rule caused the result.
+- Compare actual result with contract and expected output.
+- Reproduce a failure with the smallest input and fix its cause.
+
+## Lab checkpoint 5
+
+- Predict the result before running.
+- Execute this stage on a small input.
+- Record output, count and error (if any).
+- Explain which input/rule caused the result.
+- Compare actual result with contract and expected output.
+- Reproduce a failure with the smallest input and fix its cause.
+
+## Lab checkpoint 6
+
+- Predict the result before running.
+- Execute this stage on a small input.
+- Record output, count and error (if any).
+- Explain which input/rule caused the result.
+- Compare actual result with contract and expected output.
+- Reproduce a failure with the smallest input and fix its cause.
+
+## Lab checkpoint 7
+
+- Predict the result before running.
+- Execute this stage on a small input.
+- Record output, count and error (if any).
+- Explain which input/rule caused the result.
+- Compare actual result with contract and expected output.
+- Reproduce a failure with the smallest input and fix its cause.
+
+## Lab checkpoint 8
+
+- Predict the result before running.
+- Execute this stage on a small input.
+- Record output, count and error (if any).
+- Explain which input/rule caused the result.
+- Compare actual result with contract and expected output.
+- Reproduce a failure with the smallest input and fix its cause.
+
+
+# 13. Instructor review rubric
+
+| Skill | Beginner evidence |
+|---|---|
+| Concept | Explains what/why plainly |
+| Code | Reads/explains lines, not blindly copies |
+| Output | Derives output from input/rule |
+| Quality | Identifies invalid, duplicate and boundary cases |
+| Reliability | Explains retry, replay and checkpoint |
+| Verification | Uses counts/keys/totals/quality checks |
+| Interview | Gives decision, reason, failure mode and proof |
+
