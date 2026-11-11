@@ -33,6 +33,8 @@ A file extension tells you the intended format, but it does not prove that the f
 
 ## 3. Serialization and deserialization
 
+![Serialization and deserialization flow](images/day_09_serialization_flow.svg)
+
 - **Serialization:** Convert an in-memory object into a format that can be stored or transmitted.
 - **Deserialization:** Read the stored/transmitted representation and reconstruct an in-memory object.
 
@@ -504,6 +506,8 @@ print(amounts_only)
 **Interpretation:** Selecting only needed columns is a common analytical pattern. The Parquet format and reader can avoid loading unrelated columns.
 
 ## 9. Compare CSV, JSON, XML and Parquet
+
+![Choosing a data format](images/day_09_format_selection.svg)
 
 | Feature | CSV | JSON | XML | Parquet |
 |---|---|---|---|---|
