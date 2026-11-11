@@ -831,3 +831,608 @@ What must be validated after optimization?
 - [ ] Validate correctness after optimization.
 
 **Next lesson — Day 59: Cloud and Distributed Pipeline Integration.** You will connect the ideas from object storage, cloud databases and Spark into a complete batch pipeline design, then compare it with a streaming architecture and learn the role of Kafka.
+
+
+---
+
+# Part 16 — Read a physical plan step by step
+
+The plan is not just text to memorize. It is evidence about what Spark intends to do.
+
+## 50. Start with a simple filter and select
+
+~~~python
+from pyspark.sql.functions import col
+
+simple_query = (
+    sales
+    .filter(col("amount") > 100)
+    .select("customer_id", "amount")
+)
+
+simple_query.explain("formatted")
+~~~
+
+Look for these ideas in the plan:
+- a scan of the source;
+- a filter condition;
+- a projection of the required columns.
+
+The exact node names and order vary by Spark version.
+
+## 51. What is a scan node?
+
+A scan node represents reading data from a source.
+
+Questions to ask:
+- Which files or table are read?
+- How many columns are read?
+- Is a partition filter applied?
+- Are pushed filters shown?
+- Is the source much larger than the result?
+
+A scan of a large dataset may be expected. The issue is whether the job reads more data than the business requirement needs.
+
+## 52. What is an exchange node?
+
+An Exchange node commonly indicates data redistribution between partitions.
+
+It is often associated with shuffle.
+
+For example, a groupBy customer_id may require rows with the same customer_id to be brought together.
+
+Do not treat every Exchange as a defect. Grouping and joins often need data movement to produce the correct result.
+
+## 53. What is a sort node?
+
+A sort node orders records.
+
+Sorting a very large dataset can be expensive because it may require memory, disk and data movement.
+
+Ask whether the business requirement actually needs a global sort. If only a small sample or top-N is required, use an appropriate limited and ordered operation.
+
+## 54. What is a hash aggregate?
+
+A hash aggregate groups values using a hash-based structure.
+
+It may appear in groupBy aggregations. Large groups or high-cardinality keys can create memory pressure.
+
+The plan and Spark UI help show whether aggregation is expensive.
+
+## 55. A plan-reading checklist
+
+When you inspect a plan, write down:
+
+| Question | What to look for |
+|---|---|
+| What is the input? | Scan node and source |
+| How many columns are read? | Projection |
+| Are filters applied early? | Filter and pushed filters |
+| Is data redistributed? | Exchange |
+| Is data sorted? | Sort |
+| Is data grouped? | Aggregate nodes |
+| Which join is selected? | Join strategy |
+| Are partitions pruned? | Partition filters |
+| Is there an unexpected operation? | Compare plan to intended logic |
+
+---
+
+# Part 17 — Measure cache correctly
+
+## 56. Why cache timing can mislead
+
+The first action after cache may include:
+- reading the source;
+- executing transformations;
+- storing the result;
+- returning the action result.
+
+A later action may reuse cached data.
+
+Comparing the first cached action with a later uncached action is not a fair benchmark.
+
+## 57. Cache a DataFrame that will be reused
+
+~~~python
+from pyspark.sql.functions import col
+
+reusable_sales = sales.filter(
+    col("amount") > 100
+).select(
+    "customer_id",
+    "amount"
+)
+
+reusable_sales.cache()
+~~~
+
+At this point, cache has marked the DataFrame for persistence. The data is typically materialized when an action runs.
+
+## 58. Materialize the cache
+
+~~~python
+cached_row_count = reusable_sales.count()
+
+print("Cached rows:", cached_row_count)
+print("Storage level:", reusable_sales.storageLevel)
+~~~
+
+The count depends on the filter and generated input. The action causes Spark to compute the DataFrame and populate its cache.
+
+## 59. Reuse the cached DataFrame
+
+~~~python
+reusable_sales.groupBy("customer_id").count().show(5)
+reusable_sales.groupBy("customer_id").sum("amount").show(5)
+~~~
+
+These two operations reuse the same filtered DataFrame. Caching may avoid repeating the source read and filter, depending on cache availability and execution.
+
+## 60. Release the cache
+
+~~~python
+reusable_sales.unpersist()
+
+print("Cached DataFrame released")
+~~~
+
+Expected output:
+
+~~~text
+Cached DataFrame released
+~~~
+
+Always unpersist data when it is no longer needed in a long-running application or notebook.
+
+## 61. When not to cache
+
+Do not cache a DataFrame when:
+- it is used only once;
+- it is cheap to recompute;
+- it is too large for available storage;
+- caching causes memory pressure;
+- the application has no reason to retain it.
+
+Caching is a resource decision, not a decoration to add to every Spark program.
+
+---
+
+# Part 18 — Understand partition pruning with a local Parquet exercise
+
+## 62. Create a date column
+
+~~~python
+from pyspark.sql.functions import to_date, lit
+
+dated_sales = sales.withColumn(
+    "sale_date",
+    to_date(lit("2026-11-10"))
+)
+~~~
+
+This creates the same training date for each generated row. It is only for demonstrating a partition layout.
+
+## 63. Add a year column
+
+~~~python
+from pyspark.sql.functions import year
+
+dated_sales = dated_sales.withColumn(
+    "sale_year",
+    year(col("sale_date"))
+)
+~~~
+
+## 64. Write a year-partitioned dataset
+
+~~~python
+dated_sales.write.mode("overwrite").partitionBy(
+    "sale_year"
+).parquet("spark_day58/data/sales_by_year")
+~~~
+
+Expected folder structure resembles:
+
+~~~text
+sales_by_year/
+    sale_year=2026/
+        part-....parquet
+~~~
+
+Spark may create one or multiple part files depending on execution partitions.
+
+## 65. Read the dataset back
+
+~~~python
+partitioned_sales = spark.read.parquet(
+    "spark_day58/data/sales_by_year"
+)
+
+partitioned_sales.printSchema()
+print("Rows:", partitioned_sales.count())
+~~~
+
+Expected row count: 500000.
+
+The partition column can be reconstructed from the folder layout.
+
+## 66. Filter using the partition column
+
+~~~python
+sales_2026 = partitioned_sales.filter(
+    col("sale_year") == 2026
+)
+
+sales_2026.explain("formatted")
+~~~
+
+Inspect the plan for partition filters. Because this sample contains only one year, it cannot demonstrate a reduction across multiple years. The point is to recognize how the filter is represented.
+
+A meaningful pruning experiment needs multiple partition values and a query that selects only some of them.
+
+## 67. Partition pruning requirements
+
+Partition pruning is most useful when:
+- data is physically organized by a partition column;
+- the query filters on that column;
+- the filter can be interpreted by the data source;
+- the engine supports partition pruning.
+
+If the data is not partitioned by the filtered column, a predicate may still filter rows but may not skip entire storage partitions.
+
+---
+
+# Part 19 — Create an intentionally skewed dataset
+
+## 68. What does a skewed key distribution look like?
+
+Suppose most sales events belong to one large customer, while other customers have only a few records.
+
+A groupBy or join on customer_id can send much more data to one partition.
+
+## 69. Build a small skew demonstration
+
+~~~python
+from pyspark.sql.functions import when
+
+skewed_data = spark.range(0, 100000).withColumn(
+    "customer_id",
+    when(col("id") < 90000, "C001")
+    .otherwise("C" + col("id").cast("string"))
+)
+
+skewed_data.groupBy("customer_id").count().orderBy(
+    desc("count")
+).show(5)
+~~~
+
+Expected leading result:
+
+| customer_id | count |
+|---|---:|
+| C001 | 90000 |
+
+The remaining 10,000 records have different customer IDs.
+
+This data is intentionally skewed to make the concept visible.
+
+## 70. Why the largest key matters
+
+A groupBy or join that redistributes by customer_id may send the 90,000 C001 records to one hash partition.
+
+That partition can become much larger than others.
+
+The number of rows alone is not the only factor; record size and transformation cost also matter.
+
+## 71. Inspect the plan
+
+~~~python
+skewed_data.groupBy("customer_id").count().explain("formatted")
+~~~
+
+Look for an exchange and aggregate operations. The plan describes the redistribution and aggregation strategy.
+
+Do not assume the plan alone proves how long each task took. Use the Spark UI and task metrics for runtime evidence.
+
+---
+
+# Part 20 — Understand adaptive query execution
+
+## 72. What is Adaptive Query Execution (AQE)?
+
+Adaptive Query Execution allows Spark to adjust parts of a physical plan using runtime statistics collected while the query executes.
+
+Depending on Spark version and configuration, AQE can help with:
+- coalescing shuffle partitions;
+- handling certain skewed joins;
+- changing join strategies based on runtime information.
+
+## 73. Why AQE matters
+
+Before execution, Spark may estimate data sizes. Actual runtime sizes can be different.
+
+AQE can use observed information to improve some decisions.
+
+It does not automatically fix every slow query, poor data model, bad file layout or external system bottleneck.
+
+## 74. Inspect whether AQE is enabled
+
+~~~python
+print(
+    spark.conf.get(
+        "spark.sql.adaptive.enabled",
+        "not configured"
+    )
+)
+~~~
+
+The value depends on your Spark version and session configuration.
+
+Do not change production configuration without understanding the cluster policy and workload.
+
+---
+
+# Part 21 — Understand output file sizing
+
+## 75. Why does output partition count matter?
+
+Spark commonly writes one or more part files per output partition and storage partition combination.
+
+Too many small partitions can create many small files.
+
+Too few partitions can create large tasks and insufficient parallel write throughput.
+
+## 76. Inspect output files
+
+After writing a dataset, inspect the output directory using File Explorer or CMD.
+
+~~~bat
+dir /s spark_day58\data\sales_by_year
+~~~
+
+The exact file count depends on Spark's execution partitioning and write behavior.
+
+Record:
+- number of part files;
+- total bytes;
+- partition folder count;
+- whether empty or tiny files exist.
+
+## 77. Reduce output partitions carefully
+
+If the dataset is small enough for fewer output files, you may reduce partitions before writing:
+
+~~~python
+sales_output = dated_sales.coalesce(2)
+
+sales_output.write.mode("overwrite").parquet(
+    "spark_day58/output/sales_compacted"
+)
+~~~
+
+coalesce can reduce partition count without a full shuffle in typical use. It may create uneven partitions.
+
+Do not force one output file for a large dataset merely because it looks tidy.
+
+## 78. Repartition before writing when needed
+
+If a balanced redistribution is required:
+
+~~~python
+sales_output = dated_sales.repartition(4)
+
+print("Output partitions:", sales_output.rdd.getNumPartitions())
+~~~
+
+repartition normally causes a shuffle. Use it when the expected benefit justifies the data movement.
+
+---
+
+# Part 22 — Performance investigation case study
+
+## 79. Incident
+
+A daily Spark job used to finish in 12 minutes. It now takes 55 minutes.
+
+Do not immediately increase executor memory or worker count.
+
+## 80. Step 1 — Confirm the workload
+
+Check:
+- input date range;
+- number of source files;
+- total bytes;
+- input row count;
+- schema changes;
+- backfill activity.
+
+A wider date range or larger source can explain longer runtime.
+
+## 81. Step 2 — Compare execution plans
+
+Check whether:
+- a new join was introduced;
+- a filter moved or disappeared;
+- more columns are read;
+- an unexpected sort appears;
+- shuffle volume increased;
+- partition pruning stopped working.
+
+## 82. Step 3 — Inspect Spark UI metrics
+
+Review:
+- job and stage duration;
+- task duration distribution;
+- shuffle read/write;
+- memory and disk spill;
+- failed and retried tasks;
+- executor loss;
+- input size per task.
+
+The Spark UI provides runtime evidence that a static plan cannot provide by itself.
+
+## 83. Step 4 — Identify the bottleneck
+
+| Observation | Possible investigation |
+|---|---|
+| One task much slower | Skew or slow worker |
+| Large shuffle read/write | Join/grouping redistribution |
+| High disk spill | Memory pressure or large aggregation |
+| Many tiny tasks | Too many small partitions/files |
+| Huge input scan | Filter or partition pruning issue |
+| Executor lost | Resource, node or infrastructure failure |
+| Long external wait | Source/sink/database bottleneck |
+
+These are clues. Verify the actual cause before changing configuration.
+
+## 84. Step 5 — Change one thing
+
+Possible changes:
+- filter earlier when logically valid;
+- select only required columns;
+- compact small files;
+- correct partition layout;
+- use a suitable broadcast join;
+- reduce unnecessary repartition;
+- handle skew;
+- cache a reused expensive DataFrame;
+- adjust resource allocation after evidence.
+
+Change one major variable at a time where practical.
+
+## 85. Step 6 — Validate correctness
+
+Compare:
+- output schema;
+- output row count;
+- distinct keys;
+- total amount;
+- date coverage;
+- null counts;
+- duplicate counts;
+- reject counts.
+
+Do not accept a performance change that alters the business result without an approved requirement change.
+
+## 86. Step 7 — Record the result
+
+| Field | Evidence |
+|---|---|
+| Run ID | Actual run identifier |
+| Input size | Actual bytes and rows |
+| Change | Exact code/configuration change |
+| Before plan | Saved plan |
+| After plan | Saved plan |
+| Before runtime | Measured value |
+| After runtime | Measured value |
+| Correctness | Row/key/total checks |
+| Cost/resource effect | Actual metrics |
+| Rollback | Known previous configuration |
+
+Never invent a speedup percentage. If measurements are noisy or inconclusive, record that honestly.
+
+---
+
+# Part 23 — Additional practice exercises with worked answers
+
+## Exercise 9 — Exchange
+
+An execution plan contains Exchange before aggregation. What does this commonly indicate?
+
+**Worked answer:** Data is being redistributed between partitions so related keys can be grouped. It is a shuffle-related operation and may be required for correctness.
+
+## Exercise 10 — Cache
+
+A DataFrame is used once and then discarded. Should it automatically be cached?
+
+**Worked answer:** No. Caching adds storage and management overhead. Cache when reuse and recomputation savings justify it.
+
+## Exercise 11 — Cache timing
+
+The first action after cache is slower than the next action. Why?
+
+**Worked answer:** The first action may read, compute and materialize the cache. A later action can reuse cached data.
+
+## Exercise 12 — Partition pruning
+
+A dataset is partitioned by sale_year, but a query filters only by customer_id. Will it necessarily prune year partitions?
+
+**Worked answer:** No. The filter does not restrict the partition column. The engine may need to examine multiple year partitions.
+
+## Exercise 13 — Skew
+
+One key contains 90% of the records. Why can repartitioning by that same key fail to balance work?
+
+**Worked answer:** All records for that key are routed to the same hash partition. The skew remains.
+
+## Exercise 14 — Broadcast
+
+A dimension table is too large to fit safely in executor memory. Should it be broadcast?
+
+**Worked answer:** No. Broadcasting can cause memory pressure or executor failure. Use a suitable join strategy based on size and plan evidence.
+
+## Exercise 15 — Python UDF
+
+A simple amount calculation can be written using Spark column arithmetic. Should a Python UDF be the first choice?
+
+**Worked answer:** No. Prefer built-in Spark expressions because the engine can optimize them more effectively in many cases.
+
+## Exercise 16 — Small files
+
+A job reads 200,000 tiny files. What should be investigated?
+
+**Worked answer:** Small-file overhead, file listing, metadata and task scheduling. Consider safe compaction and a better output partition strategy.
+
+## Exercise 17 — Optimization result
+
+A candidate job is 20% faster but returns fewer customer groups. Is it accepted?
+
+**Worked answer:** No. First determine why groups are missing. Performance is not an improvement if the intended result changed.
+
+---
+
+# Part 24 — Day 58 practical completion checklist
+
+### Measurement and plans
+- [ ] Record a repeatable baseline.
+- [ ] Use explain and explain("formatted").
+- [ ] Recognize scan, filter, projection, exchange, sort and aggregate nodes.
+- [ ] Distinguish plan information from runtime metrics.
+- [ ] Use Spark UI evidence where available.
+
+### Performance techniques
+- [ ] Explain narrow and wide transformations.
+- [ ] Explain shuffle and spill.
+- [ ] Cache a reused DataFrame and unpersist it.
+- [ ] Explain partition pruning.
+- [ ] Identify data skew and stragglers.
+- [ ] Explain broadcast join benefits and risks.
+- [ ] Explain AQE at a high level.
+- [ ] Explain why built-in functions are often preferable to Python UDFs.
+- [ ] Explain small-file and output partition problems.
+
+### Engineering validation
+- [ ] Compare the same input and workload before and after.
+- [ ] Change one major variable at a time.
+- [ ] Record actual execution time rather than inventing it.
+- [ ] Compare row counts, keys, totals and schema.
+- [ ] Explain why a faster incorrect result must not be released.
+
+## Final self-assessment
+
+Without looking at the notes, explain:
+
+1. What information does a Spark execution plan provide?
+2. What does an Exchange node commonly indicate?
+3. Why can shuffle slow a job?
+4. When should a DataFrame be cached?
+5. Why should cached data be unpersisted?
+6. How does partition pruning reduce scanned data?
+7. Why can repartitioning by a skewed key fail to balance work?
+8. When is a broadcast join useful and when is it dangerous?
+9. Why can too many small files slow Spark?
+10. Which correctness checks must pass after optimization?
+
+If you can inspect a plan, identify a likely bottleneck, run a controlled experiment and validate the result, you are ready for Day 59.
+
+**Next lesson — Day 59: Cloud and Distributed Pipeline Integration.** You will connect S3, managed databases and Spark into a complete batch architecture, then compare it with a streaming design and learn where Kafka fits.
