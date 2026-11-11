@@ -639,3 +639,16 @@ To ensure records are accounted for between input, accepted and rejected outputs
 - [ ] Record validation results safely.
 
 **Next lesson — Day 64: Pipeline Monitoring and Alerting.** You will learn how to observe workflow health, define useful metrics, configure failure notifications and build an operational dashboard.
+
+---
+
+## Visual Learning Diagrams
+
+### Automated data quality flow
+![Day 63 - Automated data quality flow](images/day_63_quality_rule_pipeline.svg)
+
+### Quality dimensions and checks
+![Day 63 - Quality dimensions and checks](images/day_63_quality_dimensions_checks.svg)
+
+### Quality gate blocks downstream
+![Day 63 - Quality gate blocks downstream](images/day_63_quality_gate_dependencies.svg)
