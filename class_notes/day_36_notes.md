@@ -1,530 +1,344 @@
-# Day 36: Batch Processing and Partitioning
+# Day 36 — Batch Processing and Partitioning
 
 **Phase:** 4 — Data Processing and Pipelines  
-**Syllabus topic:** Batch Processing and Partitioning  
-**Mini-project:** Partitioned Batch Processor  
-**Learning time:** 2–3 hours  
-**Level:** Complete beginner to junior Data Engineer  
+**Syllabus:** Batch processing, partitioning, date-based partitions, file organization, Parquet partitioning and partition pruning  
+**Mini-project:** TechStore Partitioned Batch Processor  
+**Level:** Beginner → junior Data Engineer  
+**Study time:** 2–3 hours
 
----
+> Work cell by cell. Run code, inspect output, then answer the checkpoint. The purpose is to understand why a pipeline processes data in bounded units and how partitioning changes storage and query work.
 
-# 1. What are we learning today?
+## 0. Learning outcomes
 
-A 500 GB dataset needs bounded processing and query-aware partition layout; avoid memory blowups and unnecessary scans.
+You will be able to:
+- explain batch processing in plain English and compare it with streaming;
+- identify a batch boundary and batch size;
+- process records in small chunks rather than loading everything at once;
+- explain partition, partition key, partition directory and partition pruning;
+- create date-based partitions and write Parquet files;
+- avoid common partition mistakes such as too many tiny files and skew;
+- reconcile records across batches/partitions;
+- build a small partitioned output and verify it.
 
-## 1.1 Learning outcomes
+## 1. Business scenario
 
-By the end of this lesson, you should be able to:
+TechStore receives millions of orders. Analysts often ask:
+- “Show orders from 2026-01-10.”
+- “Calculate daily revenue for January.”
+- “Compare last month's orders.”
 
-1. Estimate data volume and memory.
-2. Choose batches by rows or bytes.
-3. Choose partitions from query patterns/cardinality.
-4. Write deterministic partition paths.
-5. Use Parquet for analytical workloads when supported.
-6. Avoid excessive partitions and tiny files.
-7. Measure sizes/skew; compact when needed.
-8. Filter partition columns to enable pruning.
-9. Reconcile all partition counts.
+If all orders are stored in one huge file, every query may need to inspect much more data than necessary. If data is organized by date, a query for one day can read only that date's partition (when the engine and filter allow pruning).
 
-## 1.2 Pipeline context
+We will practice with a tiny dataset first. The same idea applies to larger data, but large-scale performance also depends on file size, engine, statistics, compression, data layout and query design.
 
-```text
-Business source -> Batch Processing and Partitioning -> Validate/process -> Staging/destination -> Reconcile -> Checkpoint + monitoring
-```
+## 2. Batch processing from zero
 
-A pipeline is not merely a script that reads data. It is repeatable work with defined input, rules, output, progress, error path and evidence of correctness.
+A **batch** is a bounded group of records processed together. A batch boundary may be:
+- a fixed record count (e.g. 1,000 rows);
+- a time window (hour/day);
+- a source file;
+- a source partition;
+- a scheduled arrival window.
 
-# 2. Business scenario and vocabulary
-
-A 500 GB dataset needs bounded processing and query-aware partition layout; avoid memory blowups and unnecessary scans.
-
-| Term | Beginner meaning | Why it matters |
-|---|---|---|
-| **Batch** |  finite records | Used to design and explain reliable pipelines. |
-| **batch size** |  unit volume | Used to design and explain reliable pipelines. |
-| **partition** |  data subdivision | Used to design and explain reliable pipelines. |
-| **pruning** |  skip irrelevant partitions | Used to design and explain reliable pipelines. |
-| **Parquet** |  columnar analytics format | Used to design and explain reliable pipelines. |
-| **small-file problem** |  many tiny files | Used to design and explain reliable pipelines. |
-| **skew** |  uneven distribution | Used to design and explain reliable pipelines. |
-| **throughput** |  work/time. | Used to design and explain reliable pipelines. |
-
-## Before coding, answer five questions
-
-1. Where does data come from and who owns it?
-2. Which records/fields must be collected or changed?
-3. What can go wrong (missing values, duplicates, timeout, schema change, partial failure)?
-4. Where does the result go and what is its schema?
-5. How will correctness be proven (counts, keys, totals, status and run metadata)?
-
-# 3. Understand the concept before coding
-
-## 3.1 A small record example
-
-| ID | Value | Status |
-|---:|---:|---|
-| 1 | 100 | valid |
-| 2 | 200 | valid |
-| 3 | -5 | invalid |
-
-A reliable run accounts for all 3 input records: 2 accepted, 1 rejected with a reason, 2 output records. It must not silently discard record 3.
-
-## 3.2 Flow to remember
+Batch processing means the system collects or reads a bounded unit, processes it, writes a result and records progress. It does not require the data to arrive in real time.
 
 ```text
-Receive -> Inspect -> Validate -> Process -> Persist -> Verify -> Record progress
-                    |                  |
-                    v                  v
-                Reject path       Retry/recovery path
+Source records -> Choose batch boundary -> Process batch -> Write result -> Verify -> Next batch
 ```
 
-- Receive: obtain source data.
-- Inspect: understand shape, size and metadata.
-- Validate: check rules before trusting it.
-- Process: apply topic-specific operation.
-- Persist: write durably.
-- Verify: compare expected and actual results.
-- Record progress: checkpoint only when safe.
+### Batch vs streaming
 
-# 4. First practical example
+| Batch | Streaming |
+|---|---|
+| Process bounded groups | Process events continuously or in small time/event windows |
+| Often scheduled | Often continuously running |
+| Easier to rerun a defined batch | Requires event/state/replay design |
+| Good for daily reports/backfills | Good for live alerts/event reactions |
+| Latency depends on schedule/window | Lower latency, but more operational complexity |
 
-## Task
+Neither is universally better. Choose based on business latency, cost, volume and operational requirements.
 
-Demonstrate batch size with one small operation before scaling it into a pipeline.
-
-## Code
+## 3. First example: process records in batches
 
 ```python
-from pathlib import Path
-root = Path("data/orders")
-for folder in sorted(root.glob("year=*/month=*/day=*")):
-    print(folder)
+orders = list(range(1, 11))
+batch_size = 3
+
+for start in range(0, len(orders), batch_size):
+    batch = orders[start:start + batch_size]
+    print(batch)
 ```
 
-## Expected output
-
+Expected output:
 ```text
-data/orders/year=2026/month=11/day=10
-data/orders/year=2026/month=11/day=11
+[1, 2, 3]
+[4, 5, 6]
+[7, 8, 9]
+[10]
 ```
 
-> Sample output is for the stated sample values. API/database/file results may vary. Do not claim variable outputs are guaranteed or runtime-tested unless you executed them.
+### Explain every important part
+- `orders`: ten sample order IDs.
+- `batch_size = 3`: each full batch contains at most three values.
+- `range(0, len(orders), batch_size)`: starts at zero, moves by three, and stops before ten.
+- `orders[start:start + batch_size]`: selects the current slice.
+- Last batch contains one record because ten is not divisible by three.
 
-## Line-by-line explanation
+**Checkpoint:** Why is the last batch smaller? What would change if batch_size were 4?
 
-glob discovers Hive-style date partitions; sorted makes order deterministic. Partition date/timezone must be documented.
+## 4. Batch size is a trade-off
 
-### After running, answer
+Small batches:
+- use less memory per batch;
+- reduce the amount to retry after a failure;
+- may increase overhead (more queries, writes, commits or files).
 
-- What input did I provide?
-- Which operation ran?
-- Which object holds the result?
-- What does output prove?
-- What does output not prove?
+Large batches:
+- reduce per-batch overhead;
+- can improve throughput;
+- require more memory and make retries larger;
+- may exceed source/target limits.
 
-A successful request/query/read does not automatically prove completeness, uniqueness, business validity or correctness.
+There is no universal best batch size. Measure memory, throughput, latency, database limits and retry cost.
 
-# 5. Build the pipeline step by step
+## 5. Read CSV in chunks
 
-## Step 1 — Define the input contract
+### Create a sample CSV
 
-Document source and owner, fields/types, required/optional values, unique identity, time/batch boundary, expected volume/frequency, permissions, and source limitations. If these are unknown, clarify before coding.
+```python
+import pandas as pd
 
-## Step 2 — Read a tiny sample
+sample = pd.DataFrame({
+    "order_id": ["O1", "O2", "O3", "O4", "O5", "O6"],
+    "order_date": ["2026-01-10", "2026-01-10", "2026-01-11", "2026-01-11", "2026-01-12", "2026-01-12"],
+    "amount": [100, 200, 50, 75, 120, 80]
+})
+sample.to_csv("orders.csv", index=False)
+```
 
-Start with 3–10 safe records. Inspect field names, types, nulls, duplicate keys, cursor/timestamp/version and whether the sample represents real edge cases. Never print credentials or sensitive data.
+### Read in chunks
 
-## Step 3A — Validation is a decision
+```python
+for chunk in pd.read_csv("orders.csv", chunksize=2):
+    print("Chunk rows:", len(chunk))
+    print(chunk)
+```
 
-| Rule | Example | Violation action |
+Expected chunk sizes: 2, 2, 2. The loop receives a DataFrame chunk at each iteration.
+
+**Why chunksize?** It bounds how much CSV data pandas reads into a DataFrame at one time. It does not automatically make every later operation memory-safe; avoid collecting all chunks into one giant list if the goal is bounded memory.
+
+## 6. What is partitioning?
+
+A **partition** is a logical subset of data grouped by a partition key. A partition key is a field used to divide records into groups.
+
+Examples:
+- date: `order_date`;
+- country: `country`;
+- department: `department`.
+
+Partitioning is primarily a data organization technique. Batch processing is a processing technique. They are related but not identical:
+- You can process a batch without partitioning storage.
+- You can store data in partitions and process many partitions in one batch.
+
+## 7. Partition by date (concept first)
+
+Our orders:
+
+| order_id | order_date | amount |
+|---|---|---:|
+| O1 | 2026-01-10 | 100 |
+| O2 | 2026-01-10 | 200 |
+| O3 | 2026-01-11 | 50 |
+| O4 | 2026-01-11 | 75 |
+| O5 | 2026-01-12 | 120 |
+| O6 | 2026-01-12 | 80 |
+
+Date is a good partition candidate for daily reporting because common queries filter by date. It may not be good if queries rarely filter date or the table is extremely small.
+
+## 8. Create date partitions in pandas
+
+```python
+sample["order_date"] = pd.to_datetime(sample["order_date"])
+sample["partition_date"] = sample["order_date"].dt.strftime("%Y-%m-%d")
+sample
+```
+
+The date is parsed into a datetime type. `.dt.strftime` creates a date string suitable for a directory name.
+
+### Group records by partition
+
+```python
+for partition_date, group in sample.groupby("partition_date"):
+    print(partition_date, len(group))
+```
+
+Expected:
+```text
+2026-01-10 2
+2026-01-11 2
+2026-01-12 2
+```
+
+Each group contains rows for one day.
+
+## 9. Write partitioned Parquet files
+
+Parquet is a columnar file format: values are stored by column rather than as row-oriented text. It supports efficient column selection and compression in many analytical engines.
+
+Install if needed in the notebook environment:
+```text
+pip install pyarrow
+```
+
+Write one folder per date:
+```python
+for partition_date, group in sample.groupby("partition_date"):
+    folder = "orders_partitioned/order_date=" + partition_date
+    group.drop(columns=["partition_date"]).to_parquet(folder + "/part.parquet", index=False)
+```
+
+**Note:** In a real notebook, create the directory first using `pathlib.Path(folder).mkdir(parents=True, exist_ok=True)`. The full runnable workbook includes the folder creation and read-back checks.
+
+Typical layout:
+```text
+orders_partitioned/
+  order_date=2026-01-10/part.parquet
+  order_date=2026-01-11/part.parquet
+  order_date=2026-01-12/part.parquet
+```
+
+The `order_date=...` naming convention is commonly recognized by Hive-style partition readers. The partition value may be represented in the path rather than repeated in each data file; readers can reconstruct it when configured to do so.
+
+## 10. Partition pruning
+
+**Partition pruning** means a query engine skips partitions that cannot match the filter.
+
+Example request:
+```sql
+SELECT order_id, amount
+FROM orders
+WHERE order_date = '2026-01-11';
+```
+
+If the table is correctly registered/laid out by date and the engine recognizes the predicate, it can read the 2026-01-11 partition rather than scan all date partitions.
+
+**Important:** Writing folders alone does not guarantee pruning. The table/catalog, partition metadata, file format, query predicate and engine must support it. Confirm with an execution plan or scan metrics.
+
+## 11. Partition key selection
+
+A useful partition key:
+- appears frequently in query filters;
+- divides data into meaningful, reasonably sized groups;
+- has manageable number of distinct values;
+- is stable and available at ingestion.
+
+Poor choices:
+- unique order_id → millions of tiny partitions;
+- customer_id with millions of customers → excessive directories/files;
+- a field with one value for almost all records → skew;
+- date partition at minute/second granularity for low volume → tiny files.
+
+## 12. Partition size, small files and skew
+
+### Small-file problem
+Thousands of tiny files increase listing, metadata and scheduling overhead. A partitioned dataset should usually target sensible file sizes based on engine/cloud/object-store guidance—not create one file per row or tiny batch.
+
+### Skew
+Skew occurs when one partition receives far more data than others. Example: partition by country, but 90% of orders belong to one country. That partition becomes a bottleneck.
+
+Possible approaches:
+- choose a better key or multi-level layout;
+- use a secondary distribution key for processing (not necessarily storage partition);
+- rebalance or handle heavy partitions separately;
+- measure actual distribution before deciding.
+
+## 13. Read only a selected partition (local demonstration)
+
+```python
+day = pd.read_parquet("orders_partitioned/order_date=2026-01-11/part.parquet")
+day
+```
+
+Expected rows: O3 and O4. This demonstrates selecting a path. It is not itself proof that a query engine performed automatic partition pruning.
+
+## 14. Reconciliation across batches and partitions
+
+For a batch run, record:
+- input rows;
+- processed rows;
+- accepted rows;
+- rejected rows;
+- output rows;
+- batch/partition ID;
+- start/end time;
+- status.
+
+At minimum:
+```text
+Input rows = Accepted rows + Rejected rows
+```
+
+If every accepted record is written once:
+```text
+Accepted rows = Output rows
+```
+
+For partitioning:
+```text
+Total rows = Sum of rows in all partitions
+```
+
+These checks catch missing partitions, duplicate writes and incomplete runs.
+
+## 15. Common mistakes
+
+| Mistake | Why it is wrong | Correction |
 |---|---|---|
-| Required field | ID exists | Reject/quarantine |
-| Type | Amount numeric | Record conversion reason |
-| Range | Quantity positive | Reject or business review |
-| Identity | Key unique | Deduplicate or fail per contract |
-| Schema | Required columns exist | Stop batch and alert |
-| Completeness | All pages/partitions processed | Mark incomplete; don't checkpoint |
-
-## Step 4 — Process bounded units
-
-A unit can be a page, file, fetch batch, partition or record group. Bounded units control memory, reduce retry scope, provide progress points and isolate failures. Select the unit based on source/target capacity—not a tutorial's arbitrary number.
-
-## Step 5 — Persist safely
-
-Ask: did destination commit finish? Can the batch replay without duplicate effects? Is there a unique key/idempotency token? Can I trace output to source? What if process crashes now?
-
-## Step 6 — Verify
-
-Use at least two: input = accepted + rejected; key uniqueness; totals/ranges; boundary gap/overlap; schema; freshness; source/target reconciliation.
-
-# 6. Mistakes and corrections
-
-## Mistake 1: Partition by customer ID
-
-**Why dangerous:** High cardinality creates tiny partitions.
-
-**Correct approach:** Use manageable keys such as date.
-
-## Mistake 2: One giant file
-
-**Why dangerous:** Poor parallelism/memory.
-
-**Correct approach:** Bound file sizes.
-
-## Mistake 3: Millions of tiny files
-
-**Why dangerous:** Metadata/task overhead.
-
-**Correct approach:** Compact files.
-
-## Mistake 4: Timezone unclear
-
-**Why dangerous:** Wrong day partition near midnight.
-
-**Correct approach:** Define UTC/business timezone.
-
-## Mistake 5: Assume partition always helps
-
-**Why dangerous:** Bad key can slow queries.
-
-**Correct approach:** Measure scans and pruning.
-
-
-## Debugging checklist
-
-1. Confirm source exists and request/query is correct.
-2. Inspect exact raw input for a small failing case.
-3. Confirm schema and types.
-4. Check filters and boundaries (>, >=, dates, cursor).
-5. Check mapping/business rules.
-6. Check duplicate and unique-key behavior.
-7. Check destination write/transaction result.
-8. Inspect checkpoint and update timing.
-9. Reconcile input, accepted, rejected and output counts.
-10. Reproduce with controlled input before changing the full job.
-
-# 7. Mini-project — Partitioned Batch Processor
-
-## Objective
-
-Build a beginner-readable pipeline demonstrating batch processing and partitioning with a happy path, invalid/failure path and verification step.
-
-## Requirements
-
-- Reproducible sample input and defined contract.
-- Predictable processing order and bounded units.
-- Required-field and identity validation.
-- Accepted/rejected outcomes separated.
-- Safe rerun without duplicate effects.
-- Run metadata: run ID, start/end, counts and status.
-- Progress/checkpoint behavior explained.
-- Output reconciled.
-
-## Sample business data
-
-| record_id | event_time | customer_id | amount | status |
-|---:|---|---:|---:|---|
-| 501 | 2026-11-10 09:00:00 | 11 | 1200.00 | PAID |
-| 502 | 2026-11-10 09:15:00 | 12 | 850.00 | PAID |
-| 503 | 2026-11-10 10:00:00 | 11 | 499.00 | PENDING |
-| 504 | 2026-11-10 10:30:00 | 13 | 0.00 | CANCELLED |
-
-These are teaching records. A zero amount or CANCELLED status is not automatically invalid; the business contract decides.
-
-## Part A — Design
-
-1. Name source/destination.
-2. Define unique key and required fields/types.
-3. Decide batch boundary and accepted/rejected rules.
-4. Define checkpoint and output schema.
-5. Define reconciliation checks.
-
-## Part B — Happy path
-
-1. Read a small batch.
-2. Count received records.
-3. Validate required fields.
-4. Process accepted records.
-5. Persist/display output.
-6. Verify counts and values.
-
-## Part C — Failure tests
-
-Test missing field, duplicate key and one transient error/malformed payload. Record expected behavior, actual behavior and correction. A happy-path-only script is not reliable yet.
-
-## Part D — Replay
-
-Run input twice; inspect duplicates; interrupt before checkpoint; restart from safe progress; reconcile final target.
-
-## Acceptance checklist
-
-- [ ] Input contract documented.
-- [ ] Small sample reproducible.
-- [ ] Code split into readable stages.
-- [ ] Outputs shown after important steps.
-- [ ] Invalid data has a reason.
-- [ ] Retry behavior bounded.
-- [ ] Rerun behavior safe.
-- [ ] Checkpoint order explained.
-- [ ] Counts and values reconciled.
-- [ ] Limitations and production improvements documented.
-
-# 8. Production thinking
-
-A classroom script runs on small data. Production additionally considers scale/memory, least-privilege security, secret management, concurrency, retries/checkpoints, source load, data contracts, monitoring/alerts/runbooks, schema changes, cost and auditability. A notebook is not production-ready merely because it executes successfully.
-
-# 9. Practice exercises
-
-## Exercise 1 — Explain
-
-Explain Batch to a beginner; give a business example; name a failure; explain detection and recovery.
-
-## Exercise 2 — Trace one record
-
-Trace record 502 from source through validation, processing, destination, checkpoint and verification.
-
-## Exercise 3 — Boundary test
-
-Create records immediately before, exactly at and after the boundary. Explain which are processed and why.
-
-## Exercise 4 — Failure test
-
-Interrupt after output persistence but before checkpoint. Restart and explain idempotency and duplicate checks.
-
-## Exercise 5 — Quality test
-
-Make one field invalid, one key duplicated and one record late. Decide action from contract and justify.
-
-## Exercise 6 — Interview practice
-
-Answer aloud: problem solved; end-to-end flow; failure behavior; completeness proof; production improvements.
-
-# 10. Day 36 revision sheet
-
-**Flow:** Define contract -> Read bounded input -> Validate -> Process -> Persist -> Verify -> Checkpoint -> Observe
-
-Never skip: unique record identity; what success guarantees; replay behavior; invalid versus transient error; evidence of destination correctness.
-
-## One-minute project defence
-
-“My Partitioned Batch Processor receives data from a defined source. It validates the contract and identity, processes controlled units, handles invalid/transient cases explicitly, persists safely, records progress after durable success and reconciles counts/values. I can rerun it safely and diagnose failures from run metadata. Before production I would add automated tests, secret management, monitoring, access controls and scale testing.”
-
-## Self-assessment
-
-- [ ] I can define terms without memorizing.
-- [ ] I can explain code and output.
-- [ ] I can trace a record end-to-end.
-- [ ] I can reproduce/debug a failure.
-- [ ] I can explain checkpoint ordering and replay.
-- [ ] I can prove correctness with checks.
-- [ ] I can defend the project.
-
-**Complete the day when you can explain, run, interpret, test failure and prove the result—not merely read the notes.**
-
-
-# 11. Mentor-led deep dive — Batch/partition
-
-Read each scenario slowly. Identify input, risk, control and proof.
-
-## 11.1 Raw/curated distinction
-
-Batch thought experiment: 1,000,000 rows / 10,000 per batch = 100 batches. Smaller reduces memory/retry cost but increases overhead; tune measured throughput.
-
-**Student checkpoint:** Explain this in your own words and name a test that proves it.
-
-## 11.2 Walkthrough
-
-Date layout year=2026/month=11/day=11 enables day pruning. Month query may read all days; design for common query filters.
-
-**Student checkpoint:** Explain this in your own words and name a test that proves it.
-
-## 11.3 Normalization policy
-
-Columnar stores values by column; analytics selecting amount/date may read fewer columns and compress similar values efficiently.
-
-**Student checkpoint:** Explain this in your own words and name a test that proves it.
-
-## 11.4 Mapping design
-
-Pruning: filter event_date=2026-11-11; engine can skip other folders if layout/metadata supports it. Confirm with plan/scan metrics.
-
-**Student checkpoint:** Explain this in your own words and name a test that proves it.
-
-## 11.5 Worked business example
-
-Small files: thousands of 5KB files incur listing/open/metadata tasks. Compact within partition; avoid one oversized file.
-
-**Student checkpoint:** Explain this in your own words and name a test that proves it.
-
-## 11.6 Filter semantics
-
-Skew: one partition has 90% rows and delays job. Inspect distribution; repartition/salt carefully because it changes aggregation/layout.
-
-**Student checkpoint:** Explain this in your own words and name a test that proves it.
-
-## 11.7 Aggregation grain
-
-Late data for yesterday arrives today. Reprocess affected partition or define correction policy; date partition is not automatically immutable.
-
-**Student checkpoint:** Explain this in your own words and name a test that proves it.
-
-## 11.8 Transformation order
-
-Partition correctness needs stable date derivation, timezone, null/invalid date policy and idempotent overwrite/append; verify count and min/max event time.
-
-**Student checkpoint:** Explain this in your own words and name a test that proves it.
-
-# 12. Guided lab checkpoints
-
-## Lab checkpoint 1
-
-- Predict the result before running.
-- Execute this stage on a small input.
-- Record output, count and error (if any).
-- Explain which input/rule caused the result.
-- Compare actual result with contract and expected output.
-- Reproduce a failure with the smallest input and fix its cause.
-
-## Lab checkpoint 2
-
-- Predict the result before running.
-- Execute this stage on a small input.
-- Record output, count and error (if any).
-- Explain which input/rule caused the result.
-- Compare actual result with contract and expected output.
-- Reproduce a failure with the smallest input and fix its cause.
-
-## Lab checkpoint 3
-
-- Predict the result before running.
-- Execute this stage on a small input.
-- Record output, count and error (if any).
-- Explain which input/rule caused the result.
-- Compare actual result with contract and expected output.
-- Reproduce a failure with the smallest input and fix its cause.
-
-## Lab checkpoint 4
-
-- Predict the result before running.
-- Execute this stage on a small input.
-- Record output, count and error (if any).
-- Explain which input/rule caused the result.
-- Compare actual result with contract and expected output.
-- Reproduce a failure with the smallest input and fix its cause.
-
-## Lab checkpoint 5
-
-- Predict the result before running.
-- Execute this stage on a small input.
-- Record output, count and error (if any).
-- Explain which input/rule caused the result.
-- Compare actual result with contract and expected output.
-- Reproduce a failure with the smallest input and fix its cause.
-
-## Lab checkpoint 6
-
-- Predict the result before running.
-- Execute this stage on a small input.
-- Record output, count and error (if any).
-- Explain which input/rule caused the result.
-- Compare actual result with contract and expected output.
-- Reproduce a failure with the smallest input and fix its cause.
-
-## Lab checkpoint 7
-
-- Predict the result before running.
-- Execute this stage on a small input.
-- Record output, count and error (if any).
-- Explain which input/rule caused the result.
-- Compare actual result with contract and expected output.
-- Reproduce a failure with the smallest input and fix its cause.
-
-## Lab checkpoint 8
-
-- Predict the result before running.
-- Execute this stage on a small input.
-- Record output, count and error (if any).
-- Explain which input/rule caused the result.
-- Compare actual result with contract and expected output.
-- Reproduce a failure with the smallest input and fix its cause.
-
-
-# 13. Instructor review rubric
-
-| Skill | Beginner evidence |
-|---|---|
-| Concept | Explains what/why plainly |
-| Code | Reads/explains lines, not blindly copies |
-| Output | Derives output from input/rule |
-| Quality | Identifies invalid, duplicate and boundary cases |
-| Reliability | Explains retry, replay and checkpoint |
-| Verification | Uses counts/keys/totals/quality checks |
-| Interview | Gives decision, reason, failure mode and proof |
-
-
-
-# 14. Additional worked lab cells — Batch partitioning
-
-Each cell is a separate experiment. Students should predict, execute, record output and explain the business meaning.
-
-## Lab cell 1
-
-Rows-per-batch exercise: 25 records, batch size 10 => batches 10,10,5. Explain final partial batch; never drop it because it is smaller.
-
-**Write in your notebook:** input; expected output; actual output; why it happened; validation evidence; what you would do if it failed.
-
-## Lab cell 2
-
-Memory thought experiment: 1 KB average row × 1 million ≈ 1 GB raw payload plus Python object overhead. Bounded batches reduce peak memory.
-
-**Write in your notebook:** input; expected output; actual output; why it happened; validation evidence; what you would do if it failed.
-
-## Lab cell 3
-
-Partition by event date: derive date in documented timezone; show one record near midnight and compare UTC versus local date.
-
-**Write in your notebook:** input; expected output; actual output; why it happened; validation evidence; what you would do if it failed.
-
-## Lab cell 4
-
-Pruning exercise: list three date folders; query one date; identify folders that can be skipped. Then query month and explain more folders scanned.
-
-**Write in your notebook:** input; expected output; actual output; why it happened; validation evidence; what you would do if it failed.
-
-## Lab cell 5
-
-Small-file exercise: 1000 files × 10 KB = 10 MB data but 1000 file opens. Compaction reduces file count while preserving rows/schema.
-
-**Write in your notebook:** input; expected output; actual output; why it happened; validation evidence; what you would do if it failed.
-
-## Lab cell 6
-
-Skew exercise: partition counts 100,100,100,900. Average hides imbalance; inspect max/median and explain straggler.
-
-**Write in your notebook:** input; expected output; actual output; why it happened; validation evidence; what you would do if it failed.
-
-## Lab cell 7
-
-Late data correction: append record with yesterday event_date today; reprocess that partition and make output idempotent; record correction run.
-
-**Write in your notebook:** input; expected output; actual output; why it happened; validation evidence; what you would do if it failed.
-
-## Lab cell 8
-
-Validation: total output rows equals sum partition rows; min/max event date per partition; no record in wrong date folder; no duplicate event key.
-
-**Write in your notebook:** input; expected output; actual output; why it happened; validation evidence; what you would do if it failed.
-
-# 15. Lab completion evidence
-
-| Evidence | Student submission |
-|---|---|
-| Input contract | Fields, types, keys, source behavior |
-| Happy-path run | Input and output counts |
-| Invalid case | Error/reject reason and handling |
-| Replay | Proof no duplicate side effect |
-| Boundary case | Proof no gap or unintended overlap |
-| Recovery | Last safe point and restart procedure |
-| Reconciliation | Counts, keys, totals or quality checks |
-| Project defence | Explain decision, risk, control and proof |
-
+| One batch equals one partition | Processing unit and storage layout are different concepts | Explain both independently |
+| Partition by unique ID | Creates too many tiny partitions | Select query-aligned, bounded-cardinality key |
+| Assume folder layout guarantees pruning | Engine/catalog may not recognize it | Verify scan plan/metrics |
+| Use huge batches without measurement | Memory and retry risk | Tune with observed workload |
+| Create one tiny file per batch | Small-file overhead | Compact files where appropriate |
+| Ignore skew | One partition can dominate runtime | Profile key distribution |
+| Mark success after one partition | Other partitions may fail | Track all partition statuses and reconcile |
+| Retry a partition with append blindly | Duplicates may appear | Idempotent overwrite/merge or stable keys |
+
+## 16. Debugging questions
+
+**Only one date appears in output:** inspect date parsing, filter values, partition paths and whether all groups were written.
+
+**Parquet read fails:** check pyarrow installation, path, file existence, permissions and schema.
+
+**Output count is smaller:** compare source count, per-partition counts, accepted/rejected and write results.
+
+**Pipeline is slow despite partitioning:** inspect whether filters enable pruning, number/size of files, skew, selected columns and execution plan. Partitioning is not magic acceleration.
+
+## 17. Production considerations
+
+- Partition layout should follow query patterns and data volume.
+- Store partition metadata/catalog and schema version.
+- Make writes idempotent; define overwrite/merge behavior per partition.
+- Track each partition's status; publish only when required partitions succeed.
+- Avoid high-cardinality partition keys.
+- Compact small files and monitor file counts.
+- Handle late-arriving data by reprocessing affected date partitions safely.
+- Keep raw and curated layers separate.
+- Secure data and avoid sensitive partition keys in public paths.
+- Use execution metrics to prove pruning and performance.
+
+## 18. Revision checklist
+
+- [ ] Explain batch processing and streaming difference.
+- [ ] Process a list in batches and explain the last smaller batch.
+- [ ] Read CSV with chunksize.
+- [ ] Explain partition vs batch.
+- [ ] Create date groups.
+- [ ] Write/read Parquet partition.
+- [ ] Explain pruning and its conditions.
+- [ ] Identify small-file and skew risks.
+- [ ] Reconcile batch/partition counts.
+
+## 19. What comes next?
+
+Day 37 — **Incremental Loading and Upserts**. We will compare full and incremental loads, understand watermarks and checkpoints, simulate inserts/updates, and safely apply upserts without duplicating records.
