@@ -11,7 +11,7 @@ The course is being rebuilt phase by phase to one consistent beginner-first teac
 | Phase 1 — Data Engineering Foundations | 1–5 | Complete | 5/5 days rebuilt and verified |
 | Phase 2 — Python for Data Engineering | 6–18 | Complete | 13/13 days rebuilt and verified |
 | Phase 3 — SQL and Database Engineering | 19–29 | Rebuilt; final technical review | 9/11 days rebuilt and verified; Days 19–20 retained for cross-check |
-| Phase 4 — Data Processing and Pipelines | 30–39 | Pending | 0/10 days verified |
+| Phase 4 — Data Processing and Pipelines | 30–39 | **Rebuild required** | Existing drafts are not student-ready; re-authoring from teaching standard |
 | Phase 5 — Data Warehousing and Modeling | 40–49 | Pending | 0/10 days verified |
 | Phase 6 — Cloud and Distributed Processing | 50–59 | Pending | 0/10 days verified |
 | Phase 7 — Orchestration, Quality and Monitoring | 60–67 | Pending | 0/8 days verified |
