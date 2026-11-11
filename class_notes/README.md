@@ -195,6 +195,14 @@ The course is being rebuilt phase by phase to one consistent beginner-first teac
 
 **Status:** Rebuilt under independent-learning standard. Execute with TechStore schema and verify driver/cursor behavior in the learner environment.
 
+## Day 35 — Data Cleaning and Schema Evolution (rebuild artifacts)
+
+- [Day 35 Class Notes](day_35_notes.md) — profiling, nulls, duplicates, safe conversions, schema drift/evolution and accepted/rejected reconciliation.
+- [Day 35 Project Workbook](day_35_project_workbook.md) — step-by-step cleaning lab, multi-reason quarantine, schema drift drill, assertions and submission evidence.
+- [Day 35 Interview Guide](day_35_interview.md) — complete model answers, production scenarios and project explanation.
+
+**Status:** Rebuilt as a beginner-first draft. Expected results are reasoned from the documented fixture; run the notebook in the supported TechPhile environment before claiming runtime verification.
+
 ## Day 34 — Data Transformation and Business Rules (rebuild artifacts)
 
 - [Day 34 Class Notebook](day_34_notes.md) — 547 lines; raw/curated, profiling, parsing, Decimal, mapping, derived values, cross-field rules and reconciliation.
