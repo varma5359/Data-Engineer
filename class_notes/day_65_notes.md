@@ -255,3 +255,16 @@ DAG write access is sensitive because DAG code can execute with permissions avai
 - [ ] Review logs and Git for secret exposure.
 
 **Next lesson — Day 66: Docker for Data Engineering.** You will package an ETL application into a container and understand images, containers, Dockerfiles, volumes, environment variables and Docker Compose.
+
+---
+
+## Visual Learning Diagrams
+
+### Authentication vs authorization
+![Day 65 - Authentication vs authorization](images/day_65_authentication_authorization.svg)
+
+### Safe secret management
+![Day 65 - Safe secret management](images/day_65_secret_management.svg)
+
+### Least privilege access
+![Day 65 - Least privilege access](images/day_65_least_privilege.svg)
