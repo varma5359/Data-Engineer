@@ -1291,7 +1291,7 @@ Expected results:
 | city | total_amount | row_count | average_amount |
 |---|---:|---:|---:|
 | Bengaluru | 875.25 | 2 | 437.625 |
-| Chennai | 1298.00 | 3 | 433.00 |
+| Chennai | 1299.00 | 3 | 433.00 |
 | Hyderabad | 350.00 | 3 | 116.6667 |
 
 These totals include PAID, PENDING and CANCELLED records because this cell groups all source rows. That is intentional: the next cell applies a business eligibility rule.
@@ -1318,7 +1318,7 @@ Expected results:
 | city | paid_sales | paid_order_count |
 |---|---:|---:|
 | Bengaluru | 875.25 | 2 |
-| Chennai | 1298.00 | 3 |
+| Chennai | 1299.00 | 3 |
 | Hyderabad | 250.00 | 1 |
 
 Hyderabad has only one paid order. Its pending order and cancelled order are excluded.
@@ -1372,7 +1372,7 @@ source_paid_total.show()
 curated_paid_total.show()
 ~~~
 
-Expected source and curated totals are both 2423.25.
+Expected source and curated totals are both 2424.25.
 
 Arithmetic:
 - 250.00 + 499.50 + 750.25 + 300.00 + 125.00 + 499.50 = 2424.25.
