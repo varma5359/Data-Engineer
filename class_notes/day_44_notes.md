@@ -634,3 +634,16 @@ Why should refunds be modeled carefully?
 - [ ] Document mart ownership and refresh expectations.
 
 **Next lesson — Day 45: Data Quality and Validation.** We will build checks for accuracy, completeness, consistency, uniqueness, validity and freshness, then learn how to stop bad warehouse data from reaching reports.
+
+---
+
+## Visual Learning Diagrams
+
+### Warehouse SQL layers
+![Day 44 - Warehouse SQL layers](images/day_44_warehouse_sql_layers.svg)
+
+### Dimension key lookup
+![Day 44 - Dimension key lookup](images/day_44_surrogate_key_lookup.svg)
+
+### Data mart delivery
+![Day 44 - Data mart delivery](images/day_44_data_mart_flow.svg)
