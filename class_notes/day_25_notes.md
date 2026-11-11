@@ -57,6 +57,8 @@ Important:
 
 ## 3. What is a database index?
 
+![How a database index works](images/day_25_index_lookup.svg)
+
 An index is a data structure maintained by the database to help find rows efficiently.
 
 Example business query:
@@ -228,6 +230,8 @@ Run EXPLAIN again and compare the plan. The result may still differ by environme
 
 ## 7. Understand common index types
 
+![B-tree index search](images/day_25_btree_index.svg)
+
 ### 7.1 B-tree index
 
 B-tree is the common default index type in PostgreSQL. It supports equality comparisons and range comparisons, and can support ordered retrieval.
@@ -252,6 +256,8 @@ PostgreSQL also supports specialized index types such as GiST, SP-GiST, GIN and 
 ---
 
 ## 8. Composite index: index more than one column
+
+![Composite index column order](images/day_25_composite_index.svg)
 
 A composite index contains multiple columns.
 
@@ -323,6 +329,8 @@ Do not assume the terms mean exactly the same implementation across PostgreSQL, 
 ---
 
 ## 11. EXPLAIN: read the execution plan
+
+![Read an EXPLAIN query plan](images/day_25_explain_plan.svg)
 
 EXPLAIN shows the plan the optimizer expects to use.
 
@@ -476,6 +484,8 @@ Do not add expression indexes without a measured need. They consume space and ad
 ---
 
 ## 16. Index costs and trade-offs
+
+![Database index benefits and costs](images/day_25_index_tradeoffs.svg)
 
 Indexes are not free.
 

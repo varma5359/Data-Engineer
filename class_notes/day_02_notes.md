@@ -316,6 +316,8 @@ A small company may begin with one database. As workloads grow, separating opera
 
 ## 5. OLTP vs OLAP — understand the difference properly
 
+![OLTP vs OLAP comparison](images/day_02_oltp_vs_olap.svg)
+
 ### 5.1 Business purpose
 
 - OLTP helps the business perform its daily operations.
@@ -783,6 +785,8 @@ These are introductory concepts. You will study Kafka in greater detail later in
 
 ## 9. Batch vs streaming — compare using business requirements
 
+![Batch processing versus streaming](images/day_02_batch_vs_streaming.svg)
+
 ### 9.1 Main comparison
 
 | Dimension | Batch | Streaming |
@@ -1047,6 +1051,8 @@ Do not put unnecessary sensitive information into every event. Include only the 
 ---
 
 ## 12. Delivery guarantees — why duplicates happen
+
+![Event delivery and duplicate prevention](images/day_02_event_delivery.svg)
 
 ### 12.1 Why is delivery not always simple?
 

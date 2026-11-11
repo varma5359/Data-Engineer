@@ -384,6 +384,8 @@ Do not silently delete rejected records in a real pipeline. Record why they were
 
 ### 5.4 ETL architecture diagram
 
+![Conventional ETL architecture](images/day_04_etl_architecture.svg)
+
 ```text
 Order Database
       |
@@ -602,6 +604,8 @@ ELT may be a good fit when:
 ---
 
 ## 7. ETL versus ELT — understand the difference
+
+![ETL versus ELT](images/day_04_etl_vs_elt.svg)
 
 ### 7.1 Comparison table
 
@@ -900,6 +904,8 @@ This is not an absolute rule: architecture depends on scale, workload and platfo
 ---
 
 ## 10. Lakehouse — combining lake and warehouse ideas
+
+![Data lake, data warehouse and lakehouse](images/day_04_lake_warehouse_lakehouse.svg)
 
 ### 10.1 What is a lakehouse?
 

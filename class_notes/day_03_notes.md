@@ -40,6 +40,8 @@ By the end of this lesson, you should be able to:
 
 ## 2. First understand what a data source is
 
+![Data source to destination flow](images/day_03_data_source_to_destination.svg)
+
 ### 2.1 Beginner definition
 
 A **data source** is the original system, application, device, service or file location from which data is obtained.
@@ -106,6 +108,8 @@ You may build a pipeline that runs but produces incorrect data.
 ---
 
 ## 3. Understand the basic structure of data
+
+![Anatomy of a data table](images/day_03_data_table_anatomy.svg)
 
 Before learning file formats, understand the words used to describe data.
 
@@ -208,6 +212,8 @@ An identifier is used to identify something; it is not necessarily used for arit
 ---
 
 ## 4. Three broad categories of data
+
+![Structured, semi-structured and unstructured data](images/day_03_structured_semi_unstructured_data.svg)
 
 Data is often described as structured, semi-structured or unstructured.
 

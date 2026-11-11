@@ -96,6 +96,8 @@ The exact path depends on your computer.
 
 ## 7. Understand git status
 
+![Everyday Git workflow](images/day_18_git_workflow.svg)
+
 ```bash
 git status
 ```
@@ -233,6 +235,8 @@ The new commit records the update. The previous commit remains in history.
 
 ## 14. Create a feature branch
 
+![Git branch and merge concept](images/day_18_git_branch_merge.svg)
+
 A branch lets you work on a change without immediately changing the main branch.
 
 ```bash
@@ -306,6 +310,8 @@ git log --oneline --all
 ```
 
 ## 17. Understand a merge conflict
+
+![Resolving a Git merge conflict](images/day_18_git_conflict_resolution.svg)
 
 A merge conflict happens when Git cannot automatically combine competing edits.
 

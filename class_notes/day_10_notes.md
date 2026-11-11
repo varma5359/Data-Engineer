@@ -44,6 +44,10 @@ A syntax error prevents Python from understanding the program. An exception happ
 
 ## 4. Read a traceback
 
+![How to read a Python traceback](images/day_10_traceback_anatomy.svg)
+
+![Exception handling flow](images/day_10_exception_handling_flow.svg)
+
 Run this deliberately failing example:
 
 ```python
@@ -262,6 +266,8 @@ Calculation failed: division by zero
 ```
 
 ## 13. Logging fundamentals
+
+![Python logging levels](images/day_10_logging_levels.svg)
 
 Logging records events while a program runs. It is more useful than scattered print statements for repeatable applications.
 

@@ -48,6 +48,8 @@ SQLite is excellent for this lesson's local exercises. Production teams may use 
 
 ## 5. Connect to a local SQLite database
 
+![Python database connection lifecycle](images/day_13_python_database_connection.svg)
+
 ```python
 import sqlite3
 
@@ -257,6 +259,8 @@ The comma in `("PAID",)` makes it a one-item tuple. The query returns only paid 
 
 ## 13. Why parameterized SQL matters
 
+![Parameterized SQL and transactions](images/day_13_parameterized_sql_transaction.svg)
+
 Never build SQL by inserting untrusted values into the query string.
 
 **Unsafe pattern — do not use:**
@@ -290,6 +294,8 @@ print(cursor.fetchall())
 The database driver binds the value separately. Placeholder syntax differs by driver: SQLite uses `?`; other drivers may use `%s` or named placeholders. Follow the selected driver's documentation.
 
 ## 14. Insert, update and delete (CRUD)
+
+![Database CRUD operations](images/day_13_database_crud_flow.svg)
 
 CRUD means Create, Read, Update and Delete.
 

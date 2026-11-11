@@ -40,6 +40,8 @@ Successful parsing does not prove the schema is correct. A correct schema does n
 
 ## 4. Define a sample data contract
 
+![Data contract validation](images/day_16_data_contract_validation.svg)
+
 A data contract documents what the producer promises and what the consumer expects.
 
 | Field | Expected type | Required | Rule |
@@ -480,6 +482,8 @@ The order of dictionary output follows the order in which reasons were first enc
 
 ## 16. Save accepted and rejected records
 
+![Accepted and rejected records flow](images/day_16_accepted_rejected_records.svg)
+
 ```python
 import json
 
@@ -527,6 +531,8 @@ Unexpected: {'source_file'}
 A missing required column may be a breaking schema change. An unexpected column may be harmless or may indicate an upstream change that needs review.
 
 ## 18. Data quality dimensions
+
+![Data quality dimensions](images/day_16_data_quality_dimensions.svg)
 
 | Dimension | Meaning | Example |
 |---|---|---|

@@ -68,6 +68,8 @@ Store each fact in the table that represents the entity it describes.
 
 ## 3. Three data anomalies
 
+![Three data anomalies explained](images/day_26_normalization_anomalies.svg)
+
 Poorly organized tables can create anomalies.
 
 ### 3.1 Update anomaly
@@ -301,6 +303,8 @@ Normalization does not mean information is lost. It means facts are stored in th
 
 ## 9. Compare 1NF, 2NF and 3NF
 
+![1NF, 2NF and 3NF comparison](images/day_26_1nf_2nf_3nf.svg)
+
 | Normal form | Main beginner rule | Problem addressed |
 |---|---|---|
 | 1NF | One value per cell; no repeating groups | Multi-valued cells |
@@ -315,6 +319,8 @@ A table cannot satisfy 3NF if it has not first satisfied the earlier normal form
 ---
 
 ## 10. Build a normalized TechStore model
+
+![Build normalized relational tables](images/day_26_normalized_tables.svg)
 
 We will use these tables:
 
@@ -519,6 +525,8 @@ The data is not lost by normalization. The query reconstructs the required view 
 ---
 
 ## 14. Normalization versus denormalization
+
+![Normalization versus denormalization](images/day_26_normalize_denormalize.svg)
 
 Normalization reduces unnecessary duplication in operational systems. But analytical systems may intentionally store pre-joined or repeated values to make reporting simpler or faster.
 

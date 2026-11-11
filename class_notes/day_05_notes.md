@@ -152,6 +152,8 @@ Common examples:
 
 ## 4. What is a pipeline lifecycle?
 
+![Data pipeline lifecycle](images/day_05_data_pipeline_lifecycle.svg)
+
 A lifecycle is the sequence of stages through which a pipeline is planned, built, released and operated.
 
 A Data Engineer should not begin by immediately writing code. First, the engineer must understand the business requirement.
@@ -493,6 +495,8 @@ The transformation is simple, but a production pipeline must also define what ha
 
 ## 9. Stage 5 — Test the pipeline
 
+![Pipeline testing layers](images/day_05_pipeline_testing_layers.svg)
+
 Testing checks whether the pipeline behaves as expected.
 
 A pipeline that works for one clean example may fail with real business data.
@@ -751,6 +755,8 @@ A safe design coordinates checkpoint updates with successful destination commits
 **Remember:** A checkpoint is not merely a timestamp written somewhere. It must represent progress that is safe to resume from.
 
 ## 15. Retries
+
+![Pipeline failure and retry flow](images/day_05_pipeline_failure_retry.svg)
 
 A retry means attempting an operation again after a failure.
 

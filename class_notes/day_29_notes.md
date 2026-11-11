@@ -147,6 +147,8 @@ Do not put real passwords into Python source files or commit them to GitHub.
 
 ## 5. Configure database credentials safely
 
+![Python database loader lifecycle](images/day_29_python_db_lifecycle.svg)
+
 For this class, we will use environment variables. A production project may use a secret manager.
 
 Create a file named .env in the project folder:
@@ -339,6 +341,8 @@ The connection context commits when the block completes successfully. If an erro
 ---
 
 ## 9. Insert one record using Python
+
+![Parameterized SQL queries](images/day_29_parameterized_queries.svg)
 
 Create 03_insert_one_record.py:
 
@@ -578,6 +582,8 @@ Expected after the single insert and three-row batch: 4 rows.
 
 ## 12. Understand executemany and bulk loading
 
+![Batch loading workflow](images/day_29_bulk_loading_batches.svg)
+
 executemany executes a parameterized statement for multiple parameter sets. It is convenient for a beginner batch insert.
 
 For very large loads, Psycopg and PostgreSQL support more efficient approaches such as COPY. The right method depends on volume, validation needs and database environment.
@@ -712,6 +718,8 @@ Always use a suitable WHERE clause. An UPDATE without WHERE can modify every row
 
 ## 15. Build a repeatable, idempotent loader
 
+![Idempotent database loader](images/day_29_idempotent_loader.svg)
+
 A pipeline may be retried after a network failure. If it inserts the same records again, primary-key errors or duplicate data can occur.
 
 Idempotency means running the same logical operation more than once produces the same intended final state, rather than applying the effect repeatedly.
@@ -808,6 +816,8 @@ Each batch can be validated and inserted separately. If the project requires eac
 ---
 
 ## 17. Handle common errors
+
+![Database error handling and cleanup](images/day_29_error_handling_cleanup.svg)
 
 ### 17.1 Connection refused
 

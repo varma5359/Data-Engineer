@@ -45,6 +45,8 @@ By the end, you can:
 
 ## 2. Database object overview
 
+![Database objects overview](images/day_27_database_objects_map.svg)
+
 | Object | Simple meaning | Example use |
 |---|---|---|
 | Table | Stores rows and columns | customers |
@@ -189,6 +191,8 @@ A normal PostgreSQL view stores the query definition. It does not materialize a 
 ---
 
 ## 5. Materialized views: store a query result
+
+![View versus materialized view](images/day_27_view_materialized_view.svg)
 
 A materialized view stores the result of its defining query physically. It can make repeated analytical reads faster, but the stored result becomes stale until refreshed.
 
@@ -385,6 +389,8 @@ PostgreSQL procedures can have transaction-control capabilities in specific CALL
 
 ## 8. Function versus procedure
 
+![Function versus procedure](images/day_27_function_procedure.svg)
+
 | Function | Procedure |
 |---|---|
 | Invoked in expressions with SELECT in common use | Invoked with CALL |
@@ -398,6 +404,8 @@ Exact features differ across PostgreSQL, MySQL and other database products. Lear
 ---
 
 ## 9. Triggers: automatically respond to table events
+
+![Trigger audit flow](images/day_27_trigger_audit.svg)
 
 A trigger is database logic that automatically runs when a specified event happens on a table or view.
 

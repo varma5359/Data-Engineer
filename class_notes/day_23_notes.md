@@ -72,6 +72,8 @@ For a useful ranking demonstration, these are the values we will analyze.
 
 ## 3. First understand GROUP BY versus window functions
 
+![GROUP BY versus window functions](images/day_23_groupby_vs_window.svg)
+
 ### 3.1 GROUP BY reduces rows
 
 ```sql
@@ -118,6 +120,8 @@ Notice all three order rows remain visible. The count is calculated across each 
 ---
 
 ## 4. Understand the OVER clause
+
+![Understand the SQL OVER clause](images/day_23_over_clause.svg)
 
 A window function is followed by OVER(...).
 
@@ -351,6 +355,8 @@ D receives rank 3 because DENSE_RANK counts distinct ranking values without gaps
 
 ## 8. Compare ROW_NUMBER, RANK and DENSE_RANK
 
+![Compare SQL ranking functions](images/day_23_ranking_functions.svg)
+
 Use exactly the same sample:
 
 | Product | Sales |
@@ -434,6 +440,8 @@ Use this only when the business requirement needs that grouping.
 ---
 
 ## 10. LAG: read a value from a previous row
+
+![LAG and LEAD window functions](images/day_23_lag_lead.svg)
 
 A manager wants to compare each customer's order date with their previous order date.
 
@@ -646,6 +654,8 @@ Meena is included because the customer summary begins with customers and uses LE
 ---
 
 ## 14. Top N records per group
+
+![Top N records per group](images/day_23_top_n_per_group.svg)
 
 Business question: Show the latest order for every customer.
 

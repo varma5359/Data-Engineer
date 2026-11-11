@@ -34,6 +34,8 @@ A function is not automatically better for every two-line calculation. Use one w
 
 ## 3. Define and call a function
 
+![How a Python function works](images/day_07_function_execution_flow.svg)
+
 ```python
 def calculate_line_amount(quantity, unit_price):
     line_amount = quantity * unit_price
@@ -144,6 +146,8 @@ Expected output:
 For real tax processing, rates must come from the applicable business rules and jurisdiction; the example values are only for learning.
 
 ## 8. Return versus print
+
+![Python return versus print](images/day_07_return_vs_print.svg)
 
 `print()` displays a value. `return` gives a value back to the caller so another step can use it.
 
@@ -316,6 +320,8 @@ Expected output:
 The example uses an explicit date so the output is stable when students rerun the notebook.
 
 ## 14. Create your own module
+
+![Python modules and imports](images/day_07_python_modules_imports.svg)
 
 Create a project folder:
 

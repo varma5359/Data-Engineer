@@ -74,6 +74,8 @@ print(orders)
 
 ## 5. Inspect a DataFrame
 
+![Pandas DataFrame workflow](images/day_14_dataframe_workflow.svg)
+
 ### 5.1 First and last rows
 
 ```python
@@ -262,6 +264,8 @@ print(orders[["order_id", "amount", "order_size"]])
 
 ## 10. Handle missing values
 
+![Pandas missing and duplicate data cleaning](images/day_14_pandas_missing_duplicates.svg)
+
 Missing values require a business decision. Do not fill every missing value with zero automatically.
 
 ### 10.1 Identify missing records
@@ -342,6 +346,8 @@ Duplicate rows: 1
 Use `subset=["order_id"]` when order_id is the defined business key. Do not remove duplicates without deciding which record should survive when duplicate keys contain different values.
 
 ## 12. Group and aggregate
+
+![Pandas GroupBy and merge](images/day_14_pandas_groupby_merge.svg)
 
 ### 12.1 Revenue by city
 

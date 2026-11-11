@@ -11,10 +11,10 @@ The course is being rebuilt phase by phase to one consistent beginner-first teac
 | Phase 1 — Data Engineering Foundations | 1–5 | Complete | 5/5 days rebuilt and verified |
 | Phase 2 — Python for Data Engineering | 6–18 | Complete | 13/13 days rebuilt and verified |
 | Phase 3 — SQL and Database Engineering | 19–29 | Rebuilt; final technical review | 9/11 days rebuilt and verified; Days 19–20 retained for cross-check |
-| Phase 4 — Data Processing and Pipelines | 30–39 | Pending | 0/10 days verified |
-| Phase 5 — Data Warehousing and Modeling | 40–49 | Pending | 0/10 days verified |
-| Phase 6 — Cloud and Distributed Processing | 50–59 | Pending | 0/10 days verified |
-| Phase 7 — Orchestration, Quality and Monitoring | 60–67 | Pending | 0/8 days verified |
+| Phase 4 — Data Processing and Pipelines | 30–39 | Rebuilt draft; execution review pending | Days 30–39 have class notes, project workbooks and interview guides; verify examples in the learner environment before classroom-verified status |
+| Phase 5 — Data Warehousing and Modeling | 40–49 | Authored; runtime validation pending | 10/10 lesson sets prepared |
+| Phase 6 — Cloud and Distributed Processing | 50–59 | Authored; runtime validation pending | 10/10 lesson sets prepared |
+| Phase 7 — Orchestration, Quality and Monitoring | 60–67 | Authored; runtime validation pending | 8/8 lesson sets prepared |
 | Phase 8 — Data Engineering Capstone | 68–75 | Pending | 0/8 days verified |
 
 
@@ -142,3 +142,177 @@ The course is being rebuilt phase by phase to one consistent beginner-first teac
 - Phase 8: Data Engineering Capstone (Days 68–75)
 
 **Learning format:** beginner-friendly explanations, practical code examples, expected outputs, operational considerations and a separate interview-preparation file for every day.
+## Phase 4 — Data Processing and Pipelines (Days 30–39)
+
+| Day | Syllabus topic | Mini-project | Class notes | Project workbook | Interview |
+|---|---|---|---|---|---|
+| 30 | ETL and Data Extraction Patterns | Incremental Extraction Pipeline | [Notes](day_30_notes.md) | [Workbook](day_30_project_workbook.md) | [Interview](day_30_interview.md) |
+| 31 | File-Based Data Ingestion | Multi-File Ingestion System | [Notes](day_31_notes.md) | [Workbook](day_31_project_workbook.md) | [Interview](day_31_interview.md) |
+| 32 | API-Based Data Ingestion | API Ingestion Pipeline | [Notes](day_32_notes.md) | [Workbook](day_32_project_workbook.md) | [Interview](day_32_interview.md) |
+| 33 | Database Ingestion | Database Extractor | [Notes](day_33_notes.md) | [Workbook](day_33_project_workbook.md) | [Interview](day_33_interview.md) |
+| 34 | Data Transformation and Business Rules | Transformation Pipeline | [Notes](day_34_notes.md) | [Workbook](day_34_project_workbook.md) | [Interview](day_34_interview.md) |
+| 35 | Data Cleaning and Schema Evolution | Data Cleaning Framework | [Notes](day_35_notes.md) | [Workbook](day_35_project_workbook.md) | [Interview](day_35_interview.md) |
+| 36 | Batch Processing and Partitioning | Partitioned Batch Processor | [Notes](day_36_notes.md) | [Workbook](day_36_project_workbook.md) | [Interview](day_36_interview.md) |
+| 37 | Incremental Loading and Upserts | Incremental Data Loader | [Notes](day_37_notes.md) | [Workbook](day_37_project_workbook.md) | [Interview](day_37_interview.md) |
+| 38 | Pipeline Reliability and Failure Handling | Reliable Pipeline Simulator | [Notes](day_38_notes.md) | [Workbook](day_38_project_workbook.md) | [Interview](day_38_interview.md) |
+| 39 | Pipeline Logging and Observability | Pipeline Observability Tool | [Notes](day_39_notes.md) | [Workbook](day_39_project_workbook.md) | [Interview](day_39_interview.md) |
+
+**Phase 4 content status:** Days 30–39 include class notes, separate project workbooks and interview guides. Days 35–39 interview guides have been rewritten with complete model answers and scenario reasoning. All ten days have separate class notes, project workbooks and interview guides. Runtime validation in the supported TechPhile environment remains pending.
+
+---
+
+
+
+## Day 30 — ETL and Data Extraction (rebuild artifacts)
+
+- [Day 30 Class Notebook](day_30_notes.md) — 697 lines, beginner lesson with SQL/Python walkthrough, output interpretation, validation and debugging.
+- [Day 30 Project Workbook](day_30_project_workbook.md) — 305 lines, step-by-step project cells, exact expected output shapes, acceptance checks and failure drills.
+- [Day 30 Interview Guide](day_30_interview.md) — complete model answers, follow-ups, project defence and common traps.
+
+**Status:** Day 30 is the first rebuilt lesson under the independent-learning standard. Review against the real TechStore schema and execute all cells before marking fully classroom-verified.
+
+## Day 31 — File-Based Data Ingestion (rebuild artifacts)
+
+- [Day 31 Class Notebook](day_31_notes.md) — 802 lines; CSV/JSON from zero, file discovery, schema and record validation, accept/reject, reconciliation, reruns and debugging.
+- [Day 31 Project Workbook](day_31_project_workbook.md) — 312 lines; input fixture, execution cells, expected results, reconciliation, failure drills and acceptance checklist.
+- [Day 31 Interview Guide](day_31_interview.md) — complete model answers and project defence.
+
+**Status:** Rebuilt under independent-learning standard. Execute cells and test against the student's environment before classroom verification.
+
+## Day 32 — API-Based Data Ingestion (rebuild artifacts)
+
+- [Day 32 Class Notebook](day_32_notes.md) — 643 lines; API fundamentals, request/response, status codes, JSON, parameters, pagination, retries, security and persistence.
+- [Day 32 Project Workbook](day_32_project_workbook.md) — guided execution, mock pagination, expected outputs, failure drills and acceptance criteria.
+- [Day 32 Interview Guide](day_32_interview.md) — full model answers, follow-up prompts and project defence.
+
+**Status:** Rebuilt under independent-learning standard. Live API tests depend on network and provider availability; mock exercises remain executable offline.
+
+## Day 33 — Database Ingestion (rebuild artifacts)
+
+- [Day 33 Class Notebook](day_33_notes.md) — 522 lines; source safety, SQL parameters, fetch methods, batching, streaming, watermark limits, consistency and recovery.
+- [Day 33 Project Workbook](day_33_project_workbook.md) — guided extraction cells, batch output, reconciliation, failure drills and acceptance criteria.
+- [Day 33 Interview Guide](day_33_interview.md) — full model answers, limitations and project defence.
+
+**Status:** Rebuilt under independent-learning standard. Execute with TechStore schema and verify driver/cursor behavior in the learner environment.
+
+## Day 35 — Data Cleaning and Schema Evolution (rebuild artifacts)
+
+- [Day 35 Class Notes](day_35_notes.md) — profiling, nulls, duplicates, safe conversions, schema drift/evolution and accepted/rejected reconciliation.
+- [Day 35 Project Workbook](day_35_project_workbook.md) — step-by-step cleaning lab, multi-reason quarantine, schema drift drill, assertions and submission evidence.
+- [Day 35 Interview Guide](day_35_interview.md) — complete model answers, production scenarios and project explanation.
+
+**Status:** Rebuilt as a beginner-first draft. Expected results are reasoned from the documented fixture; run the notebook in the supported TechPhile environment before claiming runtime verification.
+
+## Day 34 — Data Transformation and Business Rules (rebuild artifacts)
+
+- [Day 34 Class Notebook](day_34_notes.md) — 547 lines; raw/curated, profiling, parsing, Decimal, mapping, derived values, cross-field rules and reconciliation.
+- [Day 34 Project Workbook](day_34_project_workbook.md) — guided transformation fixture, expected outputs, accepted/rejected data and validation.
+- [Day 34 Interview Guide](day_34_interview.md) — complete model answers and project defence.
+
+**Status:** Rebuilt under independent-learning standard. Confirm all business rules with the dataset/owner; examples are explicitly teaching rules.
+
+
+## Phase 4 — Data Processing and Pipelines (Days 30–39)
+
+Each day has a class notebook, a guided project workbook and an interview guide. Complete the artifacts in order and retain your own execution evidence.
+
+| Day | Topic | Class notes | Project workbook | Interview |
+|---|---|---|---|---|
+| 30 | ETL and Data Extraction | [Notes](day_30_notes.md) | [Workbook](day_30_project_workbook.md) | [Guide](day_30_interview.md) |
+| 31 | File-Based Data Ingestion | [Notes](day_31_notes.md) | [Workbook](day_31_project_workbook.md) | [Guide](day_31_interview.md) |
+| 32 | API-Based Data Ingestion | [Notes](day_32_notes.md) | [Workbook](day_32_project_workbook.md) | [Guide](day_32_interview.md) |
+| 33 | Database Ingestion | [Notes](day_33_notes.md) | [Workbook](day_33_project_workbook.md) | [Guide](day_33_interview.md) |
+| 34 | Data Transformation and Business Rules | [Notes](day_34_notes.md) | [Workbook](day_34_project_workbook.md) | [Guide](day_34_interview.md) |
+| 35 | Data Cleaning and Schema Evolution | [Notes](day_35_notes.md) | [Workbook](day_35_project_workbook.md) | [Guide](day_35_interview.md) |
+| 36 | Batch Processing and Partitioning | [Notes](day_36_notes.md) | [Workbook](day_36_project_workbook.md) | [Guide](day_36_interview.md) |
+| 37 | Incremental Loading and Upserts | [Notes](day_37_notes.md) | [Workbook](day_37_project_workbook.md) | [Guide](day_37_interview.md) |
+| 38 | Pipeline Reliability and Failure Handling | [Notes](day_38_notes.md) | [Workbook](day_38_project_workbook.md) | [Guide](day_38_interview.md) |
+| 39 | Pipeline Logging and Observability | [Notes](day_39_notes.md) | [Workbook](day_39_project_workbook.md) | [Guide](day_39_interview.md) |
+
+**Teaching-quality status:** content rebuild and artifact indexing completed for the phase. Runtime validation still belongs to the student environment/CI: execute every workbook, verify installed dependencies, compare outputs, and record environment-specific differences before marking classroom delivery fully validated.
+
+
+## Phase 5 — Data Warehousing and Modeling (Days 40–49)
+
+Each day has separate class notes, a guided project workbook and a complete interview guide. Class notes are written for independent beginner learning. SQL examples use PostgreSQL unless a platform difference is explicitly noted.
+
+| Day | Syllabus topic | Mini-project | Class notes | Project workbook | Interview |
+|---|---|---|---|---|---|
+| 40 | Data Warehouse Architecture | Warehouse Architecture Plan | [Notes](day_40_notes.md) | [Workbook](day_40_project_workbook.md) | [Guide](day_40_interview.md) |
+| 41 | Fact and Dimension Tables | Sales Star Schema | [Notes](day_41_notes.md) | [Workbook](day_41_project_workbook.md) | [Guide](day_41_interview.md) |
+| 42 | Slowly Changing Dimensions | Customer History Model | [Notes](day_42_notes.md) | [Workbook](day_42_project_workbook.md) | [Guide](day_42_interview.md) |
+| 43 | Keys and Data Relationships | Warehouse Key Management | [Notes](day_43_notes.md) | [Workbook](day_43_project_workbook.md) | [Guide](day_43_interview.md) |
+| 44 | Data Marts and Subject-Oriented Modeling | Sales Data Mart | [Notes](day_44_notes.md) | [Workbook](day_44_project_workbook.md) | [Guide](day_44_interview.md) |
+| 45 | Data Quality and Validation | Data Quality Framework | [Notes](day_45_notes.md) | [Workbook](day_45_project_workbook.md) | [Guide](day_45_interview.md) |
+| 46 | Data Reconciliation and Lineage | Source-to-Target Reconciliation | [Notes](day_46_notes.md) | [Workbook](day_46_project_workbook.md) | [Guide](day_46_interview.md) |
+| 47 | Metadata and Data Documentation | Data Dictionary Generator | [Notes](day_47_notes.md) | [Workbook](day_47_project_workbook.md) | [Guide](day_47_interview.md) |
+| 48 | Warehouse Loading Strategies | Warehouse Load Simulator | [Notes](day_48_notes.md) | [Workbook](day_48_project_workbook.md) | [Guide](day_48_interview.md) |
+| 49 | Warehouse Performance Optimization | Warehouse Performance Audit | [Notes](day_49_notes.md) | [Workbook](day_49_project_workbook.md) | [Guide](day_49_interview.md) |
+
+**Phase 5 content status:** All ten lesson sets have been authored for this phase batch. Class notes, project workbooks and interview guides are separate. Runtime execution of SQL examples and environment-specific dbt/warehouse behavior remains to be validated before marking the phase classroom-verified.
+
+**Teaching progression:** architecture -> dimensional model -> historical dimensions -> key management -> subject marts -> quality -> reconciliation and lineage -> metadata -> loading -> performance.
+
+
+## Phase 6 — Cloud and Distributed Processing (Days 50–59)
+
+Each day has separate beginner-first class notes, a guided project workbook and a complete interview guide. Cloud exercises distinguish local simulations from actual AWS deployments. Spark examples use local mode for learning unless a cluster is explicitly configured.
+
+| Day | Approved syllabus topic | Mini-project | Class notes | Project workbook | Interview |
+|---|---|---|---|---|---|
+| 50 | Cloud Data Engineering Fundamentals | Cloud Architecture Design | [Notes](day_50_notes.md) | [Workbook](day_50_project_workbook.md) | [Guide](day_50_interview.md) |
+| 51 | Object Storage and Data Lakes | Cloud Data Lake Layout | [Notes](day_51_notes.md) | [Workbook](day_51_project_workbook.md) | [Guide](day_51_interview.md) |
+| 52 | AWS S3 and Storage Management | Object Storage Organizer | [Notes](day_52_notes.md) | [Workbook](day_52_project_workbook.md) | [Guide](day_52_interview.md) |
+| 53 | Cloud Database Fundamentals | Cloud Database Design | [Notes](day_53_notes.md) | [Workbook](day_53_project_workbook.md) | [Guide](day_53_interview.md) |
+| 54 | Distributed Computing | Parallel Processing Experiment | [Notes](day_54_notes.md) | [Workbook](day_54_project_workbook.md) | [Guide](day_54_interview.md) |
+| 55 | Apache Spark Fundamentals | Spark Data Exploration | [Notes](day_55_notes.md) | [Workbook](day_55_project_workbook.md) | [Guide](day_55_interview.md) |
+| 56 | Spark Transformations and Actions | Spark Transformation Lab | [Notes](day_56_notes.md) | [Workbook](day_56_project_workbook.md) | [Guide](day_56_interview.md) |
+| 57 | Spark Joins and Partitioning | Distributed Sales Analysis | [Notes](day_57_notes.md) | [Workbook](day_57_project_workbook.md) | [Guide](day_57_interview.md) |
+| 58 | Spark Performance Optimization | Spark Performance Experiment | [Notes](day_58_notes.md) | [Workbook](day_58_project_workbook.md) | [Guide](day_58_interview.md) |
+| 59 | Cloud and Distributed Pipeline Integration | Cloud Pipeline Architecture | [Notes](day_59_notes.md) | [Workbook](day_59_project_workbook.md) | [Guide](day_59_interview.md) |
+
+**Phase 6 content status:** All ten lesson sets have been authored for this phase batch. Class notes, project workbooks and interview guides are separate. AWS resource creation, cloud connectivity, Kafka deployment and Spark cluster execution remain environment-specific and have not been claimed as runtime-tested.
+
+**Teaching progression:** cloud foundations and IAM -> object storage and data lakes -> S3 management -> managed databases -> distributed computing -> Spark fundamentals -> transformations/actions -> joins/partitioning -> performance -> integrated batch/streaming architecture.
+
+**Phase 6 completion checklist**
+- [x] Days 50–59 class notes authored.
+- [x] Days 50–59 project workbooks authored separately.
+- [x] Days 50–59 interview guides authored separately.
+- [x] Daily topics and mini-project names checked against career_path.md.
+- [ ] Execute local Python/PySpark examples in the target student environment.
+- [ ] Validate AWS and Kafka examples in an approved cloud/lab environment before claiming deployment readiness.
+
+**Phase 6 content authoring is complete.** Runtime and classroom validation remain to be performed in the target environment.
+
+
+## Phase 7 — Orchestration, Quality and Monitoring (Days 60–67)
+
+Each day has separate beginner-first class notes, a guided project workbook and a complete interview guide. Airflow examples identify the teaching version and distinguish syntax checks from actual Airflow runtime validation. Docker and CI exercises distinguish local examples from verified deployment.
+
+| Day | Approved syllabus topic | Mini-project | Class notes | Project workbook | Interview |
+|---|---|---|---|---|---|
+| 60 | Workflow Orchestration Fundamentals | Workflow DAG Design | [Notes](day_60_notes.md) | [Workbook](day_60_project_workbook.md) | [Guide](day_60_interview.md) |
+| 61 | Airflow DAGs and Tasks | Daily ETL DAG | [Notes](day_61_notes.md) | [Workbook](day_61_project_workbook.md) | [Guide](day_61_interview.md) |
+| 62 | Airflow Scheduling and Reliability | Resilient Workflow | [Notes](day_62_notes.md) | [Workbook](day_62_project_workbook.md) | [Guide](day_62_interview.md) |
+| 63 | Automated Data Quality | Automated Quality Gate | [Notes](day_63_notes.md) | [Workbook](day_63_project_workbook.md) | [Guide](day_63_interview.md) |
+| 64 | Pipeline Monitoring and Alerting | Pipeline Monitoring Dashboard | [Notes](day_64_notes.md) | [Workbook](day_64_project_workbook.md) | [Guide](day_64_interview.md) |
+| 65 | Data Pipeline Security | Secure Data Pipeline | [Notes](day_65_notes.md) | [Workbook](day_65_project_workbook.md) | [Guide](day_65_interview.md) |
+| 66 | Docker for Data Engineering | Containerized ETL Application | [Notes](day_66_notes.md) | [Workbook](day_66_project_workbook.md) | [Guide](day_66_interview.md) |
+| 67 | CI/CD and Automated Pipeline Testing | Data Pipeline CI Workflow | [Notes](day_67_notes.md) | [Workbook](day_67_project_workbook.md) | [Guide](day_67_interview.md) |
+
+**Phase 7 content status:** All eight lesson sets have been authored for this phase batch. Class notes, project workbooks and interview guides are separate. Actual Airflow, Docker and GitHub Actions execution must be completed in the target student environment before claiming classroom/runtime validation.
+
+**Teaching progression:** orchestration concepts -> DAGs and tasks -> scheduling and recovery -> automated data quality -> monitoring and alerts -> security -> Docker -> CI/CD and automated testing.
+
+**Phase 7 completion checklist**
+- [x] Days 60–67 class notes authored.
+- [x] Days 60–67 project workbooks authored separately.
+- [x] Days 60–67 interview guides authored separately.
+- [x] Topics and mini-project names checked against career_path.md.
+- [ ] Execute Airflow DAG examples in the target supported Airflow environment.
+- [ ] Build and run the Docker ETL example.
+- [ ] Run GitHub Actions workflow in a test repository.
+- [ ] Validate the full phase with beginner students.
+
+**Phase 7 content authoring is complete.** Runtime and classroom validation remain to be performed in the target environment.
